@@ -88,7 +88,7 @@ export function makeNature(scene) {
   flowerCols.forEach(col => { const f = new THREE.InstancedMesh(flowerGeo, toonMat(col), 90); let k = 0;
     while (k < 90) { const x = (rnd() - 0.5) * 2 * R, z = (rnd() - 0.5) * 2 * R; if (!onGrassRing(x, z) || Math.hypot(x - POOL.x, z - POOL.z) < PL.rx + 0.8) continue; M.makeTranslation(x, 0.2, z); f.setMatrixAt(k++, M); } g.add(f); });
   // bushes on the rim
-  for (let i = 0; i < 26; i++) { const a = rnd() * 6.28, r = R - 1.0 + rnd() * 0.5; const x = Math.cos(a) * r, z = Math.sin(a) * r; if (Math.abs(x - POOL.x) < 2.2 && z > 0) continue;
+  for (let i = 0; i < 26; i++) { const a = rnd() * 6.28, r = R - 1.0 + rnd() * 0.5; const x = Math.cos(a) * r, z = Math.sin(a) * r; if (Math.abs(x - POOL.x) < 2.2 && z > 0) continue; if (Math.abs(x - 2) < 2.4 && z > 12) continue; // bridge mouth
     const b = toonMesh(new THREE.SphereGeometry(0.5 + rnd() * 0.4, 7, 5), rnd() > 0.5 ? 0x6cc45a : 0x57ad4b); b.position.set(x, 0.1, z); b.scale.y = 0.8; g.add(b); }
   // hanging vines over the cliff edge
   const vineGeo = new THREE.BoxGeometry(0.22, 1, 0.05); vineGeo.translate(0, -0.5, 0);

@@ -19,7 +19,27 @@ export const PARK = { cx: 7.4, cz: 10.8, r: 2.7 };
 { const b = (a, r) => [PARK.cx + Math.cos(a) * r, PARK.cz + Math.sin(a) * r, Math.atan2(-Math.cos(a), -Math.sin(a))]; PARK.benches = [b(2.6, 3.5), b(-0.55, 3.5)]; PARK.blanket = [PARK.cx + Math.cos(0.75) * 3.6, PARK.cz + Math.sin(0.75) * 3.6]; }
 export const WALK_R = ISLAND_R - 1.4; // walkable lawn radius
 export const TREES = [[-15.6, -4.2, 1.5], [-15.1, 4.6, 1.3], [-11.4, -12.2, 1.4], [-2.4, -15.5, 1.1], [10.3, -12.7, 1.5], [15.4, -5.3, 1.3], [-13.2, 10.3, 1.2], [-11.0, 13.2, 0.9], [14.2, -9.1, 1.0],
-  [12.9, 3.6, 0.9], [14.0, 5.8, 1.0], [12.3, 7.4, 0.8]]; // last three = park grove
+  [12.9, 3.6, 0.9], [14.0, 5.8, 1.0], [12.3, 7.4, 0.8], // park grove
+  [9.6, 29.4, 0.85], [-4.6, 28.6, 0.8]]; // home island (last two)
+// ---- home island (+z), joined by a rope-and-plank bridge ----
+export const HOME = { cx: 2, cz: 33, r: 10.5 }; HOME.walk = HOME.r - 1.3;
+export const BRIDGE = { x: 2, half: 1.0, z0: 15.6, z1: 24.4, s0: 16.4, s1: 23.4 }; // corridor z0..z1, rope span s0..s1
+BRIDGE.walkHalf = BRIDGE.half - 0.45; // body radius inside the rails
+export const HOUSE = { x0: HOME.cx - 7.6, x1: HOME.cx + 7.6, z0: HOME.cz + 2.6, z1: HOME.cz + 6.4, h: 3.55, y: 0.12, porch: 1.0 };
+HOUSE.rooms = [['Pixel', -5.7], ['Jun', -1.9], ['Sage', 1.9], ['Mika', 5.7]].map(([who, dx]) => ({ who, cx: HOME.cx + dx, x0: HOME.cx + dx - 1.9, x1: HOME.cx + dx + 1.9 }));
+HOUSE.walls = [HOUSE.x0, ...HOUSE.rooms.slice(1).map(r => r.x0), HOUSE.x1]; // side walls + partitions (x)
+export const FIRE = { x: HOME.cx, z: HOME.cz - 2.2 };
+FIRE.logs = [Math.PI * 0.5 + 0.0, Math.PI * 1.15, Math.PI * 1.85].map(a => ({ a, x: FIRE.x + Math.cos(a + Math.PI / 2) * 2.0, z: FIRE.z + Math.sin(a + Math.PI / 2) * 2.0 }));
+export const GARDEN = { x: HOME.cx - 6.0, z: HOME.cz - 1.6, w: 2.6, d: 1.6 };
+export const inBridge = (x, z, m = 0) => Math.abs(x - BRIDGE.x) < BRIDGE.half + m && z > BRIDGE.z0 && z < BRIDGE.z1;
+export const onHome = (x, z, m = 0) => Math.hypot(x - HOME.cx, z - HOME.cz) < HOME.r + m;
+// walkable regions: main lawn circle OR bridge corridor OR home lawn circle; anything else snaps to the nearest one
+export function walkClamp(p, W) { const B = BRIDGE, hx = p.x - HOME.cx, hz = p.z - HOME.cz, r = Math.hypot(p.x, p.z), rh = Math.hypot(hx, hz);
+  if (r <= W || rh <= HOME.walk || (Math.abs(p.x - B.x) <= B.walkHalf && p.z >= B.z0 && p.z <= B.z1)) return p;
+  const c = [[p.x * W / r, p.z * W / r], [HOME.cx + hx * HOME.walk / rh, HOME.cz + hz * HOME.walk / rh], [Math.max(B.x - B.walkHalf, Math.min(B.x + B.walkHalf, p.x)), Math.max(B.z0, Math.min(B.z1, p.z))]];
+  let best = c[0], bd = Infinity; for (const q of c) { const d = Math.hypot(q[0] - p.x, q[1] - p.z); if (d < bd) { bd = d; best = q; } } p.x = best[0]; p.z = best[1]; return p; }
+// bridge deck height: sags in the middle of the rope span
+export function bridgeY(z) { const B = BRIDGE, u = Math.max(0, Math.min(1, (z - B.s0) / (B.s1 - B.s0))); return 0.1 - 0.3 * Math.sin(Math.PI * u); }
 const inR = (r, x, z, m = 0) => x > r.x0 - m && x < r.x1 + m && z > r.z0 - m && z < r.z1 + m;
 export { inR };
 // ground height for any (x,z): stairs ramp, rooftop, balcony deck, else lawn/floor 0
@@ -27,6 +47,8 @@ export function heightAt(x, z) {
   if (inR(STAIRS, x, z)) return STAIRS.y * Math.min(1, Math.max(0, (STAIRS.x1 - x) / (STAIRS.x1 - STAIRS.x0)));
   if (inR(ROOF, x, z)) return ROOF.y;
   if (inR(BALCONY, x, z)) return BALCONY.y;
+  if (inBridge(x, z, 0.1) && Math.hypot(x, z) > ISLAND_R - 2.2 && Math.hypot(x - HOME.cx, z - HOME.cz) > HOME.r - 2.2) return bridgeY(z);
+  if (x > HOUSE.x0 && x < HOUSE.x1 && z > HOUSE.z0 - HOUSE.porch && z < HOUSE.z1) return HOUSE.y;
   return 0;
 }
 

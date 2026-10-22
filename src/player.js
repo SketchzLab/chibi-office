@@ -3,27 +3,38 @@
 import * as THREE from 'three';
 import { makeChibi } from './chibi.js';
 import { applyPose } from './behavior.js';
-import { CALVIN_S, DESKS, BOSS_DESK, GLASS, LOUNGE, PANTRY, BACK_Z, FLOOR, LEFT_X, ROOF, STAIRS, BALCONY, PARK, TREES, POOL, WALK_R, inR, heightAt, canopyRadius, headReach, HEAD_R, HEAD_M, PLANTS, PLANT_SPHERES } from './layout.js';
+import { CALVIN_S, DESKS, BOSS_DESK, GLASS, LOUNGE, PANTRY, BACK_Z, FLOOR, LEFT_X, ROOF, STAIRS, BALCONY, PARK, TREES, POOL, WALK_R, inR, heightAt, canopyRadius, headReach, HEAD_R, HEAD_M, PLANTS, PLANT_SPHERES, HOUSE, FIRE, GARDEN, BRIDGE, walkClamp, inBridge, onHome } from './layout.js';
 
 const R = 0.42; // body radius (legs/torso vs low furniture, railings)
 const RH = HEAD_R + HEAD_M; // head radius + margin vs anything head-high (walls, glass, panels, foliage)
 let RR = R; // radius used by pushOut (switched per pass)
 // furniture AABBs [x0,z0,x1,z1] (world space) + circles [x,z,r]
 const L = LOUNGE;
-const BOXES = [
+const BOXES0 = [
   ...[...DESKS, BOSS_DESK].map(([x, z]) => [x - 1.15, z - 0.6, x + 1.15, z + 0.6]),
   [L.cx - 1.9, L.cz + 1.85, L.cx + 1.9, L.cz + 2.7], [L.cx - 2.8, L.cz - 1.6, L.cx - 2.0, L.cz + 1.6], // sofas
   [PANTRY.x - 1.9, PANTRY.z - 0.75, PANTRY.x + 2.0, PANTRY.z + 0.6], [3.5, BACK_Z, 6.3, BACK_Z + 0.95], [-4.5, BACK_Z, -1.0, BACK_Z + 0.75],
 ];
-const CIRCLES = [[L.cx, L.cz, 0.65], [(GLASS.x0 + GLASS.x1) / 2, (GLASS.z0 + GLASS.z1) / 2, 1.25], [-4.6, -7.2, 0.5], [7.4, 2.6, 0.62], [-2.4, 7.2, 0.5], [6.6, 6.9, 0.62], [10.2, -1.2, 0.5], [-3.9, 7.3, 0.3], [9.6, 3.2, 0.3], [-10.2, 7.3, 0.4], [10.1, 7.1, 0.5]];
+// home island: beds + persona corners (body), house walls + tall items (head), campfire ring + log benches + garden + lantern posts
+const HB = HOUSE.rooms.flatMap(r => { const lx = r.x0 + 0.1, fz = HOUSE.z0 + 0.9, bed = [r.cx - 1.55, HOUSE.z1 - 1.55, r.cx + 1.5, HOUSE.z1];
+  const corner = { Pixel: [lx, fz - 0.7, lx + 0.5, fz + 0.7], Jun: [lx + 0.3, fz - 0.45, lx + 1.2, fz + 0.45], Sage: [lx, fz - 0.65, lx + 0.45, fz + 1.05], Mika: [lx, fz - 0.7, lx + 1.1, fz + 1.4] }[r.who];
+  const extra = { Pixel: [lx + 0.95, fz - 0.4, lx + 1.85, fz + 0.6], Jun: [lx + 1.25, fz + 0.25, lx + 1.75, fz + 0.75], Sage: [lx + 0.95, fz - 0.45, lx + 1.65, fz + 0.25], Mika: [lx + 1.4, HOUSE.z1 - 2.0, lx + 1.8, HOUSE.z1 - 1.5] }[r.who];
+  return [bed, corner, extra]; });
+const HOUSE_TALL = [[HOUSE.x0, HOUSE.z1 - 0.08, HOUSE.x1, HOUSE.z1 + 0.08], ...HOUSE.walls.map(x => [x - 0.08, HOUSE.z0 - 0.07, x + 0.08, HOUSE.z1]),
+  ...HOUSE.rooms.flatMap(r => { const lx = r.x0 + 0.1, fz = HOUSE.z0 + 0.9; return { Pixel: [[lx, fz - 0.58, lx + 0.48, fz + 0.58]], Jun: [[lx + 0.35, fz - 0.4, lx + 1.15, fz + 0.4]], Sage: [[lx, fz - 0.65, lx + 0.45, fz + 1.05]], Mika: [] }[r.who]; })];
+const HOME_CIRCLES = [[FIRE.x, FIRE.z, 0.82], ...FIRE.logs.flatMap(L => [-0.55, 0, 0.55].map(k => [L.x + Math.cos(L.a + Math.PI) * 0 + Math.sin(-L.a) * 0 + Math.cos(-L.a) * k, L.z + Math.sin(-L.a) * k * -1 + 0, 0.34])),
+  ...[[BRIDGE.x - 1.7, 15.9], [BRIDGE.x + 1.7, 15.9], [BRIDGE.x - 1.7, 24.1], [BRIDGE.x + 1.7, 24.1], [HOUSE.rooms[1].x1 - 1.4 + 0.0, FIRE.z + 1.8], [HOUSE.rooms[2].x0 + 1.4, FIRE.z + 1.8]].map(([x, z]) => [x, z, 0.1])];
+const HOME_BOXES = [...HB, [GARDEN.x - GARDEN.w / 2, GARDEN.z - GARDEN.d / 2, GARDEN.x + GARDEN.w / 2, GARDEN.z + GARDEN.d / 2]];
+const CIRCLES0 = [[L.cx, L.cz, 0.65], [(GLASS.x0 + GLASS.x1) / 2, (GLASS.z0 + GLASS.z1) / 2, 1.25], [-4.6, -7.2, 0.5], [7.4, 2.6, 0.62], [-2.4, 7.2, 0.5], [6.6, 6.9, 0.62], [10.2, -1.2, 0.5], [-3.9, 7.3, 0.3], [9.6, 3.2, 0.3], [-10.2, 7.3, 0.4], [10.1, 7.1, 0.5]];
+const BOXES = [...BOXES0, ...HOME_BOXES], CIRCLES = [...CIRCLES0, ...HOME_CIRCLES];
 // ---- two-level collision: ground (office + lawn), stairs (ramp, side-clamped), rooftop ----
 const P = PARK;
 // head-high thin walls/panels: pushed with the HEAD radius so the big round head never pokes through
 const TALL_BOXES = [[FLOOR.x0, BACK_Z - 0.12, FLOOR.x1, BACK_Z + 0.1], [LEFT_X - 0.12, FLOOR.z0, LEFT_X + 0.12, FLOOR.z1], // back wall, left wall
   [GLASS.x0, GLASS.z1 - 0.06, GLASS.door0, GLASS.z1 + 0.06], [GLASS.x1 - 0.06, GLASS.z0, GLASS.x1 + 0.06, GLASS.z1 + 0.06], // glass room panes (door gap)
-  [ROOF.x0, ROOF.z0, ROOF.x1, ROOF.z1]]; // annex block walls (roof only reachable from above)
+  [ROOF.x0, ROOF.z0, ROOF.x1, ROOF.z1], ...HOUSE_TALL]; // annex block walls (roof only reachable from above), home longhouse
 // trees: trunk is a body circle; foliage is a head circle sized from the real canopy spheres (3D head-vs-sphere clearance)
-const TALL_CIRCLES = [...TREES.map(([x, z, s]) => [x, z, canopyRadius(s) - RH]), ...PLANTS.map(([x, z, s]) => [x, z, headReach(PLANT_SPHERES, s) - RH])]; // pushOut adds RH back
+const TALL_CIRCLES = [...TREES.map(([x, z, s]) => [x, z, canopyRadius(s) - RH]), ...PLANTS.map(([x, z, s]) => [x, z, headReach(PLANT_SPHERES, s) - RH]), ...HOME_CIRCLES.filter(c => c[2] === 0.1).map(([x, z]) => [x, z, 0.16])]; // + lantern posts // pushOut adds RH back
 const GROUND_BOXES = [
   [STAIRS.x0, STAIRS.z0 - 0.1, STAIRS.x1 - 0.5, STAIRS.z0 + 0.02], [STAIRS.x0, STAIRS.z1 - 0.02, STAIRS.x1 - 0.5, STAIRS.z1 + 0.1]]; // stair sides
 const GROUND_CIRCLES = [...TREES.map(([x, z, s]) => [x, z, 0.24 * s]), [POOL.x, POOL.z, 2.5], [-8.6, 9.6, 1.4], [-1.2, 13.0, 0.8], [P.cx, P.cz, 1.15],
@@ -39,7 +50,7 @@ function pushOut(p, boxes, circles) {
   for (const [x, z, r] of circles) { const dx = p.x - x, dz = p.z - z, d = Math.hypot(dx, dz), m = r + RR; if (d < m && d > 1e-4) { p.x = x + dx / d * m; p.z = z + dz / d * m; } } }
 // p = proposed {x,z}; from = current position (decides which level we're on)
 // rim trees: when the island edge and a canopy circle squeeze him, slide along the rim to where the circle meets it
-function rimSlide(p) { const W = WALK_R, r = Math.hypot(p.x, p.z); if (r < W - 0.02 || inR(BALCONY, p.x, p.z, -0.05)) return;
+function rimSlide(p) { const W = WALK_R, r = Math.hypot(p.x, p.z); if (r < W - 0.02 || inR(BALCONY, p.x, p.z, -0.05) || inBridge(p.x, p.z, 0.2) || onHome(p.x, p.z, 1)) return;
   for (const [cx, cz, cr] of TALL_CIRCLES) { const m = cr + RH, d = Math.hypot(p.x - cx, p.z - cz); if (d >= m) continue; const C = Math.hypot(cx, cz), ca = (W * W + C * C - m * m) / (2 * W * C);
     if (Math.abs(ca) >= 1) continue; const al = Math.acos(ca), th = Math.atan2(p.z, p.x), tc = Math.atan2(cz, cx), wr = a => Math.atan2(Math.sin(a), Math.cos(a));
     const t = Math.abs(wr(tc + al - th)) < Math.abs(wr(tc - al - th)) ? tc + al : tc - al; const q = 1 - 0.005; p.x = Math.cos(t) * W * q; p.z = Math.sin(t) * W * q; } }
@@ -53,7 +64,7 @@ export function collide(p, others = [], from = null, small = false) { // small =
   for (let it = 0; it < 4; it++) {
     RR = R; pushOut(p, [...BOXES, ...GROUND_BOXES], [...CIRCLES, ...GROUND_CIRCLES, ...others]);
     if (!small) { RR = RH; pushOut(p, TALL_BOXES, TALL_CIRCLES); RR = R; } else { RR = 0.3; pushOut(p, TALL_BOXES, []); RR = R; }
-    if (!inR(BALCONY, p.x, p.z, -0.05) && !inR(STAIRS, p.x, p.z)) { const r = Math.hypot(p.x, p.z); if (r > WALK_R) { p.x *= WALK_R / r; p.z *= WALK_R / r; } }
+    if (!inR(BALCONY, p.x, p.z, -0.05) && !inR(STAIRS, p.x, p.z)) walkClamp(p, WALK_R);
     if (inR(BALCONY, p.x, p.z, 0.4)) { p.x = Math.min(p.x, BALCONY.x1 - R); if (p.x > BALCONY.x0 - 0.2) p.z = Math.max(BALCONY.z0 + R, Math.min(BALCONY.z1 - R, p.z)); }
   }
   if (!small) rimSlide(p);

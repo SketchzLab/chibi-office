@@ -11,6 +11,7 @@ import { makeNature } from './nature.js';
 import { makeOffice, glows } from './props.js';
 import { makeWorld } from './world.js';
 import { makePets } from './pets.js';
+import { makeHome } from './home.js';
 import { makeChibi } from './chibi.js';
 import { makePlayer } from './player.js';
 import { pickTier, makeAtmosphere, lightPools, steam, radial } from './fx.js';
@@ -42,7 +43,7 @@ controls.minDistance = 12; controls.maxDistance = 110; controls.minPolarAngle = 
 const sky = makeSky(scene);
 const island = makeIsland(scene);
 const nature = makeNature(scene);
-makeOffice(scene); makeWorld(scene, nature.waterMat);
+makeOffice(scene); makeWorld(scene, nature.waterMat); const home = makeHome(scene); window.__home = home;
 // ---- Bots: look + persona + clock-driven brain ----
 const chibis = [], brains = [];
 for (const [name, per] of Object.entries(PERSONAS)) {
@@ -59,7 +60,7 @@ const steamFx = tier === 'low' ? null : steam(scene, [...DESKS, BOSS_DESK].map((
 const pools = lightPools(scene, [[-3.9, 7.3, 2.6, 0xffc070, 0.55], [9.6, 3.2, 2.6, 0xffc070, 0.55], [-7.8, 4.6, 3.4, 0xffb060, 0.28], [8.2, -5.2, 3.0, 0xffd090, 0.3], [5.2, 2.0, 2.2, 0xffc890, 0.3], [-7.9, -5.1, 3.0, 0xfff0c0, 0.22]]);
 // ---- day / night (Calvin's local UTC+8 clock; ?t=HH:MM preview) ----
 const dayClock = makeDayClock(); const day = makeDayCycle({ skyMat: sky.mat, atmoEl: atmo, raysEl: atmos.rays });
-const flies = [fireflies(scene, { cx: PARK.cx, cz: PARK.cz, r: PARK.r + 0.6, n: 34, seed: 11 })];
+const flies = [fireflies(scene, { cx: PARK.cx, cz: PARK.cz, r: PARK.r + 0.6, n: 34, seed: 11 }), home.flies];
 const lampGlow = glowPoints(scene, [[-3.9, 2.1, 7.3, 1.6], [9.6, 2.1, 3.2, 1.6]], { size: 70, color: 0xffc070 });
 window.__day = () => ({ ...day.state, sec: dayClock() });
 buildShadows(scene); const blobsExtra = []; const blobs = [...chibis, calvin].map(c => [c, chibiShadow(scene)]);
@@ -303,7 +304,7 @@ function loop() { const t = clock.getElapsedTime(); toonUniforms.uTime.value = t
   island.children.forEach(c => { if (c.userData.float !== undefined) c.position.y += Math.sin(t + c.userData.float) * 0.003; });
   const ds = day.update(dayClock()); sky.mat.uniforms.uTime.value = t; lampGlow.material.uniforms.uTime.value = t;
   glows.forEach((h,i)=>{ const b = h.userData.base ?? (h.userData.base = h.material.opacity); h.material.opacity = b * (1 + (b < 0.3 ? 2.4 : 0.35) * ds.glow) * (0.92 + 0.08 * Math.sin(t * 2 + i)); });
-  pools.material.color.setScalar(1 + 1.4 * ds.glow);
+  pools.material.color.setScalar(1 + 1.4 * ds.glow); home.update(t); for (const n in home.windows) home.windows[n].material.uniforms.uGlow.value = ds.glow;
   flies.forEach(f => { f.visible = ds.fireflies > 0.01; f.material.uniforms.uA.value = ds.fireflies; f.material.uniforms.uTime.value = t; });
   frames++; const now=performance.now(); if(now-last>1000){window.__info=renderer.info.render; window.__fps=frames*1000/(now-last); autoTier(window.__fps, t); fpsEl.textContent=window.__fps.toFixed(0)+' fps'; frames=0; last=now;}
   player.update(dt, t); petsys.update(dt, t, wt); interact(wt, t, dt);
