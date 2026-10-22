@@ -21,7 +21,7 @@ const loungeSeats = [
 ];
 function loungePlace(i) { const s = loungeSeats[i]; return { pos: s.pos, rot: s.rot, seat: SEAT_SOFA, approach: [[-4.6, 0.25], ...s.via, s.pos] }; }
 const doorX = (GLASS.door0 + GLASS.x1) / 2, tcx = (GLASS.x0 + GLASS.x1) / 2, tcz = (GLASS.z0 + GLASS.z1) / 2;
-const stools = [[tcx + 0.8, tcz + 1.3, Math.PI], [tcx + 2.1, tcz, -Math.PI / 2], [tcx - 0.8, tcz + 1.3, Math.PI], [tcx + 0.8, tcz - 1.3, 0]];
+const stools = [[tcx + 0.8, tcz + 1.3], [tcx + 2.1, tcz], [tcx - 0.8, tcz + 1.3], [tcx + 0.8, tcz - 1.3]].map(([x, z]) => [x, z, Math.atan2(tcx - x, tcz - z)]); // face the table centre
 function meetingPlace(i) { const [x, z, r] = stools[i]; const via = [[-4.6, -0.25], [doorX, GLASS.z1 + 1.0], [doorX, GLASS.z1 - 0.5]];
   if (i === 3) via.push([tcx + 2.6, tcz - 1.3]); if (i === 2) via.push([tcx - 0.8, GLASS.z1 - 0.5]);
   return { pos: [x, z], rot: r, seat: SEAT_STOOL, approach: [...via, [x, z]] }; }
@@ -35,6 +35,11 @@ function roofPlace(i) { const [x, z, r, seated, pose] = roofSpots[i % 4]; return
 const parkSpots = () => [[...PARK.benches[0], true], [...PARK.benches[1], true], [PARK.blanket[0] - 0.3, PARK.blanket[1], -2.4, 'blanket'], [PARK.blanket[0] + 0.4, PARK.blanket[1] + 0.3, -2.4, 'blanket']];
 function parkPlace(i) { const [x, z, r, kind] = parkSpots()[i % 4]; const fx = x - Math.sin(r) * 0.0; return { pos: [fx, z], rot: r, seat: kind === 'blanket' ? -0.32 : SEAT_STOOL, approach: [[1.0, 0.25], [2.2, 7.0], [4.6, 8.4], [x + Math.sin(r) * 1.0, z + Math.cos(r) * 1.0], [fx, z]] }; }
 function viewPlace(i) { const z = [-0.9, 1.1][i % 2]; return { pos: [BALCONY.x1 - 0.65, z], rot: Math.PI / 2, seat: null, pose: 'lean', approach: [[9.2, 0.25], [12.2, 0.25], [BALCONY.x0 + 0.4, z], [BALCONY.x1 - 0.65, z]] }; }
+// every seated spot a bot can use (for the facing audit)
+export function seatPlaces() { const out = [];
+  DESKS.forEach((_, i) => out.push({ name: 'desk ' + i, ...deskPlace(i) })); loungeSeats.forEach((_, i) => out.push({ name: 'lounge ' + i, ...loungePlace(i) }));
+  stools.forEach((_, i) => out.push({ name: 'meeting stool ' + i, ...meetingPlace(i) })); roofSpots.forEach((r, i) => r[3] && out.push({ name: 'roof ' + i, ...roofPlace(i) }));
+  parkSpots().forEach((_, i) => out.push({ name: 'park ' + i, ...parkPlace(i) })); return out; }
 // ---------- Activities ----------
 // pose: what the body does once arrived. emoji for the status bubble.
 const ACTS = {
@@ -93,7 +98,8 @@ export function makeBrain(chibi, persona) {
       st.seated = !walking && pose !== 'stand' && to.seat !== null;
       chibi.position.x = x; chibi.position.z = z;
       const ty = st.seated ? to.seat : 0; st.sy = (st.sy || 0) + (ty - (st.sy || 0)) * Math.min(1, dt * 7); chibi.position.y = heightAt(x, z) + st.sy;
-      let dr = rot - chibi.rotation.y; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); chibi.rotation.y += dr * Math.min(1, dt * 8);
+      if (st.seated) chibi.rotation.y = rot; // snap to the seat's defined facing
+      else { let dr = rot - chibi.rotation.y; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); chibi.rotation.y += dr * Math.min(1, dt * 8); }
       applyPose(chibi, pose, time, dt, st.seated, b);
     },
   };

@@ -4,7 +4,7 @@ import { makeSky } from './sky.js';
 import { toonUniforms } from './toon.js';
 import { chatLink } from './agents.js';
 import { PERSONAS } from './personas.js';
-import { makeBrain, actEmoji, applyPose } from './behavior.js';
+import { makeBrain, actEmoji, applyPose, seatPlaces } from './behavior.js';
 import { buildShadows, chibiShadow } from './shadows.js';
 import { makeIsland } from './island.js';
 import { makeNature } from './nature.js';
@@ -172,11 +172,11 @@ function runAct(a, bot, wt) { const n = bot?.userData.name;
 // interactable objects: { label, x, z, r, run }
 const { cx: LX, cz: LZ } = LOUNGE; const HIPC = 0.37 * (1.5 - CALVIN_S);
 const bossGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: radial, color: 0x9ff0ff, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending })); bossGlow.scale.set(2.4, 1.4, 1); bossGlow.position.set(BOSS_DESK[0], 1.45, BOSS_DESK[1] + 0.22); bossGlow.visible = false; scene.add(bossGlow);
-const seat = (kind, pos, rot, y, pose, label, extra = {}) => ({ label, x: pos[0], z: pos[1], y: extra.y0 || 0, r: 1.4, run: () => { player.sitAt({ kind, pos, rot, y, pose, ...extra }); closeTalk(); onSit(kind); } });
+const seat = (kind, pos, rot, y, pose, label, extra = {}) => ({ label, seatDef: { kind, pos, rot }, x: pos[0], z: pos[1], y: extra.y0 || 0, r: 1.4, run: () => { player.sitAt({ kind, pos, rot, y, pose, ...extra }); closeTalk(); onSit(kind); } });
 const OBJS = [
   seat('desk', [BOSS_DESK[0], BOSS_DESK[1] - 1.0], 0, 0.07 + HIPC, 'type', '💼 Sit & work', { camDist: 8.5, camYaw: Math.PI - 0.7, onStand: () => { bossGlow.visible = false; } }),
   seat('sofa', [LX - 1.95, LZ + 0.5], Math.PI / 2, -0.06 + HIPC, 'stand', '🛋️ Sit on sofa', { camDist: 11, camYaw: 0.55 }),
-  seat('sofa', [LX + 2.1, LZ - 0.9], -1.1 + Math.PI, -0.04 + HIPC, 'stand', '🪑 Sit in armchair', { camDist: 11, camYaw: 0.5 }),
+  seat('sofa', [LX + 2.1, LZ - 0.9], -1.1, /* armchair group ry (back at local -z) -> sit facing its front */ -0.04 + HIPC, 'stand', '🪑 Sit in armchair', { camDist: 11, camYaw: 0.5 }),
   seat('meeting', [(GLASS.x0 + GLASS.x1) / 2 - 2.1, (GLASS.z0 + GLASS.z1) / 2], Math.PI / 2, -0.05 + HIPC, 'stand', '🪑 Sit at meeting table', { camDist: 10, camYaw: -0.6 }),
   { label: () => player.carry ? '🍵 Sip coffee' : '☕ Make coffee', x: PANTRY.x - 0.3, z: PANTRY.z + 1.4, r: 1.6, run: () => { const t = clock.getElapsedTime(); if (player.carry) { emoteCalvin('sip', 2.4); say('Calvin', pick(['Ahh, perfect.', 'Mmm. Founder fuel.', 'Best brew on the island.']), wallTime(), 2.5); return; }
     emoteCalvin('water', 2.0); say('Calvin', 'Brewing… ☕', wallTime(), 2); setTimeout(() => { player.carry = true; say('Calvin', 'Fresh brew! ☕', wallTime(), 2.5); }, 2000); } },
@@ -261,6 +261,7 @@ function interact(wt, t, dt) {
 }
 const REMEMBER_HI = (n, topic) => ({ Pixel: `Boss! Still thinking about ${topic}!`, Jun: `Hi Calvin! I sketched something about ${topic}.`, Sage: `Calvin. I've been pondering ${topic}.`, Mika: `Heyy! Our ${topic} chat inspired a new cut!` })[n];
 const pick = a => a[Math.floor(Math.random() * a.length)];
+window.__seatAudit = () => [...OBJS.filter(o => o.seatDef).map(o => ({ who: 'Calvin', label: o.label, pos: o.seatDef.pos, rot: o.seatDef.rot })), ...seatPlaces().map(s => ({ who: 'bot', label: s.name, pos: s.pos, rot: s.rot }))];
 window.__near = () => target?.label || null; window.__target = () => target; window.__mode = () => mode; window.__objs = OBJS; window.__choose = i => imenu.children[i]?.click();
 // eager auto quality (desktop + mobile): dynamic resolution steps first, then FX tiers. Recovers resolution if fps is high again.
 const PR_STEPS = [DPR_CAP, 1.25, 1.0, 0.85, 0.7]; let prI = 0, slow = 0, fast = 0, mid = false;

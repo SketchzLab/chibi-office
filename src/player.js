@@ -85,7 +85,7 @@ body.cardon #actb,body.cardon #imenu{display:none!important}`;
     if (speed) { mvv.copy(right).multiplyScalar(ix).addScaledVector(fwd, -iy).normalize(); if (!api.moved) { api.moved = true; setFollow(true); }
       const p = collide({ x: c.position.x + mvv.x * speed * dt, z: c.position.z + mvv.z * speed * dt }, bots.filter(b => Math.abs(b.position.y - c.position.y) < 1).map(b => [b.position.x, b.position.z, 0.45]), c.position);
       c.position.x = p.x; c.position.z = p.z; let dr = Math.atan2(mvv.x, mvv.z) - c.rotation.y; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); c.rotation.y += dr * Math.min(1, dt * 10); }
-    if (api.seat) { if (speed) api.stand(); else { const S = api.seat; c.position.set(S.pos[0], c.position.y + (S.y + heightAt(S.pos[0], S.pos[1]) - c.position.y) * Math.min(1, dt * 7), S.pos[1]); let dr = S.rot - c.rotation.y; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); c.rotation.y += dr * Math.min(1, dt * 8);
+    if (api.seat) { if (speed) api.stand(); else { const S = api.seat; c.position.set(S.pos[0], c.position.y + (S.y + heightAt(S.pos[0], S.pos[1]) - c.position.y) * Math.min(1, dt * 7), S.pos[1]); c.rotation.y = S.rot;
         applyPose(c, api.emote && api.emote.until > t ? api.emote.name : S.pose, t, dt, true, { cup: 0x6b4226 }); api.afterPose?.(t); followCam(dt, S.camDist); return; } }
     else { const gy = heightAt(c.position.x, c.position.z); c.position.y += (gy - c.position.y) * Math.min(1, dt * 14); }
     applyPose(c, api.emote && api.emote.until > t ? api.emote.name : api.waveUntil > t ? 'wave' : speed ? 'walk' : 'stand', speed ? t * (run ? 1.45 : 0.8 + mag * 0.4) : t, dt, false, {});
@@ -103,7 +103,7 @@ body.cardon #actb,body.cardon #imenu{display:none!important}`;
     else if (home.active) { const k = 1 - Math.exp(-dt * 3); controls.target.lerp(home.target, k); camera.position.lerp(home.pos, k); if (camera.position.distanceTo(home.pos) < 0.05) home.active = false; controls.minDistance = 12; }
   }
   // seats: { pos:[x,z], rot, y, pose, camDist, onStand }
-  api.sitAt = s => { api.seat = s; api.carry = s.keepMug ? api.carry : api.carry; if (!follow) setFollow(true); };
+  api.sitAt = s => { api.seat = s; c.position.set(s.pos[0], c.position.y, s.pos[1]); c.rotation.y = s.rot; /* snap to the seat's facing, not the walking direction */ api.carry = s.keepMug ? api.carry : api.carry; if (!follow) setFollow(true); };
   api.stand = () => { const s = api.seat; api.seat = null; if (!s) return; const P = collide({ x: s.pos[0] + Math.sin(s.rot) * -0.9, z: s.pos[1] + Math.cos(s.rot) * -0.9 }, [], { x: s.pos[0], z: s.pos[1] }); c.position.x = P.x; c.position.z = P.z; s.onStand?.(); };
   api.setEmote = (name, dur, t) => { api.emote = { name, until: t + dur }; };
   api.setHome = (pos, tgt) => { home.pos.copy(pos); home.target.copy(tgt); };
