@@ -1,11 +1,13 @@
 // Roaming pets: Mochi (cat) and Biscuit (puppy). Each = one baked body + a dynamic tail/head (few draw calls).
 // They wander between cozy spots on a clock-seeded plan, sometimes follow Calvin, can be petted, and Biscuit plays fetch.
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { toonMesh } from './toon.js';
 import { bake } from './bake.js';
 import { collide } from './player.js';
 import { heightAt, LOUNGE, PARK, POOL } from './layout.js';
-const S = (r, c, ws = 10, hs = 8) => toonMesh(new THREE.SphereGeometry(r, ws, hs), c);
+// blocky chamfered voxels to match the chibi style-ref
+const S = (r, c) => toonMesh(new RoundedBoxGeometry(2 * r, 2 * r, 2 * r, 2, r * 0.25), c);
 function makeCat() { const g = new THREE.Group(); const body = new THREE.Group(); g.add(body); const O = 0xf2a05a, D = 0xe08a44;
   const torso = S(0.26, O); torso.scale.set(0.85, 0.75, 1.3); torso.position.y = 0.32; body.add(torso);
   [[-0.12, 0.2], [0.12, 0.2], [-0.12, -0.2], [0.12, -0.2]].forEach(([x, z]) => { const l = toonMesh(new THREE.CylinderGeometry(0.05, 0.05, 0.22, 6), O, { outline: false }); l.position.set(x, 0.11, z); body.add(l); });
