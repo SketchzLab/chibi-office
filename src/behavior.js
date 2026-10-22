@@ -92,13 +92,13 @@ export function makeBrain(chibi, persona) {
     const lo = st.local; // device-local activity (e.g. Calvin invited them for coffee); wins while active
     if (lo && t < lo.until) { const fromAct = lo.fromAct || 'work'; return { act: lo.act, fromAct, from: ACTS[fromAct].place(b), elapsed: Math.max(0, t - lo.since) }; }
     if (lo && t >= lo.until && t < lo.until + 0.05) st.local = null;
+    // fresh live status (status.json < 30 min) beats the clock; 'sleeping' (or unknown) defers to the clock's night routine
+    const o = st.override, map = { working: 'work', chatting: 'meeting', idle: 'pantry', away: 'home', break: b.breakAct, meeting: 'meeting' };
+    if (o && map[o.state]) return { act: map[o.state], from: deskPlace(b.desk), elapsed: Math.max(0, t - o.since), fromAct: 'work' };
     if (dayOf) { const d = dayOf(t), stg = (homeSpot[b.name] ?? b.slot) * 150; // stagger so they don't walk in a clump
       if (d >= 18 * H + stg && d < 22 * H) return { act: 'home', fromAct: 'work', from: deskPlace(b.desk), elapsed: d - 18 * H - stg };
       if (d >= 22 * H || d < 7 * H + stg) return { act: 'sleep', fromAct: 'home', from: homePlace(b), elapsed: (d - 22 * H + 86400) % 86400 };
       if (d < 9 * H) return { act: 'work', fromAct: 'sleep', from: bedPlace(b), elapsed: d - 7 * H - stg }; }
-    const o = st.override;
-    if (o) { const map = { working: 'work', break: b.breakAct, meeting: 'meeting' }; const act = map[o.state] || 'work'; const elapsed = Math.max(0, t - o.since);
-      return { act, from: deskPlace(b.desk), elapsed, fromAct: 'work' }; }
     const { i, elapsed } = segmentAt(t); const prev = sched[(i - 1 + sched.length) % sched.length][0], act = sched[i][0];
     return { act, fromAct: prev, from: ACTS[prev].place(b), elapsed };
   }

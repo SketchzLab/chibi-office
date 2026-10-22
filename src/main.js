@@ -66,11 +66,13 @@ window.__day = () => ({ ...day.state, sec: dayClock() });
 buildShadows(scene); const blobsExtra = []; const blobs = [...chibis, calvin].map(c => [c, chibiShadow(scene)]);
 const talkers = chibis.map(c => ({ name: c.userData.name, brain: c.userData.brain }));
 // ---- Live status (public/status.json, cache-busted every 60 s) ----
-const STATUS_URL = import.meta.env.BASE_URL + 'status.json'; const FRESH_MS = 2 * 3600 * 1000; let status = { bots: {} };
+const STATUS_URL = import.meta.env.BASE_URL + 'status.json'; const FRESH_MS = 30 * 60 * 1000; let status = { bots: {} }; // per-bot entries older than 30 min fall back to the clock routine
 async function loadStatus() { try { const r = await fetch(STATUS_URL + '?t=' + Date.now(), { cache: 'no-store' }); if (!r.ok) return; status = await r.json(); applyStatus(); } catch (e) { /* offline: keep last */ } }
-function applyStatus() { const up = Date.parse(status.updatedAt || 0); const fresh = Date.now() - up < FRESH_MS;
-  chibis.forEach(c => { const s = status.bots?.[c.userData.name] || {}; c.userData.task = s.task || '';
-    c.userData.brain.setOverride(fresh && s.state ? { state: s.state, since: Date.parse(s.since || status.updatedAt) / 1000 } : null); c.userData.bubbleDirty = true; }); }
+function applyStatus() { const bots = status.bots || {};
+  chibis.forEach(c => { const n = c.userData.name, s = bots[n.toLowerCase()] || bots[n] || {}; const up = Date.parse(s.updatedAt || status.updatedAt || 0);
+    const fresh = !!s.state && Date.now() - up < FRESH_MS; c.userData.task = s.task || ''; c.userData.live = fresh;
+    c.userData.brain.setOverride(fresh ? { state: s.state, since: up / 1000 } : null); c.userData.bubbleDirty = true; }); }
+setInterval(applyStatus, 60000); // re-check staleness even if the fetch keeps failing
 loadStatus(); setInterval(loadStatus, 60000);
 window.__setStatus = j => { status = j; applyStatus(); };
 // ---- Floating status bubbles (one small sprite per bot, redrawn only when text changes) ----
@@ -89,7 +91,7 @@ const bubbles = talkersAll.map(() => makeBubble());
 let prevT = 0;
 // --- Name card ---
 const card = document.createElement('div'); card.id = 'card';
-card.innerHTML = '<button class="x" type="button" aria-label="Close">✕</button><div class="hd"><div class="n"></div><div class="r"></div></div><div class="a"><span class="dot"></span><span class="t"></span></div><div class="w"><b>Currently working on</b><span class="wt"></span></div>'
+card.innerHTML = '<button class="x" type="button" aria-label="Close">✕</button><div class="hd"><div class="n"></div><div class="r"></div></div><div class="a"><span class="dot"></span><span class="t"></span></div><div class="w"><b>Currently working on</b><span class="wt"></span></div><div class="lv" title="Live from status.json (updated < 30 min ago)"><i></i>live</div>'
   + '<div class="sc"><div class="sec"><h4>Personality</h4><div class="chips tr"></div></div><div class="sec"><h4>Hobbies</h4><ul class="hb"></ul></div><div class="sec"><h4>Habits</h4><ul class="ht"></ul></div></div>'
   + '<button class="chat" type="button">💬 Open chat</button><div class="note"></div>';
 document.body.appendChild(card);
@@ -105,7 +107,7 @@ const css = document.createElement('style'); css.textContent = `#card{position:f
  #card .chips{display:flex;flex-wrap:wrap;gap:6px} #card .chips span{padding:3px 10px;border-radius:999px;background:#fff1d6;border:1.5px solid #2a1f35;font-size:13px;font-weight:600}
  #card ul{margin:0;padding-left:18px;font-size:13.5px;line-height:1.35} #card .chat{flex:0 0 auto}
  @media (max-height:700px){#card{max-height:62vh}} @media (max-width:480px){#card{max-height:50vh;padding:10px 12px} #card .n{font-size:19px}}
- #card{position:fixed} #card .x{position:absolute;top:6px;right:8px;width:36px;height:36px;border:0;background:transparent;font-size:18px;color:#2a1f35;cursor:pointer} #card .dot{width:10px;height:10px;border-radius:50%;background:#3ccf7a;box-shadow:0 0 6px #3ccf7a}`;
+ #card{position:fixed} #card .lv{display:none;margin-top:6px;font:600 11px system-ui;color:#2f8a4f;letter-spacing:.04em;text-transform:uppercase} #card .lv i{display:inline-block;width:7px;height:7px;border-radius:50%;background:#3ccf6e;margin-right:5px;box-shadow:0 0 0 2px #3ccf6e33;vertical-align:1px} #card.live .lv{display:block} #card .x{position:absolute;top:6px;right:8px;width:36px;height:36px;border:0;background:transparent;font-size:18px;color:#2a1f35;cursor:pointer} #card .dot{width:10px;height:10px;border-radius:50%;background:#3ccf7a;box-shadow:0 0 6px #3ccf7a}`;
 document.head.appendChild(css);
 let selected = null;
 const ring = new THREE.Mesh(new THREE.RingGeometry(1.15, 1.4, 32), new THREE.MeshBasicMaterial({ color: 0xfff1a8, transparent: true, opacity: 0.85, depthWrite: false }));
@@ -321,7 +323,7 @@ function loop() { const t = clock.getElapsedTime(); toonUniforms.uTime.value = t
     const dcam = camera.position.distanceTo(c.position), sc = (bb.big ? THREE.MathUtils.clamp(dcam * 0.16, 3.0, 7.5) : THREE.MathUtils.clamp(dcam * 0.05, 0.8, 2.6)); bb.sp.scale.set(sc, sc * 0.344, 1); if (bs?.asleep && !bb.big) { const k = 2.2; bb.sp.scale.set(k, k * 0.344, 1); bb.sp.position.set(c.position.x - 1.2, c.position.y + 2.15 + Math.sin(t * 1.6 + i) * 0.06, c.position.z - 0.2); } // Zzz floats over the pillow, under the roof
     else bb.sp.position.set(c.position.x, c.position.y + (c.userData.pet ? 1.0 : 3.7 * BOT_S / 1.5) + sc * 0.17, c.position.z); });
   blobs.forEach(([c, m]) => m.position.set(c.position.x + 0.2, heightAt(c.position.x, c.position.z) + 0.02, c.position.z - 0.15));
-  if (selected) { const bs = selected.userData.brain.state; card.querySelector('.t').textContent = bs.label + (bs.override ? ' (live)' : ''); card.querySelector('.wt').textContent = selected.userData.task || '—'; ring.position.set(selected.position.x, 0.04, selected.position.z); }
+  if (selected) { const bs = selected.userData.brain.state; card.querySelector('.t').textContent = bs.label + (bs.override ? ' (live)' : ''); card.querySelector('.wt').textContent = selected.userData.task || '—'; card.classList.toggle('live', !!selected.userData.live); ring.position.set(selected.position.x, 0.04, selected.position.z); }
   sky.clouds.children.forEach(c => { c.position.y += Math.sin(t * 0.3 + c.userData.drift * 6) * 0.004; });
   nature.update(t);
   { const d = camera.position.distanceTo(controls.target); toonUniforms.uFogRange.value.set(d + 15, d + 170); }

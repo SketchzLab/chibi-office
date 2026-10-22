@@ -1,10 +1,25 @@
 {
-  "updatedAt": "2026-10-22T14:30:00Z",
+  "_doc": "Live bot status. Per bot: state (working|idle|chatting|away|sleeping), task, updatedAt (ISO). Entries < 30 min old override the clock routine; older ones fall back to it. Update with: node scripts/set-status.mjs <bot> <state> \"task\"",
   "bots": {
-    "Pixel": { "task": "Building the chibi office web app" },
-    "Jun":   { "task": "Robber Town UI specs (paused)" },
-    "Mika":  { "task": "Imagine.ooo music video edits" },
-    "Sage":  { "task": "Advising on SketchzLab and side projects" }
-  },
-  "_doc": "Optional per bot: \"state\": \"working\" | \"break\" | \"meeting\" (overrides the clock routine while updatedAt is < 2 h old). Optional \"since\" ISO time per bot."
+    "jun": {
+      "state": "working",
+      "task": "Robber Town UI specs (paused)",
+      "updatedAt": "2026-10-22T14:30:00Z"
+    },
+    "sage": {
+      "state": "working",
+      "task": "Advising on SketchzLab and side projects",
+      "updatedAt": "2026-10-22T14:30:00Z"
+    },
+    "mika": {
+      "state": "working",
+      "task": "Imagine.ooo music video edits",
+      "updatedAt": "2026-10-22T14:30:00Z"
+    },
+    "pixel": {
+      "state": "working",
+      "task": "Chibi office matte restyle + live status feed",
+      "updatedAt": "2026-10-22T20:43:44.453Z"
+    }
+  }
 }
