@@ -198,8 +198,11 @@ function interact(wt, t, dt) {
   // pick the best target: seated -> Stand; group of 2+ bots; nearest bot; nearest object
   let tg = null; const cp = calvin.position;
   const near = chibis.map(c => [c, Math.hypot(c.position.x - cp.x, c.position.z - cp.z)]).filter(([, d]) => d < 3.2).sort((a, b) => a[1] - b[1]);
+  let closeObj = null; { let bd = 0.95; OBJS.forEach(o => { const d = Math.hypot(o.x - cp.x, o.z - cp.z); if (d < bd) { bd = d; closeObj = o; } }); }
+  const social = near.filter(([c]) => zoneOf(c) !== 'desk');
   if (player.seat) tg = { kind: 'stand', label: player.seat.kind === 'desk' ? '⬆️ Stand up' : '⬆️ Stand', id: 'stand' };
-  else if (near.length >= 2 && near[1][1] < 3.2) tg = { kind: 'group', names: near.map(([c]) => c.userData.name), label: '🎉 Join the chat', id: 'g' + near.map(([c]) => c.userData.name).join() };
+  else if (closeObj) tg = { kind: 'obj', o: closeObj, label: typeof closeObj.label === 'function' ? closeObj.label() : closeObj.label, id: 'o' + closeObj.x + closeObj.z };
+  else if (social.length >= 2 && social[1][1] < 3.2) tg = { kind: 'group', names: social.map(([c]) => c.userData.name), label: '🎉 Join the chat', id: 'g' + social.map(([c]) => c.userData.name).join() };
   else if (near.length && near[0][1] < 2.5) tg = { kind: 'bot', c: near[0][0], label: '💬 Talk to ' + near[0][0].userData.name, id: near[0][0].userData.name };
   else { let bd = 1e9; OBJS.forEach(o => { const d = Math.hypot(o.x - cp.x, o.z - cp.z); if (d < o.r && d < bd) { bd = d; tg = { kind: 'obj', o, label: typeof o.label === 'function' ? o.label() : o.label, id: 'o' + o.x + o.z }; } }); }
   if ((tg?.id) !== (target?.id)) { if (mode && !(tg && (tg.id === mode.bot?.userData.name || tg.kind === 'group' || tg.kind === 'stand'))) closeTalk(); }
@@ -208,7 +211,7 @@ function interact(wt, t, dt) {
   if (tg?.kind === 'bot') { const n = tg.c.userData.name; if (!greeted[n] || wt - greeted[n] > 25) { greeted[n] = wt; face[n] = wt + 5; emoteBot(n, pick(['wave', 'shywave', 'jump']), 2.0); const m = mem.get(n); say(n, m && Math.random() < 0.5 ? REMEMBER_HI(n, m.topic) : pick(GREET[n]), wt); } }
   if (tg?.kind === 'group' && (!greeted[tg.id] || wt - greeted[tg.id] > 40)) { greeted[tg.id] = wt; const a = tg.names[0]; say(a, pick(['Calvin! Come join us!', 'Boss! Pull up a chair!', 'Ooh, Calvin\'s here! 🎉']), wt); tg.names.forEach(n => { face[n] = wt + 6; emoteBot(n, 'wave', 1.8); }); }
   // floating button + menu beside Calvin's head (screen space, clamped, clear of the joystick)
-  if (tg) { v3.set(cp.x, cp.y + 3.0 * CALVIN_S / 1.16, cp.z).project(camera); let x = (v3.x + 1) / 2 * innerWidth + 34, y = (1 - v3.y) / 2 * innerHeight - 20;
+  if (tg) { v3.set(cp.x, cp.y + 3.0 * CALVIN_S / 1.16, cp.z).project(camera); let x = (v3.x + 1) / 2 * innerWidth + 40, y = (1 - v3.y) / 2 * innerHeight + 24;
     const bw = actb.offsetWidth, bh = actb.offsetHeight; x = Math.min(Math.max(8, x), innerWidth - bw - 8); y = Math.min(Math.max(60, y), innerHeight - bh - 10);
     const joy = document.getElementById('joy'); if (joy) { const r = joy.getBoundingClientRect(); if (x < r.right + 8 && y + bh > r.top - 8) y = r.top - bh - 12; }
     actb.style.transform = `translate(${x | 0}px, ${y | 0}px)`;
