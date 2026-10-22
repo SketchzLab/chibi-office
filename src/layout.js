@@ -9,3 +9,5 @@ export const PANTRY = { x: 8.2, z: -6.2, ry: -0.35 };
 export const POOL = { x: -4.5, z: 11.3, rx: 2.4, rz: 1.7 };
 export const WALKWAY = { z: 0, half: 0.7, x0: -4.6, x1: 9.2 };
 export const BOSS_DESK = [5.2, 2.6]; // Calvin's desk (front row, right)
+export const BOT_S = 1.12, CALVIN_S = 1.16; // chibi scales (~0.75x of the old 1.5 / 1.55) -> ~2.9 units tall
+export const GLASS_H = 3.4; // glass meeting-room frame height (clears the tallest chibi)

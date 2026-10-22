@@ -4,16 +4,17 @@ import { makeSky } from './sky.js';
 import { toonUniforms } from './toon.js';
 import { chatLink } from './agents.js';
 import { PERSONAS } from './personas.js';
-import { makeBrain, actEmoji } from './behavior.js';
+import { makeBrain, actEmoji, applyPose } from './behavior.js';
 import { buildShadows, chibiShadow } from './shadows.js';
 import { makeIsland } from './island.js';
 import { makeNature } from './nature.js';
 import { makeOffice, glows } from './props.js';
 import { makeChibi } from './chibi.js';
 import { makePlayer } from './player.js';
-import { pickTier, makeAtmosphere, lightPools, steam } from './fx.js';
-import { DESKS, BOSS_DESK } from './layout.js';
-import { speechAt, GREET, HI_BACK } from './dialogue.js';
+import { pickTier, makeAtmosphere, lightPools, steam, radial } from './fx.js';
+import { DESKS, BOSS_DESK, BOT_S, CALVIN_S, LOUNGE, GLASS, PANTRY } from './layout.js';
+import { speechAt, GREET, HI_BACK, ZONE } from './dialogue.js';
+import { buildRoot, buildGroup, pickLine, mem } from './talk.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
@@ -39,7 +40,7 @@ makeOffice(scene);
 // ---- Bots: look + persona + clock-driven brain ----
 const chibis = [], brains = [];
 for (const [name, per] of Object.entries(PERSONAS)) {
-  const c = makeChibi({ name, role: per.role, ...per.look }); c.scale.setScalar(1.5); c.userData.persona = per;
+  const c = makeChibi({ name, role: per.role, ...per.look }); c.scale.setScalar(BOT_S); c.userData.hit.scale.set(1.45, 1.2, 1.45); c.userData.persona = per;
   const brain = makeBrain(c, per); c.userData.brain = brain; scene.add(c); chibis.push(c); brains.push(brain);
 }
 export { chibis }; window.__scene = scene;
@@ -71,7 +72,7 @@ function drawBubble(bb, emoji, text) { const key = emoji + '|' + (text || ''); i
   g.font = '600 32px system-ui, "Noto Color Emoji", sans-serif'; const lines = wrap(g, text, 440); const w = Math.min(500, Math.max(...lines.map(l => g.measureText(l).width)) + 48), h = lines.length * 38 + 26, y0 = 150 - h;
   const x0 = (512 - w) / 2; g.beginPath(); g.roundRect(x0, y0, w, h, 26); g.fill(); g.stroke(); g.beginPath(); g.moveTo(240, 148); g.lineTo(256, 172); g.lineTo(274, 148); g.closePath(); g.fill(); g.stroke();
   g.fillStyle = '#2a1f35'; g.textAlign = 'center'; lines.forEach((l, i) => g.fillText(l, 256, y0 + 44 + i * 38)); g.textAlign = 'left'; bb.tex.needsUpdate = true; }
-const talkersAll = [...chibis, calvin];
+const talkersAll = [...chibis, calvin]; const catSpot = new THREE.Object3D(); catSpot.position.set(LOUNGE.cx - 2.15, -0.9, LOUNGE.cz + 0.85); catSpot.userData.name = 'Mochi'; talkersAll.push(catSpot);
 const bubbles = talkersAll.map(() => makeBubble());
 let prevT = 0;
 // --- Name card ---
@@ -129,24 +130,100 @@ const clock = new THREE.Clock();
 // so every device shows each bot at the same spot at the same moment. ?at=<sec> pins the phase for tests.
 const atParam = new URLSearchParams(location.search).get('at');
 const wallTime = atParam !== null ? (() => { const t0 = performance.now(); return () => +atParam + (performance.now() - t0) / 1000; })() : () => Date.now() / 1000;
-// ---- Calvin <-> bot interaction (local to this device) ----
-const localSay = {}; const face = {}; let near = null, greeted = {}; const pick = a => a[Math.floor(Math.random() * a.length)];
-const say = (n, text, wt, dur = 4) => { localSay[n] = { text, until: wt + dur }; };
+// ---- Interaction: branching talk with bots, group moments, objects (all local to this device) ----
+const localSay = {}, face = {}, botEmote = {}; const greeted = {}; let mode = null, target = null, calvinFlag = null, flagUntil = 0;
+const say = (n, text, wt, dur = 4.4) => { localSay[n] = { text, until: wt + dur }; };
+const emoteBot = (n, name, dur = 1.8) => { botEmote[n] = { name, until: clock.getElapsedTime() + dur }; };
+const emoteCalvin = (name, dur = 1.6) => player.setEmote(name, dur, clock.getElapsedTime());
+const botBy = n => chibis.find(c => c.userData.name === n);
+const zoneOf = c => ZONE[c.userData.brain.state.act] || 'desk';
+const tctx = { persona: n => botBy(n).userData.persona, task: n => botBy(n).userData.task, zone: n => zoneOf(botBy(n)),
+  calvinState: () => (flagUntil > wallTime() ? calvinFlag : null) || (player.carry ? 'mug' : player.seat?.kind === 'sofa' ? 'sofa' : null) };
 const actb = document.createElement('button'); actb.id = 'actb'; actb.className = 'hudb'; actb.type = 'button'; document.body.appendChild(actb);
-const imenu = document.createElement('div'); imenu.id = 'imenu'; imenu.innerHTML = '<button class="hudb" data-a="hi" type="button">👋 Say hi</button><button class="hudb" data-a="work" type="button">💼 What are you working on?</button><button class="hudb" data-a="chat" type="button">💬 Open chat</button>'; document.body.appendChild(imenu);
-actb.addEventListener('click', () => imenu.classList.toggle('on'));
-imenu.addEventListener('click', e => { const a = e.target.closest('button')?.dataset.a; if (!a || !near) return; const n = near.userData.name, wt = wallTime(); face[n] = wt + 6;
-  if (a === 'hi') { say('Calvin', 'Hey ' + n + '! 👋', wt, 2.5); setTimeout(() => say(n, HI_BACK[n], wallTime()), 900); face[n + 'wave'] = wt + 2.5; player.waveUntil = clock.getElapsedTime() + 1.6; }
-  if (a === 'work') { say('Calvin', 'What are you working on?', wt, 2.5); const task = near.userData.task; setTimeout(() => say(n, task ? 'Right now: ' + task + '!' : (near.userData.brain.state.label + '!'), wallTime(), 5), 900); }
-  if (a === 'chat') { const url = chatLink(n); if (url) { window.__lastChatLink = url; window.location.href = url; say(n, 'Opening our chat…', wt, 3); } }
-  imenu.classList.remove('on'); });
-function interact(wt, t, dt) { let best = null, bd = 2.7; chibis.forEach(c => { const d = Math.hypot(c.position.x - calvin.position.x, c.position.z - calvin.position.z); if (d < bd) { bd = d; best = c; } });
-  if (best !== near) { near = best; imenu.classList.remove('on'); actb.style.display = near ? 'block' : 'none'; if (near) actb.textContent = '✨ Interact · ' + near.userData.name; }
-  if (near) { const n = near.userData.name; if (!greeted[n] || wt - greeted[n] > 25) { greeted[n] = wt; face[n] = wt + 5; face[n + 'wave'] = wt + 2.2; say(n, pick(GREET[n]), wt); } }
-  chibis.forEach(c => { const n = c.userData.name; if (!(face[n] > wt)) return; const P = c.userData.parts, bs = c.userData.brain.state; let a = Math.atan2(calvin.position.x - c.position.x, calvin.position.z - c.position.z) - c.rotation.y; a = Math.atan2(Math.sin(a), Math.cos(a));
-    if (bs.seated || bs.walking) P.head.rotation.y = THREE.MathUtils.clamp(a, -0.9, 0.9); else c.rotation.y += a * Math.min(1, dt * 6);
-    if (face[n + 'wave'] > wt) { P.armR.rotation.x = -2.9; P.armR.rotation.z = -0.4 + Math.sin(t * 12) * 0.35; } }); }
-window.__near = () => near?.userData.name || null;
+const imenu = document.createElement('div'); imenu.id = 'imenu'; document.body.appendChild(imenu);
+const fcss = document.createElement('style'); fcss.textContent = `#actb{right:auto!important;bottom:auto!important;left:0;top:0;min-height:48px!important;min-width:48px;border-radius:24px!important;font-size:15px;white-space:nowrap;transition:opacity .15s}
+#imenu{right:auto!important;bottom:auto!important;left:0;top:0;max-width:min(300px,78vw)} #imenu button{text-align:left;white-space:normal;min-height:46px;font-size:14px;line-height:1.2;padding:8px 12px}`; document.head.appendChild(fcss);
+const strip = t => t.replace(/^[^\p{L}\p{N}"'(]+/u, '');
+function showMenu(choices) { imenu.replaceChildren(...choices.map((ch, i) => { const b = document.createElement('button'); b.className = 'hudb'; b.type = 'button'; b.textContent = ch.t; b.onclick = e => { e.stopPropagation(); choose(ch); }; return b; })); imenu.classList.add('on'); }
+function closeTalk() { mode = null; imenu.classList.remove('on'); }
+function openTalk(c) { const n = c.userData.name, wt = wallTime(); const node = buildRoot(n, tctx); mode = { type: 'talk', bot: c, node }; face[n] = wt + 30; say(n, node.say, wt, 6); emoteBot(n, node.emote); showMenu(node.choices); }
+function openGroup(names, wt) { const g = buildGroup(names); mode = { type: 'group', names, node: g }; names.forEach(n => face[n] = wt + 30); say(g.speaker, g.say, wt, 6); emoteBot(g.speaker, g.emote); showMenu(g.choices); }
+function choose(ch) { const wt = wallTime(); imenu.classList.remove('on'); const m = mode; if (!m) return;
+  say('Calvin', ch.say || strip(ch.t), wt, 2.6); emoteCalvin(ch.hf ? 'highfive' : 'nod', 1.4);
+  if (ch.act === 'chat') { const n = m.bot?.userData.name; const url = n && chatLink(n); if (url) { window.__lastChatLink = url; window.location.href = url; } closeTalk(); return; }
+  setTimeout(() => { const wt2 = wallTime();
+    if (m.type === 'group') { say(ch.reactor, ch.react, wt2, 4.5); m.names.forEach(n => emoteBot(n, ch.all || ch.emote, 2.2)); if (ch.hf) emoteCalvin('highfive', 1.6); else if (ch.all === 'laugh') emoteCalvin('laugh', 1.6);
+      if (ch.end) return closeTalk(); setTimeout(() => mode === m && showMenu([{ t: '🎲 Another round!', act: 'again' }, { t: '👋 Back to work, team', end: true, react: 'Aye aye, boss!', reactor: m.names[0], emote: 'thumbs' }]), 1400); return; }
+    const n = m.bot.userData.name; const line = pickLine(ch.react, n); if (line) say(n, line, wt2, 5); emoteBot(n, ch.emote || 'nod', 2.0); if (ch.hf) emoteCalvin('highfive', 1.6);
+    if (ch.topic) mem.set(n, ch.topic); runAct(ch.act, m.bot, wt2);
+    if (ch.end) return closeTalk();
+    setTimeout(() => { if (mode !== m) return; const next = buildRoot(n, tctx); m.node = next; showMenu([{ t: '💬 What else is new?', act: 'more' }, ...next.choices.filter(x => x.act && x.act !== 'chat').slice(0, 2), next.choices.at(-1)]); }, 1500);
+  }, 900); }
+function runAct(a, bot, wt) { const n = bot?.userData.name;
+  if (a === 'more') { openTalk(bot); return; }
+  if (a === 'coffee') { bot.userData.brain.setLocal('pantry', wt, 40); say('Calvin', 'To the pantry! ☕', wt + 1, 2.5); closeTalk(); }
+  if (a === 'game') { bot.userData.brain.setLocal('game', wt, 60); setTimeout(() => say('Calvin', '(Sit on the sofa to play!)', wallTime(), 3.5), 1200); closeTalk(); }
+  if (a === 'song') { bot.userData.brain.setLocal('bob', wt, 24); setTimeout(() => say(n, '🎵 ♪ 🎶 ♫ ♪ 🎵', wallTime(), 9), 2600); setTimeout(() => emoteCalvin('nod', 6), 2600); }
+  if (a === 'sketchfb') { bot.userData.props.pad.visible = true; }
+}
+// interactable objects: { label, x, z, r, run }
+const { cx: LX, cz: LZ } = LOUNGE; const HIPC = 0.37 * (1.5 - CALVIN_S);
+const bossGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: radial, color: 0x9ff0ff, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending })); bossGlow.scale.set(2.4, 1.4, 1); bossGlow.position.set(BOSS_DESK[0], 1.45, BOSS_DESK[1] + 0.22); bossGlow.visible = false; scene.add(bossGlow);
+const seat = (kind, pos, rot, y, pose, label, extra = {}) => ({ label, x: pos[0], z: pos[1], r: 1.4, run: () => { player.sitAt({ kind, pos, rot, y, pose, ...extra }); closeTalk(); onSit(kind); } });
+const OBJS = [
+  seat('desk', [BOSS_DESK[0], BOSS_DESK[1] - 1.0], 0, 0.07 + HIPC, 'type', '💼 Sit & work', { camDist: 9.5, onStand: () => { bossGlow.visible = false; } }),
+  seat('sofa', [LX - 1.95, LZ + 0.5], Math.PI / 2, -0.06 + HIPC, 'stand', '🛋️ Sit on sofa', { camDist: 13 }),
+  seat('sofa', [LX + 2.1, LZ - 0.9], -1.1 + Math.PI, -0.04 + HIPC, 'stand', '🪑 Sit in armchair', { camDist: 13 }),
+  seat('meeting', [(GLASS.x0 + GLASS.x1) / 2 - 2.1, (GLASS.z0 + GLASS.z1) / 2], Math.PI / 2, -0.05 + HIPC, 'stand', '🪑 Sit at meeting table', { camDist: 12 }),
+  { label: () => player.carry ? '🍵 Sip coffee' : '☕ Make coffee', x: PANTRY.x - 0.3, z: PANTRY.z + 1.4, r: 1.6, run: () => { const t = clock.getElapsedTime(); if (player.carry) { emoteCalvin('sip', 2.4); say('Calvin', pick(['Ahh, perfect.', 'Mmm. Founder fuel.', 'Best brew on the island.']), wallTime(), 2.5); return; }
+    emoteCalvin('water', 2.0); say('Calvin', 'Brewing… ☕', wallTime(), 2); setTimeout(() => { player.carry = true; say('Calvin', 'Fresh brew! ☕', wallTime(), 2.5); }, 2000); } },
+  { label: '🐱 Pet the cat', x: LX - 2.15, z: LZ + 0.85, r: 1.5, run: () => { emoteCalvin('pet', 2.8); const wt = wallTime(); say('Mochi', '💕 purrr… 💕', wt + 0.6, 4); calvinFlag = 'cat'; flagUntil = wt + 90; } },
+  { label: '🔭 Look through telescope', x: 0.6, z: 6.9, r: 1.4, run: () => { emoteCalvin('look', 5); player.look = { pos: new THREE.Vector3(0.6, 3.0, 8.2), tgt: new THREE.Vector3(9, 6, 60) }; say('Calvin', pick(['Is that… another island? 🏝️', 'I can see the Imagine.ooo blimp!', 'Clouds shaped like a roadmap.']), wallTime() + 1, 3.5); setTimeout(() => { player.look = null; }, 5000); } },
+  { label: '📚 Browse books', x: -2.75, z: -6.7, r: 1.6, run: () => { emoteCalvin('read', 2.5); say('Calvin', pick(['"Zero to One"… classic.', '"The Cozy Startup". Must read.', '"Shaders for Cats". Hmm.']), wallTime(), 3); } },
+  { label: '🖍️ Doodle on whiteboard', x: 2.9, z: -6.8, r: 1.4, run: () => { emoteCalvin('sketch', 2.5); say('Calvin', pick(['Drew a tiny cat. 🐱', 'Q4 plan: ☕ → 🚀', 'Added a smiley. Morale +10.']), wallTime(), 3); } },
+  ...[[-4.6, -7.2], [7.4, 2.6], [-2.4, 7.2], [6.6, 6.9], [10.2, -1.2], [-10.2, 7.3], [10.1, 7.1]].map(([x, z]) => ({ label: '💧 Water plant', x, z, r: 1.3, run: () => { emoteCalvin('water', 2.4); say('Calvin', pick(['There you go, buddy 🌱', 'Grow big and leafy!', 'Hydration is self-care 💧']), wallTime(), 3); } })),
+];
+function onSit(kind) { const wt = wallTime();
+  if (kind === 'desk') { bossGlow.visible = true; say('Calvin', pick(['Time to build. 💻', 'Inbox zero, here I come.', 'Okay, focus mode.']), wt, 2.5); }
+  if (kind === 'sofa' || kind === 'meeting') { const zone = kind === 'sofa' ? 'lounge' : 'meeting'; const here = chibis.filter(c => zoneOf(c) === zone && Math.hypot(c.position.x - calvin.position.x, c.position.z - calvin.position.z) < 6);
+    if (player.seat && chibis.find(c => c.userData.name === 'Pixel')?.userData.brain.state.act === 'game' && kind === 'sofa') { player.seat.pose = 'game'; calvin.userData.props.ctrl.visible = true; say('Pixel', 'Player 2 has entered the game! 🎮', wt + 0.8, 4); emoteBot('Pixel', 'jump'); }
+    if (here.length >= 2) setTimeout(() => openGroup(here.map(c => c.userData.name), wallTime()), 900); else if (here.length === 1) setTimeout(() => openTalk(here[0]), 900); } }
+actb.addEventListener('click', e => { e.stopPropagation(); if (mode && imenu.classList.contains('on')) { closeTalk(); return; } if (!target) return; const wt = wallTime();
+  if (target.kind === 'stand') { player.stand(); closeTalk(); return; }
+  if (target.kind === 'group') return openGroup(target.names, wt);
+  if (target.kind === 'bot') return openTalk(target.c);
+  if (target.kind === 'obj') target.o.run(); });
+const v3 = new THREE.Vector3();
+function interact(wt, t, dt) {
+  // pick the best target: seated -> Stand; group of 2+ bots; nearest bot; nearest object
+  let tg = null; const cp = calvin.position;
+  const near = chibis.map(c => [c, Math.hypot(c.position.x - cp.x, c.position.z - cp.z)]).filter(([, d]) => d < 3.2).sort((a, b) => a[1] - b[1]);
+  if (player.seat) tg = { kind: 'stand', label: player.seat.kind === 'desk' ? '⬆️ Stand up' : '⬆️ Stand', id: 'stand' };
+  else if (near.length >= 2 && near[1][1] < 3.2) tg = { kind: 'group', names: near.map(([c]) => c.userData.name), label: '🎉 Join the chat', id: 'g' + near.map(([c]) => c.userData.name).join() };
+  else if (near.length && near[0][1] < 2.5) tg = { kind: 'bot', c: near[0][0], label: '💬 Talk to ' + near[0][0].userData.name, id: near[0][0].userData.name };
+  else { let bd = 1e9; OBJS.forEach(o => { const d = Math.hypot(o.x - cp.x, o.z - cp.z); if (d < o.r && d < bd) { bd = d; tg = { kind: 'obj', o, label: typeof o.label === 'function' ? o.label() : o.label, id: 'o' + o.x + o.z }; } }); }
+  if ((tg?.id) !== (target?.id)) { if (mode && !(tg && (tg.id === mode.bot?.userData.name || tg.kind === 'group' || tg.kind === 'stand'))) closeTalk(); }
+  target = tg; actb.style.display = tg ? 'block' : 'none'; if (tg) actb.textContent = mode && imenu.classList.contains('on') ? '✖ Close' : tg.label;
+  // greet on approach (once per 25 s), group invite when walking up to 2+ bots
+  if (tg?.kind === 'bot') { const n = tg.c.userData.name; if (!greeted[n] || wt - greeted[n] > 25) { greeted[n] = wt; face[n] = wt + 5; emoteBot(n, pick(['wave', 'shywave', 'jump']), 2.0); const m = mem.get(n); say(n, m && Math.random() < 0.5 ? REMEMBER_HI(n, m.topic) : pick(GREET[n]), wt); } }
+  if (tg?.kind === 'group' && (!greeted[tg.id] || wt - greeted[tg.id] > 40)) { greeted[tg.id] = wt; const a = tg.names[0]; say(a, pick(['Calvin! Come join us!', 'Boss! Pull up a chair!', 'Ooh, Calvin\'s here! 🎉']), wt); tg.names.forEach(n => { face[n] = wt + 6; emoteBot(n, 'wave', 1.8); }); }
+  // floating button + menu beside Calvin's head (screen space, clamped, clear of the joystick)
+  if (tg) { v3.set(cp.x, cp.y + 3.0 * CALVIN_S / 1.16, cp.z).project(camera); let x = (v3.x + 1) / 2 * innerWidth + 34, y = (1 - v3.y) / 2 * innerHeight - 20;
+    const bw = actb.offsetWidth, bh = actb.offsetHeight; x = Math.min(Math.max(8, x), innerWidth - bw - 8); y = Math.min(Math.max(60, y), innerHeight - bh - 10);
+    const joy = document.getElementById('joy'); if (joy) { const r = joy.getBoundingClientRect(); if (x < r.right + 8 && y + bh > r.top - 8) y = r.top - bh - 12; }
+    actb.style.transform = `translate(${x | 0}px, ${y | 0}px)`;
+    if (imenu.classList.contains('on')) { const mw = imenu.offsetWidth, mh = imenu.offsetHeight; let mx = Math.min(Math.max(8, x), innerWidth - mw - 8), my = y + bh + 8; if (my + mh > innerHeight - 10) my = y - mh - 8; my = Math.max(60, my);
+      if (joy) { const r = joy.getBoundingClientRect(); if (mx < r.right + 8 && my + mh > r.top - 8) mx = Math.min(r.right + 10, innerWidth - mw - 8); } imenu.style.transform = `translate(${mx | 0}px, ${my | 0}px)`; } }
+  else if (imenu.classList.contains('on')) closeTalk();
+  // bots face Calvin; emotes layered on top of the routine pose
+  chibis.forEach(c => { const n = c.userData.name, P = c.userData.parts, bs = c.userData.brain.state;
+    if (face[n] > wt) { let a = Math.atan2(cp.x - c.position.x, cp.z - c.position.z) - c.rotation.y; a = Math.atan2(Math.sin(a), Math.cos(a));
+      if (bs.seated || bs.walking) P.head.rotation.y = THREE.MathUtils.clamp(a, -0.9, 0.9); else c.rotation.y += a * Math.min(1, dt * 6); }
+    const e = botEmote[n]; if (e && e.until > t) applyPose(c, e.name, t, dt, bs.seated, c.userData.persona); });
+}
+const REMEMBER_HI = (n, topic) => ({ Pixel: `Boss! Still thinking about ${topic}!`, Jun: `Hi Calvin! I sketched something about ${topic}.`, Sage: `Calvin. I've been pondering ${topic}.`, Mika: `Heyy! Our ${topic} chat inspired a new cut!` })[n];
+const pick = a => a[Math.floor(Math.random() * a.length)];
+window.__near = () => target?.label || null; window.__target = () => target; window.__mode = () => mode; window.__objs = OBJS; window.__choose = i => imenu.children[i]?.click();
 let slow = 0; function autoTier(fps, t) { if (tier === 'low' || new URLSearchParams(location.search).get('q') || t < 4) return; slow = fps < 24 ? slow + 1 : 0;
   if (slow >= 4) { tier = 'low'; toonUniforms.uDetail.value = 0; renderer.setPixelRatio(1); atmos.demote(); if (steamFx) steamFx.visible = false; console.log('quality tier -> low'); } }
 function loop() { const t = clock.getElapsedTime(); toonUniforms.uTime.value = t; atmos.update(t); if (steamFx) steamFx.material.uniforms.uTime.value = t; const dt = Math.min(0.1, t - prevT); prevT = t; const wt = wallTime(); brains.forEach(b => b.update(wt, dt, t));
@@ -157,7 +234,7 @@ function loop() { const t = clock.getElapsedTime(); toonUniforms.uTime.value = t
   const sp = speechAt(wt, talkers);
   talkersAll.forEach((c, i) => { const nm = c.userData.name, bs = c.userData.brain?.state; const loc = localSay[nm]; let text = loc && loc.until > wt ? loc.text : (sp && sp.name === nm ? sp.text : '');
     drawBubble(bubbles[i], bs ? (bs.walking ? '🚶' : actEmoji(bs.act)) : '', text); const bb = bubbles[i]; bb.sp.visible = bb.big || !!bs;
-    const dcam = camera.position.distanceTo(c.position), sc = (bb.big ? THREE.MathUtils.clamp(dcam * 0.16, 3.0, 7.5) : THREE.MathUtils.clamp(dcam * 0.05, 0.8, 2.6)); bb.sp.scale.set(sc, sc * 0.344, 1); bb.sp.position.set(c.position.x, c.position.y + 3.7 + sc * 0.17, c.position.z); });
+    const dcam = camera.position.distanceTo(c.position), sc = (bb.big ? THREE.MathUtils.clamp(dcam * 0.16, 3.0, 7.5) : THREE.MathUtils.clamp(dcam * 0.05, 0.8, 2.6)); bb.sp.scale.set(sc, sc * 0.344, 1); bb.sp.position.set(c.position.x, c.position.y + 3.7 * BOT_S / 1.5 + sc * 0.17, c.position.z); });
   blobs.forEach(([c, m]) => m.position.set(c.position.x + 0.2, 0.02, c.position.z - 0.15));
   if (selected) { const bs = selected.userData.brain.state; card.querySelector('.t').textContent = bs.label + (bs.override ? ' (live)' : ''); card.querySelector('.wt').textContent = selected.userData.task || '—'; ring.position.set(selected.position.x, 0.04, selected.position.z); }
   sky.clouds.children.forEach(c => { c.position.y += Math.sin(t * 0.3 + c.userData.drift * 6) * 0.004; });

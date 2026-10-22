@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { makeChibi } from './chibi.js';
 import { applyPose } from './behavior.js';
-import { DESKS, BOSS_DESK, GLASS, LOUNGE, PANTRY, BACK_Z } from './layout.js';
+import { CALVIN_S, DESKS, BOSS_DESK, GLASS, LOUNGE, PANTRY, BACK_Z } from './layout.js';
 
 const R = 0.42; // body radius
 // furniture AABBs [x0,z0,x1,z1] (world space) + circles [x,z,r]
@@ -14,7 +14,7 @@ const BOXES = [
   [L.cx - 1.9, L.cz + 1.85, L.cx + 1.9, L.cz + 2.7], [L.cx - 2.8, L.cz - 1.6, L.cx - 2.0, L.cz + 1.6], // sofas
   [PANTRY.x - 1.9, PANTRY.z - 0.75, PANTRY.x + 2.0, PANTRY.z + 0.6], [3.5, BACK_Z, 6.3, BACK_Z + 0.95], [-4.5, BACK_Z, -1.0, BACK_Z + 0.75],
 ];
-const CIRCLES = [[L.cx, L.cz, 0.65], [(GLASS.x0 + GLASS.x1) / 2, (GLASS.z0 + GLASS.z1) / 2, 1.25], [-4.6, -7.2, 0.5], [7.4, 2.6, 0.5], [-2.4, 7.2, 0.5], [6.6, 6.9, 0.5], [10.2, -1.2, 0.5], [-3.9, 7.3, 0.3], [9.6, 3.2, 0.3], [-10.2, 7.3, 0.4], [10.1, 7.1, 0.5]];
+const CIRCLES = [[L.cx, L.cz, 0.65], [(GLASS.x0 + GLASS.x1) / 2, (GLASS.z0 + GLASS.z1) / 2, 1.25], [-4.6, -7.2, 0.5], [7.4, 2.6, 0.5], [-2.4, 7.2, 0.5], [6.6, 6.9, 0.5], [10.2, -1.2, 0.5], [-3.9, 7.3, 0.3], [9.6, 3.2, 0.3], [-10.2, 7.3, 0.4], [10.1, 7.1, 0.5], [0.6, 7.0, 0.4]];
 const BOUND = { x0: -10.5, x1: 10.5, z0: -7.5, z1: 7.5 };
 export function collide(p, others = []) {
   for (let it = 0; it < 2; it++) {
@@ -28,7 +28,7 @@ export function collide(p, others = []) {
 
 export function makePlayer({ scene, camera, controls, bots }) {
   const c = makeChibi({ name: 'Calvin', role: 'Founder · Boss', hair: 0x3b2a22, shirt: 0x2f4f86, pants: 0x3a3a48, skin: 0xffdcc2 });
-  c.scale.setScalar(1.55); c.position.set(BOSS_DESK[0] - 1.6, 0, BOSS_DESK[1] - 1.5); c.rotation.y = Math.PI; scene.add(c);
+  c.scale.setScalar(CALVIN_S); c.position.set(BOSS_DESK[0] - 1.6, 0, BOSS_DESK[1] - 1.5); c.rotation.y = Math.PI; scene.add(c);
   // owner touch: little gold lanyard badge
   const badge = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.2, 0.03), new THREE.MeshBasicMaterial({ color: 0xffc94a })); badge.position.set(0.16, 0.95, 0.43); c.userData.parts.body.add(badge);
   const keys = new Set(); const joy = { x: 0, y: 0 };
@@ -64,12 +64,24 @@ body.cardon #actb,body.cardon #imenu{display:none!important}`;
     if (speed) { mvv.copy(right).multiplyScalar(ix).addScaledVector(fwd, -iy).normalize(); if (!api.moved) { api.moved = true; setFollow(true); }
       const p = collide({ x: c.position.x + mvv.x * speed * dt, z: c.position.z + mvv.z * speed * dt }, bots.map(b => [b.position.x, b.position.z, 0.45]));
       c.position.x = p.x; c.position.z = p.z; let dr = Math.atan2(mvv.x, mvv.z) - c.rotation.y; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); c.rotation.y += dr * Math.min(1, dt * 10); }
-    applyPose(c, api.waveUntil > t ? 'wave' : speed ? 'walk' : 'stand', speed ? t * (run ? 1.45 : 0.8 + mag * 0.4) : t, dt, false, {});
-    // camera: follow with smoothing (shift target and camera by the same delta, so orbiting still works)
-    if (follow) { tmp.set(c.position.x, 1.2, c.position.z); const k = 1 - Math.exp(-dt * 3.2); const delta = tmp.sub(controls.target).multiplyScalar(k); controls.target.add(delta); camera.position.add(delta);
-      const off = camera.position.clone().sub(controls.target); const want = innerWidth < innerHeight ? 22 : 17; off.setLength(off.length() + (want - off.length()) * Math.min(1, dt * 1.5)); camera.position.copy(controls.target).add(off); controls.minDistance = 8; }
-    else if (home.active) { const k = 1 - Math.exp(-dt * 3); controls.target.lerp(home.target, k); camera.position.lerp(home.pos, k); if (camera.position.distanceTo(home.pos) < 0.05) home.active = false; controls.minDistance = 12; }
+    if (api.seat) { if (speed) api.stand(); else { const S = api.seat; c.position.set(S.pos[0], c.position.y + (S.y - c.position.y) * Math.min(1, dt * 7), S.pos[1]); let dr = S.rot - c.rotation.y; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); c.rotation.y += dr * Math.min(1, dt * 8);
+        applyPose(c, api.emote && api.emote.until > t ? api.emote.name : S.pose, t, dt, true, { cup: 0x6b4226 }); api.afterPose?.(t); followCam(dt, S.camDist); return; } }
+    else c.position.y += (0 - c.position.y) * Math.min(1, dt * 7);
+    applyPose(c, api.emote && api.emote.until > t ? api.emote.name : api.waveUntil > t ? 'wave' : speed ? 'walk' : 'stand', speed ? t * (run ? 1.45 : 0.8 + mag * 0.4) : t, dt, false, {});
+    if (api.carry && !(api.emote && api.emote.until > t)) { const P = c.userData.parts; c.userData.props.cup.visible = true; P.armR.rotation.x = -1.3; P.armR.rotation.z = -0.25; }
+    api.afterPose?.(t); followCam(dt);
   };
+  function followCam(dt, near) {
+    // camera: follow with smoothing (shift target and camera by the same delta, so orbiting still works)
+    if (api.look) { const L = api.look; const k = 1 - Math.exp(-dt * 2); controls.target.lerp(L.tgt, k); camera.position.lerp(L.pos, k); return; }
+    if (follow) { tmp.set(c.position.x, 1.2, c.position.z); const k = 1 - Math.exp(-dt * 3.2); const delta = tmp.sub(controls.target).multiplyScalar(k); controls.target.add(delta); camera.position.add(delta);
+      const off = camera.position.clone().sub(controls.target); const want = near || (innerWidth < innerHeight ? 17 : 13); off.setLength(off.length() + (want - off.length()) * Math.min(1, dt * 1.5)); camera.position.copy(controls.target).add(off); controls.minDistance = 8; }
+    else if (home.active) { const k = 1 - Math.exp(-dt * 3); controls.target.lerp(home.target, k); camera.position.lerp(home.pos, k); if (camera.position.distanceTo(home.pos) < 0.05) home.active = false; controls.minDistance = 12; }
+  }
+  // seats: { pos:[x,z], rot, y, pose, camDist, onStand }
+  api.sitAt = s => { api.seat = s; api.carry = s.keepMug ? api.carry : api.carry; if (!follow) setFollow(true); };
+  api.stand = () => { const s = api.seat; api.seat = null; if (!s) return; const P = collide({ x: s.pos[0] + Math.sin(s.rot) * -0.9, z: s.pos[1] + Math.cos(s.rot) * -0.9 }); c.position.x = P.x; c.position.z = P.z; s.onStand?.(); };
+  api.setEmote = (name, dur, t) => { api.emote = { name, until: t + dur }; };
   api.setHome = (pos, tgt) => { home.pos.copy(pos); home.target.copy(tgt); };
   return api;
 }

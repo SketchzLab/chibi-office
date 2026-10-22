@@ -2,7 +2,9 @@ import * as THREE from 'three';
 import { DESKS, PANTRY, LOUNGE, GLASS } from './layout.js';
 // ---------- Places ----------
 // Each place: pos [x,z], rot (facing), seat (root y when seated, null = standing), approach: waypoints from the main aisle (z≈0).
-const SEAT_CHAIR = 0.07, SEAT_SOFA = -0.06, SEAT_STOOL = -0.05;
+import { BOT_S } from './layout.js';
+// seat root heights scale with chibi size (hip ~0.37 local units)
+const HIP = 0.37 * (1.5 - BOT_S); export const SEAT_CHAIR = 0.07 + HIP, SEAT_SOFA = -0.06 + HIP, SEAT_STOOL = -0.05 + HIP;
 export function deskPlace(i) { const [x, z] = DESKS[i]; const back = z < 0, sz = back ? z + 1.0 : z - 1.0, side = back ? 0.95 : -0.95, az = back ? -0.25 : 0.25;
   return { pos: [x, sz], rot: back ? Math.PI : 0, seat: SEAT_CHAIR, approach: [[x + side, az], [x + side, sz], [x, sz]] }; }
 export function deskAisle(i) { const [x, z] = DESKS[i]; const back = z < 0, side = back ? 0.95 : -0.95, az = back ? -0.25 : 0.25;
@@ -53,6 +55,9 @@ export function makeBrain(chibi, persona) {
   const st = { act: 'work', label: '', walking: false, seated: false, override: null };
   function segmentAt(t) { let c = ((t % cycle) + cycle) % cycle, i = 0; while (c >= sched[i][1]) { c -= sched[i][1]; i++; } return { i, elapsed: c }; }
   function resolve(t) {
+    const lo = st.local; // device-local activity (e.g. Calvin invited them for coffee); wins while active
+    if (lo && t < lo.until) { const fromAct = lo.fromAct || 'work'; return { act: lo.act, fromAct, from: ACTS[fromAct].place(b), elapsed: Math.max(0, t - lo.since) }; }
+    if (lo && t >= lo.until && t < lo.until + 0.05) st.local = null;
     const o = st.override;
     if (o) { const map = { working: 'work', break: b.breakAct, meeting: 'meeting' }; const act = map[o.state] || 'work'; const elapsed = Math.max(0, t - o.since);
       return { act, from: deskPlace(b.desk), elapsed, fromAct: 'work' }; }
@@ -62,6 +67,8 @@ export function makeBrain(chibi, persona) {
   return {
     state: st, cycle,
     setOverride(o) { st.override = o; },
+    setLocal(act, t, dur) { st.local = { act, since: t, until: t + dur, fromAct: st.act || 'work' }; },
+    clearLocal() { st.local = null; },
     actAt(t) { return resolve(t).act; }, // pure: used by the dialogue scheduler (same answer on every device)
     update(t, dt, time) {
       const r = resolve(t); const A = ACTS[r.act]; const to = A.place(b); const pts = route(r.fromAct === r.act ? null : r.from, to);
@@ -99,6 +106,15 @@ export function applyPose(c, pose, t, dt, seated, b) {
     case 'game': { const a = Math.sin(t * 18) * 0.05; tgt.armL = [-1.15 + a, 0.35]; tgt.armR = [-1.15 - a, -0.35]; tgt.headX = 0.12; tgt.bodyY = Math.abs(Math.sin(t * 3)) * 0.02; tgt.headZ = Math.sin(t * 2.6) * 0.08; break; }
     case 'sketch': { tgt.armL = [-1.1, 0.35]; tgt.armR = [-1.2 + Math.sin(t * 6) * 0.08, -0.3 + Math.cos(t * 6) * 0.08]; tgt.headX = 0.25; break; }
     case 'stretch': { const u = Math.sin(t * 1.4); tgt.armL = [-2.9, 0.15 + u * 0.1]; tgt.armR = [-2.9, -0.15 - u * 0.1]; tgt.bodyY = 0.03 + u * 0.03; tgt.headX = -0.15; break; }
+    case 'laugh': { const b2 = Math.abs(Math.sin(t * 11)); tgt.bodyY = b2 * 0.06; tgt.headX = -0.25 - b2 * 0.1; tgt.armL = [-0.5, 0.5 + b2 * 0.2]; tgt.armR = [-0.5, -0.5 - b2 * 0.2]; break; }
+    case 'nod': { tgt.headX = 0.1 + Math.max(0, Math.sin(t * 8)) * 0.3; break; }
+    case 'highfive': { tgt.armR = [-3.0, -0.15]; tgt.bodyY = 0.04; tgt.headX = -0.2; break; }
+    case 'thumbs': { tgt.armR = [-1.6, -0.2]; tgt.headZ = 0.12; tgt.bodyY = Math.abs(Math.sin(t * 6)) * 0.03; break; }
+    case 'shywave': { tgt.armR = [-2.3, -0.2 + Math.sin(t * 10) * 0.2]; tgt.headX = 0.25; tgt.headZ = 0.2; tgt.armL = [-0.3, 0.3]; break; }
+    case 'jump': { const j = Math.max(0, Math.sin(t * 9)); tgt.bodyY = j * 0.35; tgt.armL = [-2.6, 0.5]; tgt.armR = [-2.6, -0.5]; tgt.headX = -0.2; break; }
+    case 'pet': { tgt.armR = [-1.2 + Math.sin(t * 6) * 0.15, -0.2]; tgt.headX = 0.35; tgt.headZ = 0.1; break; }
+    case 'look': { tgt.armR = [-2.4, -0.7]; tgt.armL = [-1.6, 0.4]; tgt.headX = -0.35; break; }
+    case 'water': { tgt.armR = [-1.4, -0.2]; tgt.headX = 0.3; tgt.bodyY = Math.sin(t * 3) * 0.02; break; }
     case 'wave': { tgt.armR = [-2.9, -0.4 + Math.sin(t * 12) * 0.35]; tgt.headX = -0.1; break; }
     case 'talk': { const a = Math.sin(t * 3.2), c2 = Math.sin(t * 2.3 + 1); tgt.armL = [-0.9 + a * 0.3, 0.3]; tgt.armR = [-0.7 + c2 * 0.35, -0.3]; tgt.headZ = Math.sin(t * 1.6) * 0.08; tgt.headY = Math.sin(t * 0.9) * 0.2; break; }
     default: { tgt.armL = [0, -0.1 - s * 0.04]; tgt.armR = [0, 0.1 + s * 0.04]; tgt.bodyY = s * 0.025; }

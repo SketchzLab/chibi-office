@@ -4,7 +4,7 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { toonMesh } from './toon.js';
 import { bake } from './bake.js';
 import { cast } from './shadows.js';
-import { FLOOR, BACK_Z, LEFT_X, GLASS, LOUNGE, DESKS, PANTRY, WALKWAY, BOSS_DESK } from './layout.js';
+import { FLOOR, BACK_Z, LEFT_X, GLASS, LOUNGE, DESKS, PANTRY, WALKWAY, BOSS_DESK, GLASS_H } from './layout.js';
 // Phone-friendly glow: emissive screen + additive soft halo quad (no post-process bloom).
 const haloTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
   const r = g.createRadialGradient(32, 32, 0, 32, 32, 32); r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(1, 'rgba(255,255,255,0)');
@@ -100,7 +100,7 @@ function bookshelf(w = 1.6, h = 2.0) {
   return g;
 }
 function glassRoom(g) {
-  const { x0, x1, z0, z1, door0 } = GLASS, H = 2.3, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+  const { x0, x1, z0, z1, door0 } = GLASS, H = GLASS_H, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
   const glass = new THREE.MeshBasicMaterial({ color: 0xbfe9f2, transparent: true, opacity: 0.25, depthWrite: false, side: THREE.DoubleSide });
   const pane = (w, px, pz, ry) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, H), glass); m.position.set(px, H / 2, pz); m.rotation.y = ry; g.add(m); };
   pane(door0 - x0, (x0 + door0) / 2, z1, 0);            // front pane, doorway gap door0..x1
@@ -161,7 +161,7 @@ function cozy(g) {
   // desk lamps + book stacks on every desk (rotated with the desk)
   [...DESKS, BOSS_DESK].forEach(([x, z]) => { const k = z > 0 ? -1 : 1; const lx = x + 0.85 * k, lz = z - 0.3 * k;
     M(new THREE.CylinderGeometry(0.1, 0.12, 0.04, 10), 0x3a3340, lx, 0.97, lz); M(new THREE.CylinderGeometry(0.018, 0.018, 0.42, 6), 0x3a3340, lx, 1.18, lz, { r: [0.35 * k, 0, 0] });
-    M(new THREE.ConeGeometry(0.13, 0.16, 10, 1, true), 0xffd36a, lx, 1.38, lz + 0.1 * k, { outline: true, r: [Math.PI - 0.5 * k, 0, 0] });
+    M(new THREE.ConeGeometry(0.13, 0.16, 10, 1, true), 0xffd36a, lx, 1.38, lz + 0.1 * k, { r: [Math.PI - 0.5 * k, 0, 0] });
     [0xff8a7a, 0x9aa8ff].forEach((c, i) => M(B(0.32, 0.05, 0.22), c, x - 0.55 * k, 0.98 + i * 0.05, z - 0.32 * k, { r: [0, i * 0.3, 0] })); });
   // lounge: cushions, throw, cat, patterned rug, coffee-table books + vase
   const { cx, cz } = LOUNGE;
@@ -177,6 +177,9 @@ function cozy(g) {
   for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; M(new THREE.CylinderGeometry(0.08, 0.08, 0.008, 4), 0xe8a07a, cx + Math.cos(a) * 1.85 * 1.15, 0.03, cz + Math.sin(a) * 1.85 * 0.92); }
   [[0x7ac8a0, 0], [0xffd36a, 0.4]].forEach(([c, r], i) => M(B(0.32, 0.06, 0.24), c, cx - 0.15, 0.5 + i * 0.06, cz - 0.3, { r: [0, r, 0] }));
   M(new THREE.CylinderGeometry(0.06, 0.08, 0.2, 8), 0x9fd6ff, cx + 0.35, 0.57, cz + 0.1); M(new THREE.SphereGeometry(0.07, 6, 4), 0xff8fb3, cx + 0.35, 0.72, cz + 0.1);
+  // brass telescope by the front railing (Calvin can look through it)
+  [0, 2.1, 4.2].forEach(a => M(new THREE.CylinderGeometry(0.03, 0.03, 1.3), 0x8b5a3c, 0.6 + Math.cos(a) * 0.25, 0.6, 7.0 + Math.sin(a) * 0.25, { r: [Math.sin(a) * 0.4, 0, -Math.cos(a) * 0.4] }));
+  M(new THREE.CylinderGeometry(0.1, 0.15, 1.2, 12), 0xd9b35a, 0.6, 1.4, 7.15, { outline: true, r: [1.1, 0, 0] }); M(new THREE.CylinderGeometry(0.16, 0.16, 0.08, 12), 0x2f3b4f, 0.6, 1.62, 7.65, { r: [1.1, 0, 0] });
   // plant variety: snake plant, monstera, trailing pothos on a shelf, mini cactus on the pantry counter
   M(new THREE.CylinderGeometry(0.28, 0.22, 0.4, 10), 0x4fb3a9, -10.2, 0.2, 7.3, { outline: true });
   for (let i = 0; i < 6; i++) { const a = i / 6 * 6.28; M(new THREE.ConeGeometry(0.08, 1.0 + (i % 3) * 0.2, 4), 0x3f8f45, -10.2 + Math.cos(a) * 0.1, 0.85, 7.3 + Math.sin(a) * 0.1, { outline: true, r: [Math.sin(a) * 0.15, 0, -Math.cos(a) * 0.15], s: [1, 1, 0.4] }); }
