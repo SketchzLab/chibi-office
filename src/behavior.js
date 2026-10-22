@@ -120,7 +120,7 @@ export function makeBrain(chibi, persona) {
       chibi.userData.setSleepFace?.(!!st.asleep);
       if (st.asleep) { const k = Math.min(1, dt * 4); chibi.rotation.x += (-1.57 - chibi.rotation.x) * k; } else chibi.rotation.x += (0 - chibi.rotation.x) * Math.min(1, dt * 6);
       chibi.position.x = x; chibi.position.z = z;
-      const ty = st.seated ? to.seat : 0; st.sy = (st.sy || 0) + (ty - (st.sy || 0)) * Math.min(1, dt * 7); chibi.position.y = heightAt(x, z) + st.sy;
+      const ty = st.seated ? to.seat : 0; st.sy = (st.sy || 0) + (ty - (st.sy || 0)) * Math.min(1, dt * 7); chibi.position.y = heightAt(x, z) + st.sy + (st.asleep ? (breath(chibi, time) * 0.5 + 0.5) * 0.03 : 0); if (st.asleep) chibi.userData.sleepAnim?.(time, sleepPhase(chibi));
       if (st.seated) chibi.rotation.y = rot; // snap to the seat's defined facing
       else { let dr = rot - chibi.rotation.y; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); chibi.rotation.y += dr * Math.min(1, dt * 8); }
       applyPose(chibi, pose, time, dt, st.seated && !st.asleep, b);
@@ -128,6 +128,8 @@ export function makeBrain(chibi, persona) {
   };
 }
 // ---------- Poses ----------
+export const sleepPhase = c => c.userData.sleepPh ??= ((c.userData.name || '').split('').reduce((a, ch) => a * 31 + ch.charCodeAt(0), 7) % 1000) / 1000 * 6.283;
+export const breath = (c, t) => Math.sin(t * Math.PI / 2 + sleepPhase(c)); // ~4s cycle, per-bot phase
 export function applyPose(c, pose, t, dt, seated, b) {
   const P = c.userData.parts, pr = c.userData.props, k = Math.min(1, dt * 9);
   const tgt = { legL: [0, 0], legR: [0, 0], armL: [0, -0.1], armR: [0, 0.1], bodyY: 0, bodyX: 0, bodyZ: 0, headX: 0, headZ: Math.sin(t * 1.1) * 0.05, headY: 0 };
@@ -136,7 +138,9 @@ export function applyPose(c, pose, t, dt, seated, b) {
   pr.cup.visible = pose === 'sip'; pr.spinner.visible = pose === 'fidget'; pr.pencil.visible = pose === 'sketch'; pr.pad.visible = pose === 'sketch'; pr.book.visible = pose === 'read'; pr.ctrl.visible = pose === 'game';
   if (pose === 'sip') pr.liq.material.uniforms.uColor.value.set(b.cup);
   switch (pose) {
-    case 'sleep': { const br = Math.sin(t * 1.3); tgt.armL = [0.05, -0.12]; tgt.armR = [0.05, 0.12]; tgt.legL = [0, 0]; tgt.legR = [0, 0]; tgt.bodyY = br * 0.012; tgt.headZ = 0; tgt.headX = -0.12; tgt.headY = 0.55; break; } // lying face-up, head turned a little toward the room
+    case 'sleep': { const ph = sleepPhase(c), P = 20 + (ph * 977 % 40), seg = Math.floor((t + ph * P) / P), turn = Math.floor(Math.abs(Math.sin(seg * 12.9898 + ph * 78.233)) * 43758.5) % 3; // shift / turn every 20–60s
+      tgt.armL = [0.05, turn === 1 ? -0.5 : -0.12]; tgt.armR = [turn === 2 ? -0.6 : 0.05, 0.12]; tgt.legL = [0, 0]; tgt.legR = [turn === 2 ? 0.2 : 0, 0]; tgt.bodyY = 0; tgt.headX = -0.12;
+      tgt.headY = [0.55, 0.15, 0.8][turn]; tgt.headZ = [0, 0.12, -0.1][turn]; break; } // lying face-up, head turned a little toward the room
     case 'warm': { tgt.armL = [-1.3, 0.3 + Math.sin(t * 0.8) * 0.05]; tgt.armR = [-1.3, -0.3 - Math.sin(t * 0.8) * 0.05]; tgt.headX = 0.08; tgt.headZ = Math.sin(t * 0.5) * 0.08; tgt.bodyY = Math.sin(t * 1.2) * 0.01; break; }
     case 'walk': { const w = Math.sin(t * 9); tgt.legL = [w * 0.7, 0]; tgt.legR = [-w * 0.7, 0]; tgt.armL = [-w * 0.6, -0.1]; tgt.armR = [w * 0.6, 0.1]; tgt.bodyY = Math.abs(Math.cos(t * 9)) * 0.08; tgt.headZ = w * 0.05; break; }
     case 'type': case 'bob': { const a = Math.sin(t * 14), c2 = Math.sin(t * 13 + 1.3); tgt.armL = [-1.05 + a * 0.06, 0.25]; tgt.armR = [-1.05 + c2 * 0.06, -0.25]; tgt.headX = 0.12;

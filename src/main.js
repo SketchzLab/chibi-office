@@ -4,7 +4,7 @@ import { makeSky } from './sky.js';
 import { toonUniforms } from './toon.js';
 import { chatLink } from './agents.js';
 import { PERSONAS } from './personas.js';
-import { makeBrain, actEmoji, applyPose, seatPlaces, setDayClock } from './behavior.js';
+import { makeBrain, actEmoji, applyPose, seatPlaces, setDayClock, breath } from './behavior.js';
 import { buildShadows, chibiShadow } from './shadows.js';
 import { makeIsland } from './island.js';
 import { makeNature } from './nature.js';
@@ -311,7 +311,7 @@ function loop() { const t = clock.getElapsedTime(); toonUniforms.uTime.value = t
   pools.material.color.setScalar(1 + 1.4 * ds.glow); home.update(t); chibis.forEach(c => { const n = c.userData.name, bs = c.userData.brain.state, w = home.windows[n]; if (!w) return;
     // room light: on while the bot is home in the evening / getting ready, a dim night-light once asleep, off when they're out
     const want = (bs.act === 'home' ? 0.75 : bs.act === 'sleep' ? (bs.asleep ? 0.32 : 1) : 0) * ds.glow; const u = w.material.uniforms.uGlow; u.value += (want - u.value) * Math.min(1, dt * 2);
-    home.covers[n].visible = !!bs.asleep; });
+    home.covers[n].visible = !!bs.asleep; if (bs.asleep) home.covers[n].scale.y = 1 + (breath(c, t) * 0.5 + 0.5) * 0.07; });
   flies.forEach(f => { f.visible = ds.fireflies > 0.01; f.material.uniforms.uA.value = ds.fireflies; f.material.uniforms.uTime.value = t; });
   frames++; const now=performance.now(); if(now-last>1000){window.__info=renderer.info.render; window.__fps=frames*1000/(now-last); autoTier(window.__fps, t); fpsEl.textContent=window.__fps.toFixed(0)+' fps'; frames=0; last=now;}
   player.update(dt, t); petsys.update(dt, t, wt); interact(wt, t, dt);

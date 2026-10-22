@@ -11,21 +11,30 @@ export function makeChibi({ name, role, skin = 0xffe0c8, hair, shirt, pants, hai
   const face = toonMesh(new THREE.SphereGeometry(0.66, 18, 14), skin); face.scale.set(1.06, 0.96, 1); head.add(face);
   // eyes
   // face: open eyes + sparkles + blush merged into ONE vertex-coloured mesh, shut ^ ^ lids into another; swapped by setSleepFace (kept out of bake)
-  const fg = (geo, col, x, y, z, sx = 1, sy = 1, sz = 1, ry = 0) => { const g = geo.toNonIndexed(); g.scale(sx, sy, sz); g.rotateY(ry); g.translate(x, y, z); const c = new THREE.Color(col), n = g.attributes.position.count, a = new Float32Array(n * 3);
+  const fg = (geo, col, x, y, z, sx = 1, sy = 1, sz = 1, ry = 0, rz = 0) => { const g = geo.toNonIndexed(); g.scale(sx, sy, sz); g.rotateZ(rz); g.rotateY(ry); g.translate(x, y, z); const c = new THREE.Color(col), n = g.attributes.position.count, a = new Float32Array(n * 3);
     for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'color') g.deleteAttribute(k); return g; };
   const openG = [], shutG = [];
   [-0.22, 0.22].forEach(x => { openG.push(fg(new THREE.SphereGeometry(0.1, 12, 10), 0x2a1f3a, x, -0.04, 0.6, 0.95, 1.4, 0.5), fg(new THREE.SphereGeometry(0.03, 6, 4), 0xffffff, x + 0.03, 0.03, 0.66),
       fg(new THREE.CircleGeometry(0.08, 10), 0xffb8bc, x * 1.5, -0.2, 0.58, 1, 1, 1, x > 0 ? 0.45 : -0.45));
-    shutG.push(fg(new THREE.TorusGeometry(0.085, 0.022, 5, 12, Math.PI), 0x2a1f3a, x, -0.08, 0.64)); });
+    shutG.push(fg(new THREE.TorusGeometry(0.08, 0.02, 5, 12, Math.PI * 0.8), 0x2a1f3a, x, -0.02, 0.645, 1, 0.55, 1, 0, Math.PI * 1.1)); }); // relaxed lids: shallow downward u, not a smiling ^
+  // smile lives in the open face (hidden while asleep); each bot gets its own neutral sleeping mouth
+  openG.push(fg(new THREE.TorusGeometry(0.07, 0.016, 6, 12, Math.PI), 0x8a3b3b, 0, -0.24, 0.62, 1, 1, 1, 0, Math.PI));
+  const MOUTH = 0x7a3540, sleepMouth = { spiky: 'o', bob: 'drool', bun: 'frown', twintails: 'mumble' }[hairStyle] || 'o';
+  if (sleepMouth === 'o') shutG.push(fg(new THREE.TorusGeometry(0.045, 0.016, 5, 12), MOUTH, 0, -0.25, 0.63, 0.9, 1.1, 1));
+  if (sleepMouth === 'drool') shutG.push(fg(new THREE.TorusGeometry(0.05, 0.014, 5, 10, Math.PI * 0.7), MOUTH, 0.02, -0.25, 0.63, 1, 1, 1, 0, Math.PI * 1.15));
+  if (sleepMouth === 'frown') shutG.push(fg(new THREE.TorusGeometry(0.06, 0.014, 5, 12, Math.PI * 0.7), MOUTH, 0, -0.29, 0.62, 1, 0.6, 1, 0, Math.PI * 0.15)); // slight pout/frown (shallow ∩)
   const faceMat = new THREE.MeshBasicMaterial({ vertexColors: true });
   const faceOpen = new THREE.Mesh(mergeGeometries(openG), faceMat), faceShut = new THREE.Mesh(mergeGeometries(shutG), faceMat); faceShut.visible = false;
   faceOpen.userData.dynamic = faceShut.userData.dynamic = true; head.add(faceOpen, faceShut);
+  let anim = null; // animated sleep bit (only drawn while asleep, when the open face is hidden)
+  if (sleepMouth === 'drool') { anim = new THREE.Mesh(new THREE.SphereGeometry(0.085, 10, 8), new THREE.MeshBasicMaterial({ color: 0xcfefff, transparent: true, opacity: 0.75 })); anim.position.set(0.09, -0.27, 0.64); }
+  if (sleepMouth === 'mumble') { anim = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), new THREE.MeshBasicMaterial({ color: MOUTH })); anim.scale.set(1, 0.35, 0.4); anim.position.set(0, -0.25, 0.62); }
+  if (anim) { anim.visible = false; anim.userData.dynamic = true; head.add(anim); }
   // hair cap
   const cap = toonMesh(new THREE.SphereGeometry(0.72, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.56), hair); cap.scale.set(1.06, 1, 1.02); cap.position.y = 0.04; cap.rotation.x = -0.28; head.add(cap);
   // soft fringe bangs
   [-0.32, 0, 0.32].forEach((x, i) => { const b = toonMesh(new THREE.SphereGeometry(0.22, 12, 10), hair); b.scale.set(1.1, 0.75, 0.6); b.position.set(x, 0.36 - Math.abs(x) * 0.25, 0.52); head.add(b); });
   // little rounded ears/nose and a smile
-  const smile = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.016, 6, 12, Math.PI), new THREE.MeshBasicMaterial({ color: 0x8a3b3b })); smile.rotation.z = Math.PI; smile.position.set(0, -0.24, 0.62); head.add(smile);
   if (hairStyle === 'twintails') { [-1, 1].forEach(s => { const t = toonMesh(new THREE.CapsuleGeometry(0.17, 0.55, 4, 8), hair); t.position.set(0.74 * s, -0.25, -0.1); t.rotation.z = 0.35 * s; head.add(t);
       const bow = toonMesh(new THREE.BoxGeometry(0.22, 0.14, 0.1), 0xffe066); bow.position.set(0.66 * s, 0.25, -0.05); head.add(bow); }); }
   if (hairStyle === 'spiky') { for (let i = 0; i < 7; i++) { const a = i / 7 * Math.PI * 2; const sp = toonMesh(new THREE.ConeGeometry(0.17, 0.45, 6), hair);
@@ -60,6 +69,9 @@ export function makeChibi({ name, role, skin = 0xffe0c8, hair, shirt, pants, hai
   ctrl.rotation.x = -0.5; ctrl.position.set(0, 0.8, 0.62); body.add(ctrl);
   const props = { cup, liq, spinner, pencil, book, pad, ctrl }; Object.values(props).forEach(o => { if (o !== liq) o.visible = false; });
   root.userData.parts = { body, head, armL, armR, legL, legR }; root.userData.hit = hit; root.userData.props = props;
-  let asleep = false; root.userData.setSleepFace = on => { if (on === asleep) return; asleep = on; faceOpen.visible = !on; faceShut.visible = on; };
+  let asleep = false; root.userData.setSleepFace = on => { if (on === asleep) return; asleep = on; faceOpen.visible = !on; faceShut.visible = on; if (anim) anim.visible = on; };
+  root.userData.sleepAnim = (t, ph) => { if (!anim) return; // drool bubble slowly inflates now and then; mumbling mouth moves in short bursts
+    if (sleepMouth === 'drool') { const u = ((t + ph * 7) % 9) / 9, g = u < 0.6 ? 0.25 + u / 0.6 * 0.95 : u < 0.63 ? 1.4 : 0.15; anim.scale.setScalar(g); anim.position.y = -0.27 - g * 0.02; }
+    else { const on = Math.sin(t * 0.45 + ph) > 0.55; anim.scale.y = on ? 0.3 + Math.abs(Math.sin(t * 9)) * 0.9 : 0.3; } };
   return root;
 }
