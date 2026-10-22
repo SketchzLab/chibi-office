@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { toonMesh } from './toon.js';
 import { bake } from './bake.js';
+import { FLOOR, BACK_Z, LEFT_X, GLASS, LOUNGE, DESKS, PANTRY, WALKWAY } from './layout.js';
 // Phone-friendly glow: emissive screen + additive soft halo quad (no post-process bloom).
 const haloTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
   const r = g.createRadialGradient(32, 32, 0, 32, 32, 32); r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(1, 'rgba(255,255,255,0)');
@@ -66,17 +67,19 @@ function pantry() {
 }
 const WALL = 0xf6f3ec, TEAL = 0x4fb3a9;
 function shell(g) {
-  // back wall (z=-5) full height, left wall (x=-6.5) stepping down toward the front = cut-away look
-  const bw = toonMesh(B(13, 2.4, 0.2), WALL); bw.position.set(0, 1.2, -4.9); g.add(bw);
-  const bt = toonMesh(B(13.1, 0.18, 0.3), TEAL); bt.position.set(0, 2.45, -4.9); g.add(bt);
-  const bb = toonMesh(B(13, 0.14, 0.24), TEAL, { outline: false }); bb.position.set(0, 0.07, -4.78); g.add(bb);
-  const segs = [[-4.95, -1.0, 2.4], [-1.0, 1.6, 1.5], [1.6, 4.95, 0.7]];
-  segs.forEach(([a, b, h]) => { const w = toonMesh(B(0.2, h, b - a), WALL); w.position.set(-6.4, h / 2, (a + b) / 2); g.add(w);
-    const t = toonMesh(B(0.3, 0.16, b - a + 0.02), TEAL); t.position.set(-6.4, h + 0.04, (a + b) / 2); g.add(t); });
-  // wall art + whiteboard on back wall
-  const wb = toonMesh(B(2.0, 1.0, 0.05), 0xffffff); wb.position.set(-1.2, 1.55, -4.77); g.add(wb);
-  [[-1.7, 1.7, 0xff9b7a], [-1.0, 1.45, 0x7ac8a0], [-0.6, 1.75, 0x9aa8ff]].forEach(([x, y, c]) => { const n = toonMesh(B(0.3, 0.3, 0.02), c, { outline: false }); n.position.set(x, y, -4.73); g.add(n); });
-  const art = toonMesh(B(0.8, 0.6, 0.05), 0xffd36a); art.position.set(1.4, 1.6, -4.77); g.add(art);
+  const W = FLOOR.x1 - FLOOR.x0;
+  // back wall full height, left wall stepping down toward the front = cut-away look
+  const bw = toonMesh(B(W, 2.6, 0.2), WALL); bw.position.set(0, 1.3, BACK_Z); g.add(bw);
+  const bt = toonMesh(B(W + 0.1, 0.18, 0.3), TEAL); bt.position.set(0, 2.65, BACK_Z); g.add(bt);
+  const bb = toonMesh(B(W, 0.14, 0.24), TEAL, { outline: false }); bb.position.set(0, 0.07, BACK_Z + 0.12); g.add(bb);
+  const segs = [[FLOOR.z0 + 0.05, -2.0, 2.6], [-2.0, 2.2, 1.5], [2.2, FLOOR.z1 - 0.05, 0.7]];
+  segs.forEach(([a, b, h]) => { const w = toonMesh(B(0.2, h, b - a), WALL); w.position.set(LEFT_X, h / 2, (a + b) / 2); g.add(w);
+    const t = toonMesh(B(0.3, 0.16, b - a + 0.02), TEAL); t.position.set(LEFT_X, h + 0.04, (a + b) / 2); g.add(t); });
+  // big windows cut into the back wall (sky shows through as light panels)
+  [-0.2, 6.2].forEach(x => { const win = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.2), new THREE.MeshBasicMaterial({ color: 0xcdeefc })); win.position.set(x, 1.6, BACK_Z + 0.11); g.add(win);
+    const fr = toonMesh(B(2.6, 0.1, 0.08), TEAL, { outline: false }); fr.position.set(x, 2.25, BACK_Z + 0.12); g.add(fr); const fb = fr.clone(); fb.position.y = 0.95; g.add(fb); });
+  const wb = toonMesh(B(2.2, 1.1, 0.05), 0xffffff); wb.position.set(2.9, 1.6, BACK_Z + 0.13); g.add(wb);
+  [[2.3, 1.75, 0xff9b7a], [3.0, 1.5, 0x7ac8a0], [3.5, 1.8, 0x9aa8ff]].forEach(([x, y, c]) => { const n = toonMesh(B(0.3, 0.3, 0.02), c, { outline: false }); n.position.set(x, y, BACK_Z + 0.17); g.add(n); });
 }
 function bookshelf(w = 1.6, h = 2.0) {
   const g = new THREE.Group(); const fr = toonMesh(B(w, h, 0.45), 0xc98d55); fr.position.y = h / 2; g.add(fr);
@@ -87,56 +90,60 @@ function bookshelf(w = 1.6, h = 2.0) {
   return g;
 }
 function glassRoom(g) {
-  // back-left: x -6.3..-3.3, z -4.8..-1.2
-  const x0 = -6.3, x1 = -3.3, z0 = -4.8, z1 = -1.2, H = 2.2;
-  const glass = new THREE.MeshBasicMaterial({ color: 0xbfe9f2, transparent: true, opacity: 0.28, depthWrite: false });
-  const pane = (w, cx, cz, ry) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, H), glass); m.position.set(cx, H / 2, cz); m.rotation.y = ry; g.add(m); };
-  const door0 = -4.35; pane(door0 - x0, (x0 + door0) / 2, z1, 0); // doorway gap door0..x1 pane(z1 - z0, x1, (z0 + z1) / 2, Math.PI / 2);
+  const { x0, x1, z0, z1, door0 } = GLASS, H = 2.3, cx = (x0 + x1) / 2, cz = (z0 + z1) / 2;
+  const glass = new THREE.MeshBasicMaterial({ color: 0xbfe9f2, transparent: true, opacity: 0.25, depthWrite: false, side: THREE.DoubleSide });
+  const pane = (w, px, pz, ry) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, H), glass); m.position.set(px, H / 2, pz); m.rotation.y = ry; g.add(m); };
+  pane(door0 - x0, (x0 + door0) / 2, z1, 0);            // front pane, doorway gap door0..x1
+  pane(z1 - z0, x1, cz, Math.PI / 2);                   // side pane
   const F = 0x3f6f6a; const fr = (w, h, d, x, y, z) => { const m = toonMesh(B(w, h, d), F, { outline: false }); m.position.set(x, y, z); g.add(m); };
-  fr(x1 - x0, 0.08, 0.08, (x0 + x1) / 2, H, z1); fr(0.08, 0.08, z1 - z0, x1, H, (z0 + z1) / 2);
+  fr(x1 - x0, 0.08, 0.08, cx, H, z1); fr(0.08, 0.08, z1 - z0, x1, H, cz);
   [x0 + 0.05, (x0 + door0) / 2, door0, x1].forEach(x => fr(0.07, H, 0.07, x, H / 2, z1));
-  const mat = toonMesh(B(x1 - door0 - 0.1, 0.02, 0.5), 0x3f6f6a, { outline: false }); mat.position.set((door0 + x1) / 2, 0.01, z1 + 0.3); g.add(mat); [z0 + 0.1, (z0 + z1) / 2].forEach(z => fr(0.07, H, 0.07, x1, H / 2, z));
-  // door gap: leave open by not adding a pane on part? (kept simple)
-  const tbl = toonMesh(new THREE.CylinderGeometry(0.9, 0.9, 0.08, 20), 0xe9c38e); tbl.position.set(-4.8, 0.78, -3.0); tbl.scale.z = 1.3; g.add(tbl);
-  const leg = toonMesh(new THREE.CylinderGeometry(0.08, 0.2, 0.75, 8), 0xf4f1ea); leg.position.set(-4.8, 0.38, -3.0); g.add(leg);
-  [[-5.8, -3.0], [-3.8, -3.0], [-4.8, -4.2], [-4.8, -1.8]].forEach(([x, z]) => { const c = toonMesh(B(0.5, 0.5, 0.5), 0xf0ece4); c.position.set(x, 0.25, z); g.add(c); });
-  const tv = toonMesh(B(0.08, 0.8, 1.4), 0x2b2d42); tv.position.set(-6.2, 1.4, -3.0); g.add(tv);
-  const tvs = new THREE.Mesh(B(0.01, 0.7, 1.3), new THREE.MeshBasicMaterial({ color: 0x9fe3ff })); tvs.position.set(-6.15, 1.4, -3.0); g.add(tvs);
+  [z0 + 0.1, cz].forEach(z => fr(0.07, H, 0.07, x1, H / 2, z));
+  const mat = toonMesh(B(x1 - door0 - 0.1, 0.02, 0.6), F, { outline: false }); mat.position.set((door0 + x1) / 2, 0.01, z1 + 0.4); g.add(mat);
+  const rug = toonMesh(B(x1 - x0 - 0.8, 0.02, z1 - z0 - 0.8), 0xdfe9ee, { outline: false }); rug.position.set(cx, 0.012, cz); g.add(rug);
+  const tbl = toonMesh(new THREE.CylinderGeometry(1.0, 1.0, 0.08, 24), 0xe9c38e); tbl.position.set(cx, 0.78, cz); tbl.scale.x = 1.5; g.add(tbl);
+  const leg = toonMesh(new THREE.CylinderGeometry(0.1, 0.25, 0.75, 10), 0xf4f1ea); leg.position.set(cx, 0.38, cz); g.add(leg);
+  [[-2.1, 0], [2.1, 0], [-0.8, -1.3], [0.8, -1.3], [-0.8, 1.3], [0.8, 1.3]].forEach(([dx, dz]) => { const c = toonMesh(new THREE.CylinderGeometry(0.3, 0.3, 0.5, 12), 0xf0ece4); c.position.set(cx + dx, 0.25, cz + dz); g.add(c); });
+  const tv = toonMesh(B(0.08, 0.9, 1.8), 0x2b2d42); tv.position.set(x0 + 0.05, 1.45, cz); g.add(tv);
+  const tvs = new THREE.Mesh(B(0.01, 0.8, 1.7), new THREE.MeshBasicMaterial({ color: 0x9fe3ff })); tvs.position.set(x0 + 0.1, 1.45, cz); g.add(tvs);
 }
 function lounge(g) {
-  // front-left: green L sofa, rug, coffee table, orange armchair
-  const rug = toonMesh(B(3.4, 0.02, 3.0), 0xf2e2c4, { outline: false }); rug.position.set(-4.6, 0.01, 3.1); g.add(rug);
+  const { cx, cz } = LOUNGE;
+  const rug = toonMesh(B(5.0, 0.02, 4.2), 0xf2e2c4, { outline: false }); rug.position.set(cx, 0.01, cz); g.add(rug);
   const S = 0x6fb36a, SD = 0x5a9e57;
   const sofa = (w, x, z, ry) => { const s = new THREE.Group(); s.position.set(x, 0, z); s.rotation.y = ry;
-    const base = toonMesh(new THREE.BoxGeometry(w, 0.45, 0.9, 1, 1, 1), S); base.position.y = 0.25; s.add(base);
+    const base = toonMesh(B(w, 0.45, 0.9), S); base.position.y = 0.25; s.add(base);
     const back = toonMesh(B(w, 0.6, 0.25), SD); back.position.set(0, 0.7, -0.35); s.add(back);
-    for (let i = 0; i < Math.round(w / 0.9); i++) { const cu = toonMesh(new THREE.CapsuleGeometry(0.18, w / Math.round(w / 0.9) - 0.45, 3, 8), 0x86c97f); cu.rotation.z = Math.PI / 2; cu.position.set(-w / 2 + (i + 0.5) * w / Math.round(w / 0.9), 0.55, 0.05); s.add(cu); }
+    const n = Math.round(w / 0.9); for (let i = 0; i < n; i++) { const cu = toonMesh(new THREE.CapsuleGeometry(0.18, w / n - 0.45, 3, 8), 0x86c97f); cu.rotation.z = Math.PI / 2; cu.position.set(-w / 2 + (i + 0.5) * w / n, 0.55, 0.05); s.add(cu); }
     [-1, 1].forEach(k => { const arm = toonMesh(B(0.22, 0.55, 0.9), SD); arm.position.set(k * (w / 2 - 0.05), 0.4, 0); s.add(arm); });
     g.add(s); };
-  sofa(2.6, -4.6, 4.5, Math.PI); sofa(2.0, -5.9, 2.7, Math.PI / 2);
-  const ct = toonMesh(new THREE.CylinderGeometry(0.55, 0.55, 0.1, 16), 0xe9c38e); ct.position.set(-4.4, 0.42, 3.0); g.add(ct);
-  const cl = toonMesh(new THREE.CylinderGeometry(0.06, 0.06, 0.4), 0xf4f1ea, { outline: false }); cl.position.set(-4.4, 0.2, 3.0); g.add(cl);
-  const book = toonMesh(B(0.3, 0.05, 0.22), 0xff8a7a, { outline: false }); book.position.set(-4.3, 0.5, 3.0); g.add(book);
-  const ac = new THREE.Group(); ac.position.set(-3.1, 0, 2.4); ac.rotation.y = -1.2;
+  sofa(3.2, cx, cz + 2.0, Math.PI); sofa(2.4, cx - 2.2, cz - 0.1, Math.PI / 2);
+  const ct = toonMesh(new THREE.CylinderGeometry(0.65, 0.65, 0.1, 18), 0xe9c38e); ct.position.set(cx + 0.1, 0.42, cz - 0.1); g.add(ct);
+  const cl = toonMesh(new THREE.CylinderGeometry(0.06, 0.06, 0.4), 0xf4f1ea, { outline: false }); cl.position.set(cx + 0.1, 0.2, cz - 0.1); g.add(cl);
+  const book = toonMesh(B(0.3, 0.05, 0.22), 0xff8a7a, { outline: false }); book.position.set(cx + 0.2, 0.5, cz - 0.1); g.add(book);
+  const ac = new THREE.Group(); ac.position.set(cx + 2.1, 0, cz - 0.9); ac.rotation.y = -1.1;
   const ab = toonMesh(B(0.9, 0.45, 0.85), 0xf08a5a); ab.position.y = 0.25; ac.add(ab);
   const abk = toonMesh(B(0.9, 0.6, 0.22), 0xe07848); abk.position.set(0, 0.7, -0.33); ac.add(abk); g.add(ac);
 }
+function walkway(g) {
+  // lighter wood runner marks the main aisle and the branch to the pantry
+  const { z, half, x0, x1 } = WALKWAY; const col = 0xf0c995;
+  const a = toonMesh(B(x1 - x0, 0.012, half * 2), col, { outline: false }); a.position.set((x0 + x1) / 2, 0.006, z); g.add(a);
+  const b = toonMesh(B(half * 2, 0.012, 4.6), col, { outline: false }); b.position.set(7.6, 0.007, -2.3); g.add(b);
+}
 export function makeOffice(scene) {
   const g = new THREE.Group();
-  shell(g); glassRoom(g); lounge(g);
-  [[-2.3, -4.55], [-0.6, -4.55]].forEach(([x, z]) => { const b = bookshelf(); b.position.set(x, 0, z); g.add(b); });
-  // kitchen cabinets next to pantry along back wall
-  const cab = toonMesh(B(2.2, 1.0, 0.7), 0xf4f1ea); cab.position.set(3.0, 0.5, -4.4); g.add(cab);
-  const cabTop = toonMesh(B(2.3, 0.08, 0.8), 0x8b6b4a); cabTop.position.set(3.0, 1.04, -4.4); g.add(cabTop);
-  const up = toonMesh(B(2.2, 0.7, 0.4), TEAL); up.position.set(3.0, 1.95, -4.6); g.add(up);
-  const sink = toonMesh(B(0.6, 0.05, 0.4), 0xc8d3dc, { outline: false }); sink.position.set(2.6, 1.09, -4.35); g.add(sink);
-  // open desks: 2 rows, aisle at z~0 (walk paths use it) + spare
-  const spots = [[-1.6, -1.8], [1.0, -1.8], [-1.6, 1.8], [1.0, 1.8], [3.6, 1.8]];
-  spots.forEach(([x, z], i) => { const d = desk(); d.position.set(x, 0, z); if (z > 0) d.rotation.y = Math.PI; g.add(d); });
-  const p = pantry(); p.position.set(4.8, 0, -3.4); p.rotation.y = -Math.PI / 4 - Math.PI / 2 + Math.PI; g.add(p);
-  p.rotation.y = -0.53; // face island centre
-  [[-6.0, -0.5], [5.9, 0.4], [-2.6, 4.6], [5.6, 4.6]].forEach(([x, z], i) => { const pl = plant(1 + (i % 2) * 0.4); pl.position.set(x, 0, z); g.add(pl); });
-  [[-5.6, 0.6], [5.9, 3.0]].forEach(([x, z]) => { const l = lamp(); l.position.set(x, 0, z); g.add(l); });
+  shell(g); glassRoom(g); lounge(g); walkway(g);
+  [[-3.6, BACK_Z + 0.35], [-1.9, BACK_Z + 0.35]].forEach(([x, z]) => { const b = bookshelf(); b.position.set(x, 0, z); g.add(b); });
+  // kitchen cabinets along back wall
+  const kx = 4.9, kz = BACK_Z + 0.5;
+  const cab = toonMesh(B(2.6, 1.0, 0.7), 0xf4f1ea); cab.position.set(kx, 0.5, kz); g.add(cab);
+  const cabTop = toonMesh(B(2.7, 0.08, 0.8), 0x8b6b4a); cabTop.position.set(kx, 1.04, kz); g.add(cabTop);
+  const sink = toonMesh(B(0.6, 0.05, 0.4), 0xc8d3dc, { outline: false }); sink.position.set(kx - 0.5, 1.09, kz + 0.05); g.add(sink);
+  DESKS.forEach(([x, z]) => { const d = desk(); d.position.set(x, 0, z); if (z > 0) d.rotation.y = Math.PI; g.add(d); });
+  const p = pantry(); p.position.set(PANTRY.x, 0, PANTRY.z); p.rotation.y = PANTRY.ry; g.add(p);
+  [[-4.4, -4.8], [7.4, 2.6], [-4.3, 6.9], [6.6, 6.9], [10.2, -1.2]].forEach(([x, z], i) => { const pl = plant(1.1 + (i % 2) * 0.4); pl.position.set(x, 0, z); g.add(pl); });
+  [[-4.6, 0.9], [9.6, 3.2]].forEach(([x, z]) => { const l = lamp(); l.position.set(x, 0, z); g.add(l); });
   scene.add(g); bake(g);
   return g;
 }

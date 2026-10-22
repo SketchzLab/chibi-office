@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { makeSky } from './sky.js';
+import { toonUniforms } from './toon.js';
 import { makeIsland } from './island.js';
 import { makeNature } from './nature.js';
 import { makeOffice, glows } from './props.js';
@@ -12,25 +13,29 @@ renderer.setSize(innerWidth, innerHeight);
 document.body.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 500);
-camera.position.set(19, 10, 19).multiplyScalar(Math.max(1, 1.3 / camera.aspect));
+const CAM_DIR = new THREE.Vector3(1, 0.56, 1).normalize();
+// Fit the whole island (radius ~R plus clouds of breathing room) for any aspect, incl. Fold cover (≈0.43) and inner (≈0.84) screens.
+function fitDistance() { const vf = THREE.MathUtils.degToRad(camera.fov) / 2, hf = Math.atan(Math.tan(vf) * camera.aspect);
+  return Math.max(13.5 / Math.tan(vf), 18.5 / Math.tan(hf)); }
+camera.position.copy(CAM_DIR).multiplyScalar(fitDistance()).add(new THREE.Vector3(0, -2.5, 0));
 const camP = new URLSearchParams(location.search).get('cam'); if (camP) camera.position.set(...camP.split(',').map(Number));
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, -1.8, 0); const tgtP = new URLSearchParams(location.search).get('tgt'); if (tgtP) { controls.target.set(...tgtP.split(',').map(Number)); controls.minDistance = 3; } controls.enableDamping = true; controls.enablePan = false;
-controls.minDistance = 10; controls.maxDistance = 70; controls.minPolarAngle = 0.3; controls.maxPolarAngle = 1.35;
+controls.target.set(0, -2.5, 0); const tgtP = new URLSearchParams(location.search).get('tgt'); if (tgtP) { controls.target.set(...tgtP.split(',').map(Number)); controls.minDistance = 3; } controls.enableDamping = true; controls.enablePan = false;
+controls.minDistance = 12; controls.maxDistance = 110; controls.minPolarAngle = 0.3; controls.maxPolarAngle = 1.35;
 const sky = makeSky(scene);
 const island = makeIsland(scene);
 const nature = makeNature(scene);
 makeOffice(scene);
 const pixel = makeChibi({ name: 'Pixel', role: 'Game Developer', hair: 0xff7eb6, shirt: 0xffd36a, pants: 0x6a5acd, hairStyle: 'twintails' });
-Object.assign(pixel.userData, { faceDesk: Math.PI, facePantry: Math.PI - 0.53, deskActivity: 'Coding a game build', pantryActivity: 'Grabbing coffee' });
+Object.assign(pixel.userData, { faceDesk: Math.PI, facePantry: 2.79, deskActivity: 'Coding a game build', pantryActivity: 'Grabbing coffee' });
 const jun = makeChibi({ name: 'Jun', role: 'UI Designer', hair: 0x2f3b66, shirt: 0x5ec4b6, pants: 0x3a3340, hairStyle: 'spiky' });
-Object.assign(jun.userData, { faceDesk: 0, facePantry: Math.PI - 0.53, deskActivity: 'Sketching UI mockups', pantryActivity: 'Making bubble tea' });
-pixel.scale.setScalar(1.2); jun.scale.setScalar(1.2);
+Object.assign(jun.userData, { faceDesk: 0, facePantry: 2.79, deskActivity: 'Sketching UI mockups', pantryActivity: 'Making bubble tea' });
+pixel.scale.setScalar(1.5); jun.scale.setScalar(1.5);
 scene.add(pixel, jun);
 export const chibis = [pixel, jun];
 const walkers = [
-  makeWalker(pixel, [[1.0, -0.55], [2.6, -0.6], [3.7, -2.15]], { offset: 0 }),
-  makeWalker(jun, [[-1.6, 0.55], [0, 0.3], [3.2, 0.2], [4.9, -1.85]], { offset: 6, deskTime: 6 }),
+  makeWalker(pixel, [[1.0, -1.3], [1.5, 0], [6.0, 0], [6.9, -4.97]], { offset: 0 }),
+  makeWalker(jun, [[-2.4, 1.3], [-1.6, 0.2], [6.6, 0.3], [8.4, -4.43]], { offset: 6, deskTime: 6 }),
 ];
 let prevT = 0;
 // --- Name card ---
@@ -43,7 +48,7 @@ const css = document.createElement('style'); css.textContent = `#card{position:f
  #card .a{font-size:15px;display:flex;align-items:center;gap:8px} #card .dot{width:10px;height:10px;border-radius:50%;background:#3ccf7a;box-shadow:0 0 6px #3ccf7a}`;
 document.head.appendChild(css);
 let selected = null;
-const ring = new THREE.Mesh(new THREE.RingGeometry(0.9, 1.1, 32), new THREE.MeshBasicMaterial({ color: 0xfff1a8, transparent: true, opacity: 0.85, depthWrite: false }));
+const ring = new THREE.Mesh(new THREE.RingGeometry(1.15, 1.4, 32), new THREE.MeshBasicMaterial({ color: 0xfff1a8, transparent: true, opacity: 0.85, depthWrite: false }));
 ring.rotation.x = -Math.PI / 2; ring.visible = false; scene.add(ring);
 function select(c) { selected = c; card.classList.toggle('on', !!c); ring.visible = !!c;
   if (c) { card.querySelector('.n').textContent = c.userData.name; card.querySelector('.r').textContent = c.userData.role; } }
@@ -73,6 +78,7 @@ function loop() { const t = clock.getElapsedTime(); const dt = Math.min(0.1, t -
   if (selected) { card.querySelector('.t').textContent = selected.userData.activity; ring.position.set(selected.position.x, 0.04, selected.position.z); }
   sky.clouds.children.forEach(c => { c.position.y += Math.sin(t * 0.3 + c.userData.drift * 6) * 0.004; });
   nature.update(t);
+  { const d = camera.position.distanceTo(controls.target); toonUniforms.uFogRange.value.set(d + 15, d + 170); }
   controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop); }
 loop();
-addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); if (!camP) { const off = camera.position.clone().sub(controls.target).setLength(fitDistance()); camera.position.copy(controls.target).add(off); } renderer.setSize(innerWidth, innerHeight); });
