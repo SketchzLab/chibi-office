@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { toonMesh } from './toon.js';
+import { bake } from './bake.js';
 export function makeIsland(scene) {
   const g = new THREE.Group();
   let seed = 3; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
@@ -23,9 +24,9 @@ export function makeIsland(scene) {
   for (let i = 0; i < 12; i++) { const a = rnd() * 6.28, b = toonMesh(new THREE.DodecahedronGeometry(0.6 + rnd() * 0.9, 0), 0xbdb09a);
     b.position.set(Math.cos(a) * 9.6, -1.2 - rnd() * 1.5, Math.sin(a) * 9.6); b.rotation.set(rnd(), rnd(), rnd()); g.add(b); }
   // small floating rocks with grass caps
-  [[-14, -3, 5], [13, -5, -7], [7, -7, 13]].forEach(([x, yy, z], i) => { const r = new THREE.Group(); r.position.set(x, yy, z); r.userData.float = i;
+  [[-14, -3, 5], [13, -5, -7], [7, -7, 13]].forEach(([x, yy, z], i) => { const r = new THREE.Group(); r.position.set(x, yy, z); r.userData.float = i; r.userData.dynamic = true;
     const s = 0.8 + i * 0.3; const rock = toonMesh(new THREE.ConeGeometry(s, s * 1.8, 7), 0xb5a690); rock.rotation.x = Math.PI; rock.position.y = -s * 0.9; r.add(rock);
     const cap = toonMesh(new THREE.CylinderGeometry(s * 1.05, s, 0.3, 9), 0x86cf5e); r.add(cap); g.add(r); });
-  scene.add(g);
+  scene.add(g); bake(g);
   return g;
 }

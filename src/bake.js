@@ -1,0 +1,31 @@
+import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { vcolToonMat, getOutlineMat } from './toon.js';
+// Merge every static toon mesh under `root` into ONE vertex-coloured toon mesh + ONE outline mesh.
+// Skips subtrees flagged userData.dynamic. Returns {before, after} mesh counts.
+const sharedMat = vcolToonMat();
+function prep(geo, mat4, color) {
+  let g = geo.index ? geo.toNonIndexed() : geo.clone();
+  for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k);
+  g.applyMatrix4(mat4);
+  if (color) { const n = g.attributes.position.count, a = new Float32Array(n * 3); for (let i = 0; i < n; i++) { a[i * 3] = color.r; a[i * 3 + 1] = color.g; a[i * 3 + 2] = color.b; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); }
+  return g;
+}
+export function bake(root) {
+  root.updateMatrixWorld(true); const inv = root.matrixWorld.clone().invert();
+  const fills = [], hulls = [], kill = [];
+  const walk = o => { if (o !== root && o.userData.dynamic) return;
+    if (o.isMesh && !o.isInstancedMesh && o.material.userData?.toon && !o.material.vertexColors) {
+      const m = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld);
+      const col = o.material.uniforms.uColor.value.clone().add(o.material.uniforms.uEmissive.value);
+      fills.push(prep(o.geometry, m, col)); kill.push(o);
+      o.children.forEach(c => { if (c.material === getOutlineMat()) hulls.push(prep(c.geometry, m.clone().multiply(c.matrix), null)); });
+    }
+    o.children.slice().forEach(walk); };
+  walk(root);
+  kill.forEach(o => { o.children.filter(c => c.material === getOutlineMat()).forEach(c => o.remove(c));
+    o.children.slice().forEach(c => o.parent.attach(c)); o.parent.remove(o); });
+  if (!fills.length) return;
+  const fm = new THREE.Mesh(mergeGeometries(fills), sharedMat); root.add(fm);
+  if (hulls.length) { const hm = new THREE.Mesh(mergeGeometries(hulls), getOutlineMat()); hm.raycast = () => {}; root.add(hm); }
+}

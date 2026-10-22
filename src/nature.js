@@ -1,14 +1,15 @@
 import * as THREE from 'three';
 import { toonMesh, toonMat } from './toon.js';
+import { bake } from './bake.js';
 let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 const POOL = new THREE.Vector3(-2.6, 0, 7.4);
 function onGrassRing(x, z) { const r = Math.hypot(x, z); return r < 9.3 && (Math.abs(x) > 6.8 || Math.abs(z) > 5.3); }
 function tree(s = 1) {
   const g = new THREE.Group();
-  const trunk = toonMesh(new THREE.CylinderGeometry(0.16, 0.24, 1.6, 7), 0x9a6a44); trunk.position.y = 0.8; g.add(trunk);
+  const trunk = toonMesh(new THREE.CylinderGeometry(0.16, 0.24, 1.6, 6), 0x9a6a44); trunk.position.y = 0.8; g.add(trunk);
   const greens = [0x5fb550, 0x6cc45a, 0x4fa548];
   [[0, 2.1, 0, 1.0], [0.6, 1.8, 0.2, 0.7], [-0.55, 1.85, -0.1, 0.72], [0.1, 2.7, -0.1, 0.7]].forEach(([x, y, z, r], i) => {
-    const m = toonMesh(new THREE.IcosahedronGeometry(r, 1), greens[i % 3]); m.position.set(x, y, z); g.add(m); });
+    const m = toonMesh(new THREE.SphereGeometry(r, 8, 6), greens[i % 3]); m.position.set(x, y, z); g.add(m); });
   g.scale.setScalar(s); g.rotation.y = rnd() * 6.28; return g;
 }
 export function makeNature(scene) {
@@ -39,7 +40,7 @@ export function makeNature(scene) {
   for (let i = 0; i < fp.count; i++) { const y = fp.getY(i); const k = (7 - y) / 14; fp.setZ(i, Math.pow(k, 0.6) * 1.6); fp.setX(i, fp.getX(i) * (1 + k * 1.2)); }
   const fall = new THREE.Mesh(fallGeo, fallMat); fall.position.set(POOL.x, -7.0, 10.3); g.add(fall);
   // mist puffs at the bottom
-  const mistMat = toonMat(0xf4fbff); const mist = new THREE.Group(); mist.position.set(POOL.x, -14.2, 11.8);
+  const mistMat = toonMat(0xf4fbff); const mist = new THREE.Group(); mist.userData.dynamic = true; mist.position.set(POOL.x, -14.2, 11.8);
   for (let i = 0; i < 5; i++) { const m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.7 + rnd() * 0.6, 2), mistMat); m.position.set((rnd() - 0.5) * 2.5, rnd() * 0.6, (rnd() - 0.5) * 1.2); mist.add(m); }
   g.add(mist);
   updates.push(t => { waterMat.uniforms.uT.value = t; fallMat.uniforms.uT.value = t; mist.children.forEach((m, i) => m.scale.setScalar(1 + Math.sin(t * 2 + i) * 0.08)); });
@@ -59,14 +60,14 @@ export function makeNature(scene) {
     while (k < 40) { const x = (rnd() - 0.5) * 19, z = (rnd() - 0.5) * 19; if (!onGrassRing(x, z) || Math.hypot(x - POOL.x, z - POOL.z) < 2.3) continue; M.makeTranslation(x, 0.2, z); f.setMatrixAt(k++, M); } g.add(f); });
   // bushes on the rim
   for (let i = 0; i < 14; i++) { const a = rnd() * 6.28, r = 9.0 + rnd() * 0.5; const x = Math.cos(a) * r, z = Math.sin(a) * r; if (Math.hypot(x - POOL.x, z - 9.6) < 2) continue;
-    const b = toonMesh(new THREE.IcosahedronGeometry(0.5 + rnd() * 0.4, 1), rnd() > 0.5 ? 0x6cc45a : 0x57ad4b); b.position.set(x, 0.1, z); b.scale.y = 0.8; g.add(b); }
+    const b = toonMesh(new THREE.SphereGeometry(0.5 + rnd() * 0.4, 7, 5), rnd() > 0.5 ? 0x6cc45a : 0x57ad4b); b.position.set(x, 0.1, z); b.scale.y = 0.8; g.add(b); }
   // hanging vines over the cliff edge
   const vineGeo = new THREE.BoxGeometry(0.12, 1, 0.12); vineGeo.translate(0, -0.5, 0);
   const vines = new THREE.InstancedMesh(vineGeo, toonMat(0x4f9e4a), 46); for (let i = 0; i < 46; i++) { const a = i / 46 * 6.28 + rnd() * 0.1; const x = Math.cos(a) * 9.75, z = Math.sin(a) * 9.75;
     if (Math.hypot(x - POOL.x, z - 10) < 1.4) { M.makeScale(0, 0, 0); } else M.compose(new THREE.Vector3(x, -0.5, z), q.identity(), new THREE.Vector3(1, 1 + rnd() * 2.8, 1)); vines.setMatrixAt(i, M); }
   g.add(vines);
   // ---- rooftop garden on a back annex (becomes the back wall block of the office at 75%) ----
-  const annex = new THREE.Group(); annex.position.set(-1.5, 0, -6.6);
+  const annex = new THREE.Group(); annex.position.set(-1.5, 0, -6.3);
   const block = toonMesh(new THREE.BoxGeometry(8, 3, 2.4), 0xf4f1ea); block.position.y = 1.5; annex.add(block);
   const trim = toonMesh(new THREE.BoxGeometry(8.2, 0.25, 2.6), 0x4fb3a9); trim.position.y = 3.1; annex.add(trim);
   const roofGrass = toonMesh(new THREE.BoxGeometry(7.8, 0.12, 2.2), 0x86cf5e, { outline: false }); roofGrass.position.y = 3.28; annex.add(roofGrass);
@@ -75,7 +76,7 @@ export function makeNature(scene) {
   const rail = toonMesh(new THREE.BoxGeometry(8, 0.07, 0.07), 0x3f6f6a, { outline: false }); rail.position.set(0, 3.8, 1.2); annex.add(rail);
   // planters + mini tree + bushes
   [[-3, 0.2], [-1.6, -0.5], [2.8, -0.5]].forEach(([x, z]) => { const pl = toonMesh(new THREE.BoxGeometry(0.9, 0.35, 0.6), 0xb98250); pl.position.set(x, 3.5, z); annex.add(pl);
-    const b = toonMesh(new THREE.IcosahedronGeometry(0.42, 1), 0x6cc45a); b.position.set(x, 3.9, z); annex.add(b); });
+    const b = toonMesh(new THREE.SphereGeometry(0.42, 7, 5), 0x6cc45a); b.position.set(x, 3.9, z); annex.add(b); });
   const rt = tree(0.75); rt.position.set(0.3, 3.3, -0.3); annex.add(rt);
   // telescope on tripod
   const tel = new THREE.Group(); tel.position.set(2.4, 3.34, 0.4);
@@ -85,9 +86,9 @@ export function makeNature(scene) {
   annex.add(tel);
   // flag
   const pole = toonMesh(new THREE.CylinderGeometry(0.03, 0.03, 1.6), 0x8b5a3c, { outline: false }); pole.position.set(3.5, 4.1, -0.6); annex.add(pole);
-  const flag = toonMesh(new THREE.BoxGeometry(0.7, 0.42, 0.02), 0xff7a59); flag.position.set(3.85, 4.65, -0.6); annex.add(flag);
+  const flag = toonMesh(new THREE.BoxGeometry(0.7, 0.42, 0.02), 0xff7a59); flag.position.set(3.85, 4.65, -0.6); flag.userData.dynamic = true; annex.add(flag);
   updates.push(t => { flag.rotation.y = Math.sin(t * 3) * 0.25; });
   g.add(annex);
-  scene.add(g);
+  scene.add(g); bake(g);
   return { update: t => updates.forEach(u => u(t)) };
 }

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { toonMesh, toonMat } from './toon.js';
+import { bake } from './bake.js';
 export function makeSky(scene) {
   const mat = new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false,
     vertexShader: `varying vec3 vP; void main(){ vP=normalize(position); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);} `,
@@ -12,7 +13,7 @@ export function makeSky(scene) {
       gl_FragColor=vec4(c,1.0);} `});
   scene.add(new THREE.Mesh(new THREE.SphereGeometry(300, 32, 16), mat));
   // puffy 3D clouds: clusters of soft-toon spheres, no outline
-  const cloudMat = toonMat(0xffffff); const sph = new THREE.IcosahedronGeometry(1, 3);
+  const cloudMat = toonMat(0xffffff); const sph = new THREE.SphereGeometry(1, 10, 7);
   const clouds = new THREE.Group(); let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   for (let i = 0; i < 14; i++) {
     const c = new THREE.Group(); const a = i / 14 * Math.PI * 2 + rnd() * 0.3, r = 75 + rnd() * 60;
@@ -34,6 +35,6 @@ export function makeSky(scene) {
       const aa = rnd() * 6.28, rr = rnd() * R * 0.8; t.position.set(Math.cos(aa) * rr, 1.4, Math.sin(aa) * rr); g.add(t); }
     isl.add(g);
   }
-  scene.add(isl);
+  scene.add(isl); bake(isl); clouds.children.forEach(c => bake(c));
   return { clouds };
 }

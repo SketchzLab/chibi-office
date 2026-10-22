@@ -13,6 +13,7 @@ document.body.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 500);
 camera.position.set(19, 10, 19).multiplyScalar(Math.max(1, 1.3 / camera.aspect));
+const camP = new URLSearchParams(location.search).get('cam'); if (camP) camera.position.set(...camP.split(',').map(Number));
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0, -1.8, 0); controls.enableDamping = true; controls.enablePan = false;
 controls.minDistance = 10; controls.maxDistance = 70; controls.minPolarAngle = 0.3; controls.maxPolarAngle = 1.35;
