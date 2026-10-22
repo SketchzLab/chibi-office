@@ -34,7 +34,7 @@ function desk() {
   const pot = toonMesh(new THREE.CylinderGeometry(0.08, 0.06, 0.12, 6), 0xf4f1ea, { outline: false }); pot.position.set(-0.85, 1.01, -0.3); g.add(pot);
   const leaf = toonMesh(new THREE.SphereGeometry(0.13, 6, 4), 0x6cc45a, { outline: false }); leaf.position.set(-0.85, 1.16, -0.3); g.add(leaf);
   // chair
-  const ch = new THREE.Group(); ch.position.set(0, 0, 0.95);
+  const ch = new THREE.Group(); ch.position.set(0, 0, 1.2);
   const seat = toonMesh(RB(0.7, 0.14, 0.7, 0.06), 0x4fb3a9); seat.position.y = 0.55; ch.add(seat);
   const back = toonMesh(RB(0.7, 0.72, 0.12, 0.06), 0x4fb3a9); back.position.set(0, 0.95, 0.32); ch.add(back);
   const pole = toonMesh(new THREE.CylinderGeometry(0.05, 0.05, 0.5), 0x333344, { outline: false }); pole.position.y = 0.27; ch.add(pole);
@@ -153,8 +153,8 @@ export function makeOffice(scene) {
   const sink = toonMesh(B(0.6, 0.05, 0.4), 0xc8d3dc, { outline: false }); sink.position.set(kx - 0.5, 1.09, kz + 0.05); g.add(sink);
   DESKS.forEach(([x, z]) => { cast(x, z + (z > 0 ? -0.3 : 0.3), 3.0, 2.6); const d = desk(); d.position.set(x, 0, z); if (z > 0) d.rotation.y = Math.PI; g.add(d); });
   cast(PANTRY.x + 0.4, PANTRY.z, 6.2, 2.4, PANTRY.ry); const p = pantry(); p.position.set(PANTRY.x, 0, PANTRY.z); p.rotation.y = PANTRY.ry; g.add(p);
-  [[-4.4, -4.8], [7.4, 2.6], [-4.3, 6.9], [6.6, 6.9], [10.2, -1.2]].forEach(([x, z], i) => { const pl = plant(1.1 + (i % 2) * 0.4); pl.position.set(x, 0, z); cast(x, z, 1.4, 1.4); g.add(pl); });
-  [[-4.6, 0.9], [9.6, 3.2]].forEach(([x, z]) => { const l = lamp(); l.position.set(x, 0, z); cast(x, z, 1.0, 1.0); g.add(l); });
+  [[-4.6, -7.2], [7.4, 2.6], [-2.4, 7.2], [6.6, 6.9], [10.2, -1.2]].forEach(([x, z], i) => { const pl = plant(1.1 + (i % 2) * 0.4); pl.position.set(x, 0, z); cast(x, z, 1.4, 1.4); g.add(pl); });
+  [[-3.9, 7.3], [9.6, 3.2]].forEach(([x, z]) => { const l = lamp(); l.position.set(x, 0, z); cast(x, z, 1.0, 1.0); g.add(l); });
   scene.add(g); bake(g);
   return g;
 }

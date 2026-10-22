@@ -1,0 +1,10 @@
+{
+  "updatedAt": "2026-10-22T14:30:00Z",
+  "bots": {
+    "Pixel": { "task": "Building the chibi office web app" },
+    "Jun":   { "task": "Robber Town UI specs (paused)" },
+    "Mika":  { "task": "Imagine.ooo music video edits" },
+    "Sage":  { "task": "Advising on SketchzLab and side projects" }
+  },
+  "_doc": "Optional per bot: \"state\": \"working\" | \"break\" | \"meeting\" (overrides the clock routine while updatedAt is < 2 h old). Optional \"since\" ISO time per bot."
+}

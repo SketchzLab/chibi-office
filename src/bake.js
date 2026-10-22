@@ -3,7 +3,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { vcolToonMat, getOutlineMat } from './toon.js';
 // Merge every static toon mesh under `root` into ONE vertex-coloured toon mesh + ONE outline mesh.
 // Skips subtrees flagged userData.dynamic. Returns {before, after} mesh counts.
-const sharedMat = vcolToonMat();
+const sharedMat = vcolToonMat(); const basicVcol = new THREE.MeshBasicMaterial({ vertexColors: true });
 function prep(geo, mat4, color) {
   let g = geo.index ? geo.toNonIndexed() : geo.clone();
   for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'color') g.deleteAttribute(k);
@@ -15,7 +15,7 @@ function prep(geo, mat4, color) {
 }
 export function bake(root) {
   root.updateMatrixWorld(true); const inv = root.matrixWorld.clone().invert();
-  const fills = [], hulls = [], kill = [];
+  const fills = [], hulls = [], kill = [], basics = [];
   const walk = o => { if (o !== root && o.userData.dynamic) return;
     if (o.isMesh && !o.isInstancedMesh && o.material.userData?.toon && !o.material.vertexColors) {
       const m = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld);
@@ -23,10 +23,13 @@ export function bake(root) {
       fills.push(prep(o.geometry, m, col)); kill.push(o);
       o.children.forEach(c => { if (c.material === getOutlineMat()) hulls.push(prep(c.geometry, m.clone().multiply(c.matrix), null)); });
     }
+    else if (o.isMesh && !o.isInstancedMesh && o.material.type === 'MeshBasicMaterial' && !o.material.transparent && !o.material.map && !o.material.vertexColors && o.material.visible !== false) {
+      const m = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld); basics.push(prep(o.geometry, m, o.material.color.clone())); kill.push(o); }
     o.children.slice().forEach(walk); };
   walk(root);
   kill.forEach(o => { o.children.filter(c => c.material === getOutlineMat()).forEach(c => o.remove(c));
     o.children.slice().forEach(c => o.parent.attach(c)); o.parent.remove(o); });
+  if (basics.length) root.add(new THREE.Mesh(mergeGeometries(basics), basicVcol));
   if (!fills.length) return;
   const fm = new THREE.Mesh(mergeGeometries(fills), sharedMat); root.add(fm);
   if (hulls.length) { const hm = new THREE.Mesh(mergeGeometries(hulls), getOutlineMat()); hm.raycast = () => {}; root.add(hm); }
