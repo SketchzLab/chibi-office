@@ -20,7 +20,10 @@ import { speechAt, GREET, HI_BACK, ZONE } from './dialogue.js';
 import { buildRoot, buildGroup, pickLine, mem } from './talk.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
-const DPR_CAP = 1.5; renderer.setPixelRatio(Math.min(devicePixelRatio, DPR_CAP));
+// resolution: desktop renders at up to 2x DPR (crisp text/outlines), touch devices cap at 1.5x. Quality: Auto / High / Low (localStorage, ?q= overrides)
+const COARSE = matchMedia('(pointer: coarse)').matches; const DPR_CAP = COARSE ? 1.5 : 2; const PR_TARGET = Math.min(devicePixelRatio, DPR_CAP);
+const QMODE = (() => { const q = new URLSearchParams(location.search).get('q') || localStorage.getItem('chibiQuality') || 'auto'; return ['auto', 'high', 'low'].includes(q) ? q : 'auto'; })();
+renderer.setPixelRatio(QMODE === 'low' ? Math.min(devicePixelRatio, 1) : PR_TARGET);
 renderer.setSize(innerWidth, innerHeight);
 document.body.appendChild(renderer.domElement);
 const atmo = document.createElement('div'); atmo.style.cssText = 'position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at 18% 8%, rgba(255,246,214,.38), rgba(255,246,214,0) 45%), radial-gradient(ellipse at 50% 55%, rgba(0,0,0,0) 60%, rgba(30,60,110,.18) 100%)';
@@ -50,7 +53,7 @@ export { chibis }; window.__scene = scene; window.__camera = camera;
 const player = makePlayer({ scene, camera, controls, bots: chibis }); const calvin = player.chibi; window.__player = player;
 player.setHome(camera.position, controls.target);
 // ---- cozy FX + quality tier ----
-let tier = pickTier(); if (tier === 'low') { toonUniforms.uDetail.value = 0; renderer.setPixelRatio(Math.min(devicePixelRatio, 1)); }
+let tier = QMODE === 'auto' ? pickTier() : QMODE; if (tier === 'low') { toonUniforms.uDetail.value = 0; renderer.setPixelRatio(Math.min(devicePixelRatio, 1)); }
 const atmos = makeAtmosphere(scene, tier);
 const steamFx = tier === 'low' ? null : steam(scene, [...DESKS, BOSS_DESK].map(([x, z]) => z > 0 ? [x + 0.8, 1.1, z - 0.2] : [x - 0.8, 1.1, z + 0.2])); window.__tier = () => tier;
 const pools = lightPools(scene, [[-3.9, 7.3, 2.6, 0xffc070, 0.55], [9.6, 3.2, 2.6, 0xffc070, 0.55], [-7.8, 4.6, 3.4, 0xffb060, 0.28], [8.2, -5.2, 3.0, 0xffd090, 0.3], [5.2, 2.0, 2.2, 0xffc890, 0.3], [-7.9, -5.1, 3.0, 0xfff0c0, 0.22]]);
@@ -281,16 +284,21 @@ window.__headClear = () => { scene.updateMatrixWorld(true); const hb = new THREE
   return { top: +top.toFixed(2), gap: gap === Infinity ? null : +gap.toFixed(2), pos: [+calvin.position.x.toFixed(2), +calvin.position.y.toFixed(2), +calvin.position.z.toFixed(2)], seat: player.seat?.kind || null }; };
 window.__near = () => target?.label || null; window.__target = () => target; window.__mode = () => mode; window.__objs = OBJS; window.__choose = i => imenu.children[i]?.click();
 // eager auto quality (desktop + mobile): dynamic resolution steps first, then FX tiers. Recovers resolution if fps is high again.
-const PR_STEPS = [DPR_CAP, 1.25, 1.0, 0.85, 0.7]; let prI = 0, slow = 0, fast = 0, mid = false;
-function setPR() { renderer.setPixelRatio(Math.min(devicePixelRatio, PR_STEPS[prI])); }
-function autoTier(fps, t) { if (new URLSearchParams(location.search).get('q') || t < 3) return; slow = fps < 50 ? slow + 1 : 0; fast = fps > 58 ? fast + 1 : 0;
-  if (slow >= 2) { slow = 0;
-    if (!mid) { mid = true; atmos.demote(); console.log('quality -> mid (no particles/rays)'); }
-    else if (prI < 2) { prI++; setPR(); console.log('res ->', PR_STEPS[prI]); }
-    else if (tier !== 'low') { tier = 'low'; toonUniforms.uDetail.value = 0; if (steamFx) steamFx.visible = false; console.log('quality tier -> low'); }
-    else if (prI < PR_STEPS.length - 1) { prI++; setPR(); console.log('res ->', PR_STEPS[prI]); } }
-  else if (fast >= 6 && prI > 0 && tier !== 'low') { fast = 0; prI--; setPR(); } }
-window.__quality = () => ({ tier, mid, pr: renderer.getPixelRatio() });
+// Auto: scale is relative to the target ratio. Desktop never drops below 0.85x target; downscale only on sustained low fps (<45 for 3 s), step back up after 2 s of good fps.
+const PR_STEPS = COARSE ? [1, 0.85, 0.7, 0.6] : [1, 0.925, 0.85]; let prI = 0, slow = 0, fast = 0, mid = false;
+function setPR() { renderer.setPixelRatio(PR_TARGET * PR_STEPS[prI]); }
+function autoTier(fps, t) { if (QMODE !== 'auto' || t < 3) return; slow = fps < 45 ? slow + 1 : 0; fast = fps > 55 ? fast + 1 : 0;
+  if (slow >= 3) { slow = 0;
+    if (prI < PR_STEPS.length - 1) { prI++; setPR(); console.log('res ->', renderer.getPixelRatio().toFixed(2)); }
+    else if (!mid) { mid = true; atmos.demote(); console.log('quality -> mid (no particles/rays)'); }
+    else if (COARSE && tier !== 'low') { tier = 'low'; toonUniforms.uDetail.value = 0; if (steamFx) steamFx.visible = false; console.log('quality tier -> low'); } }
+  else if (fast >= 2 && prI > 0) { fast = 0; prI--; setPR(); console.log('res ->', renderer.getPixelRatio().toFixed(2)); } }
+// small Auto / High / Low toggle beside the fps counter (reloads to apply cleanly)
+{ const qb = document.createElement('button'); qb.id = 'qbtn'; qb.textContent = { auto: 'Auto', high: 'High', low: 'Low' }[QMODE];
+  qb.title = 'Graphics quality'; qb.style.cssText = 'position:fixed;top:max(4px,env(safe-area-inset-top));left:calc(max(6px,env(safe-area-inset-left)) + 46px);z-index:6;font:600 10px/1 ui-monospace,monospace;color:#fff;background:rgba(20,30,50,.45);border:1px solid rgba(255,255,255,.35);border-radius:8px;padding:3px 7px;cursor:pointer';
+  qb.onclick = () => { const nx = { auto: 'high', high: 'low', low: 'auto' }[QMODE]; localStorage.setItem('chibiQuality', nx); const u = new URL(location.href); u.searchParams.delete('q'); location.href = u.toString(); };
+  document.body.appendChild(qb); }
+window.__quality = () => ({ mode: QMODE, tier, mid, pr: renderer.getPixelRatio(), target: PR_TARGET });
 function loop() { const t = clock.getElapsedTime(); toonUniforms.uTime.value = t; atmos.update(t); if (steamFx) steamFx.material.uniforms.uTime.value = t; const dt = Math.min(0.1, t - prevT); prevT = t; const wt = wallTime(); brains.forEach(b => b.update(wt, dt, t));
   island.children.forEach(c => { if (c.userData.float !== undefined) c.position.y += Math.sin(t + c.userData.float) * 0.003; });
   const ds = day.update(dayClock()); sky.mat.uniforms.uTime.value = t; lampGlow.material.uniforms.uTime.value = t;
