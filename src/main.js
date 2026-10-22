@@ -148,7 +148,7 @@ function loop() { const t = clock.getElapsedTime(); const dt = Math.min(0.1, t -
   const sp = speechAt(wt, talkers);
   talkersAll.forEach((c, i) => { const nm = c.userData.name, bs = c.userData.brain?.state; const loc = localSay[nm]; let text = loc && loc.until > wt ? loc.text : (sp && sp.name === nm ? sp.text : '');
     drawBubble(bubbles[i], bs ? (bs.walking ? '🚶' : actEmoji(bs.act)) : '', text); const bb = bubbles[i]; bb.sp.visible = bb.big || !!bs;
-    const dcam = camera.position.distanceTo(c.position), sc = THREE.MathUtils.clamp(dcam * 0.1, 1.5, 6.0) * (bb.big ? 1 : 0.42); bb.sp.scale.set(sc, sc * 0.344, 1); bb.sp.position.set(c.position.x, c.position.y + 3.7 + sc * 0.17, c.position.z); });
+    const dcam = camera.position.distanceTo(c.position), sc = (bb.big ? THREE.MathUtils.clamp(dcam * 0.16, 3.0, 7.5) : THREE.MathUtils.clamp(dcam * 0.05, 0.8, 2.6)); bb.sp.scale.set(sc, sc * 0.344, 1); bb.sp.position.set(c.position.x, c.position.y + 3.7 + sc * 0.17, c.position.z); });
   blobs.forEach(([c, m]) => m.position.set(c.position.x + 0.2, 0.02, c.position.z - 0.15));
   if (selected) { const bs = selected.userData.brain.state; card.querySelector('.t').textContent = bs.label + (bs.override ? ' (live)' : ''); card.querySelector('.wt').textContent = selected.userData.task || '—'; ring.position.set(selected.position.x, 0.04, selected.position.z); }
   sky.clouds.children.forEach(c => { c.position.y += Math.sin(t * 0.3 + c.userData.drift * 6) * 0.004; });
