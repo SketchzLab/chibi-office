@@ -11,11 +11,11 @@ renderer.setSize(innerWidth, innerHeight);
 document.body.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 500);
-camera.position.set(14.5, 8, 14.5).multiplyScalar(Math.max(1, 1.3 / camera.aspect));
+camera.position.set(19, 10, 19).multiplyScalar(Math.max(1, 1.3 / camera.aspect));
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(0, -1.2, 0); controls.enableDamping = true; controls.enablePan = false;
-controls.minDistance = 10; controls.maxDistance = 60; controls.minPolarAngle = 0.3; controls.maxPolarAngle = 1.35;
-makeSky(scene);
+controls.target.set(0, -1.8, 0); controls.enableDamping = true; controls.enablePan = false;
+controls.minDistance = 10; controls.maxDistance = 70; controls.minPolarAngle = 0.3; controls.maxPolarAngle = 1.35;
+const sky = makeSky(scene);
 const island = makeIsland(scene);
 makeOffice(scene);
 const pixel = makeChibi({ name: 'Pixel', role: 'Game Developer', hair: 0xff7eb6, shirt: 0xffd36a, pants: 0x6a5acd, hairStyle: 'twintails' });
@@ -48,7 +48,10 @@ const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(); let down = null;
 renderer.domElement.addEventListener('pointerdown', e => { down = [e.clientX, e.clientY]; });
 renderer.domElement.addEventListener('pointerup', e => { if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 10) return;
   ndc.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1); ray.setFromCamera(ndc, camera);
-  const hit = ray.intersectObjects(chibis.map(c => c.userData.hit))[0]; select(hit ? hit.object.userData.chibi : null); });
+  // pick the chibi whose body centre is closest to the tap ray (fixes overlapping hit boxes)
+  const hits = ray.intersectObjects(chibis.map(c => c.userData.hit)); let best = null, bd = Infinity;
+  hits.forEach(h => { const c = h.object.userData.chibi; const ctr = c.position.clone(); ctr.y += 1.3 * c.scale.y; const d = ray.ray.distanceSqToPoint(ctr); if (d < bd) { bd = d; best = c; } });
+  select(best); });
 window.__screenPos = n => { const c = chibis.find(c => c.userData.name === n); const v = c.position.clone(); v.y += 1.8; v.project(camera); return [(v.x + 1) / 2 * innerWidth, (1 - v.y) / 2 * innerHeight]; };
 // FPS meter (?fps)
 const fpsEl = document.createElement('div'); fpsEl.style.cssText='position:fixed;top:6px;left:6px;color:#fff;font:12px monospace;background:#0006;padding:2px 6px;border-radius:4px';
@@ -60,6 +63,7 @@ function loop() { const t = clock.getElapsedTime(); const dt = Math.min(0.1, t -
   glows.forEach((h,i)=>h.material.opacity=0.5+0.06*Math.sin(t*2+i));
   frames++; const now=performance.now(); if(now-last>1000){window.__info=renderer.info.render; window.__fps=frames*1000/(now-last); fpsEl.textContent=window.__fps.toFixed(0)+' fps'; frames=0; last=now;}
   if (selected) { card.querySelector('.t').textContent = selected.userData.activity; ring.position.set(selected.position.x, 0.04, selected.position.z); }
+  sky.clouds.children.forEach(c => { c.position.y += Math.sin(t * 0.3 + c.userData.drift * 6) * 0.004; });
   controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop); }
 loop();
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });

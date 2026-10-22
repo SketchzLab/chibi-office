@@ -40,8 +40,8 @@ function lamp() {
   const base = toonMesh(new THREE.CylinderGeometry(0.25, 0.3, 0.08, 10), 0x3a3340); g.add(base);
   const shade = toonMesh(new THREE.ConeGeometry(0.4, 0.45, 12, 1, true), 0xffe2b0, { emissive: 0x553311 }); shade.position.y = 2.25; g.add(shade);
   const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6), new THREE.MeshBasicMaterial({ color: 0xfff0c0 })); bulb.position.y = 2.1; g.add(bulb);
-  const h = halo(0xffb060, 3.2, 0.5); h.position.y = 2.1; g.add(h); glows.push(h);
-  const pool = new THREE.Mesh(new THREE.CircleGeometry(1.4, 20), new THREE.MeshBasicMaterial({ map: haloTex, color: 0xffa050, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false }));
+  const h = halo(0xffd08a, 2.2, 0.22); h.position.y = 2.1; g.add(h); glows.push(h);
+  const pool = new THREE.Mesh(new THREE.CircleGeometry(1.4, 20), new THREE.MeshBasicMaterial({ map: haloTex, color: 0xffa050, transparent: true, opacity: 0.15, blending: THREE.AdditiveBlending, depthWrite: false }));
   pool.rotation.x = -Math.PI / 2; pool.position.y = 0.03; g.add(pool);
   return g;
 }
