@@ -140,7 +140,7 @@ function interact(wt, t, dt) { let best = null, bd = 2.7; chibis.forEach(c => { 
     if (bs.seated || bs.walking) P.head.rotation.y = THREE.MathUtils.clamp(a, -0.9, 0.9); else c.rotation.y += a * Math.min(1, dt * 6);
     if (face[n + 'wave'] > wt) { P.armR.rotation.x = -2.9; P.armR.rotation.z = -0.4 + Math.sin(t * 12) * 0.35; } }); }
 window.__near = () => near?.userData.name || null;
-function loop() { const t = clock.getElapsedTime(); const dt = Math.min(0.1, t - prevT); prevT = t; const wt = wallTime(); brains.forEach(b => b.update(wt, dt, t));
+function loop() { const t = clock.getElapsedTime(); toonUniforms.uTime.value = t; const dt = Math.min(0.1, t - prevT); prevT = t; const wt = wallTime(); brains.forEach(b => b.update(wt, dt, t));
   island.children.forEach(c => { if (c.userData.float !== undefined) c.position.y += Math.sin(t + c.userData.float) * 0.003; });
   glows.forEach((h,i)=>h.material.opacity=0.5+0.06*Math.sin(t*2+i));
   frames++; const now=performance.now(); if(now-last>1000){window.__info=renderer.info.render; window.__fps=frames*1000/(now-last); fpsEl.textContent=window.__fps.toFixed(0)+' fps'; frames=0; last=now;}
