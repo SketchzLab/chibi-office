@@ -5,16 +5,16 @@ import { bake } from './bake.js';
 export function makeChibi({ name, role, skin = 0xffe0c8, hair, shirt, pants, hairStyle }) {
   const root = new THREE.Group(); root.userData = { name, role, activity: 'Working at desk' };
   const body = new THREE.Group(); root.add(body);
-  const torsoGeo = new THREE.SphereGeometry(0.4, 18, 14); const torso = toonMesh(torsoGeo, shirt); torso.scale.set(1, 1.08, 0.9); torso.position.y = 0.82; body.add(torso);
+  const torsoGeo = new THREE.SphereGeometry(0.4, 14, 10); const torso = toonMesh(torsoGeo, shirt); torso.scale.set(1, 1.08, 0.9); torso.position.y = 0.82; body.add(torso);
   const head = new THREE.Group(); head.position.y = 1.72; body.add(head);
-  const face = toonMesh(new THREE.SphereGeometry(0.66, 28, 22), skin); face.scale.set(1.06, 0.96, 1); head.add(face);
+  const face = toonMesh(new THREE.SphereGeometry(0.66, 22, 16), skin); face.scale.set(1.06, 0.96, 1); head.add(face);
   // eyes
   [-0.22, 0.22].forEach(x => { const e = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 10), new THREE.MeshBasicMaterial({ color: 0x2a1f3a }));
     e.scale.set(0.95, 1.4, 0.5); e.position.set(x, -0.04, 0.6); head.add(e);
     const sh = new THREE.Mesh(new THREE.SphereGeometry(0.03, 6, 4), new THREE.MeshBasicMaterial({ color: 0xffffff })); sh.position.set(x + 0.03, 0.03, 0.66); head.add(sh);
     const bl = new THREE.Mesh(new THREE.CircleGeometry(0.08, 10), new THREE.MeshBasicMaterial({ color: 0xff8fa0, transparent: true, opacity: 0.5 })); bl.position.set(x * 1.5, -0.2, 0.58); bl.rotation.y = x > 0 ? 0.45 : -0.45; head.add(bl); });
   // hair cap
-  const cap = toonMesh(new THREE.SphereGeometry(0.72, 28, 16, 0, Math.PI * 2, 0, Math.PI * 0.56), hair); cap.scale.set(1.06, 1, 1.02); cap.position.y = 0.04; cap.rotation.x = -0.28; head.add(cap);
+  const cap = toonMesh(new THREE.SphereGeometry(0.72, 22, 12, 0, Math.PI * 2, 0, Math.PI * 0.56), hair); cap.scale.set(1.06, 1, 1.02); cap.position.y = 0.04; cap.rotation.x = -0.28; head.add(cap);
   // soft fringe bangs
   [-0.32, 0, 0.32].forEach((x, i) => { const b = toonMesh(new THREE.SphereGeometry(0.22, 12, 10), hair); b.scale.set(1.1, 0.75, 0.6); b.position.set(x, 0.36 - Math.abs(x) * 0.25, 0.52); head.add(b); });
   // little rounded ears/nose and a smile

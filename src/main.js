@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { makeSky } from './sky.js';
 import { toonUniforms } from './toon.js';
+import { chatLink } from './agents.js';
 import { buildShadows, chibiShadow } from './shadows.js';
 import { makeIsland } from './island.js';
 import { makeNature } from './nature.js';
@@ -36,7 +37,7 @@ Object.assign(jun.userData, { faceDesk: 0, facePantry: 2.79, deskActivity: 'Sket
 pixel.scale.setScalar(1.5); jun.scale.setScalar(1.5);
 scene.add(pixel, jun);
 buildShadows(scene); const blobs = [pixel, jun].map(c => [c, chibiShadow(scene)]);
-export const chibis = [pixel, jun];
+export const chibis = [pixel, jun]; window.__scene = scene;
 const walkers = [
   makeWalker(pixel, [[1.0, -1.3], [1.5, 0], [6.0, 0], [6.9, -4.97]], { offset: 0 }),
   makeWalker(jun, [[-2.4, 1.3], [-1.6, 0.2], [6.6, 0.3], [8.4, -4.43]], { offset: 6, deskTime: 6 }),
@@ -44,18 +45,28 @@ const walkers = [
 let prevT = 0;
 // --- Name card ---
 const card = document.createElement('div'); card.id = 'card';
-card.innerHTML = '<div class="n"></div><div class="r"></div><div class="a"><span class="dot"></span><span class="t"></span></div>';
+card.innerHTML = '<div class="n"></div><div class="r"></div><div class="a"><span class="dot"></span><span class="t"></span></div><button class="chat" type="button">💬 Open chat</button><div class="note"></div>';
 document.body.appendChild(card);
 const css = document.createElement('style'); css.textContent = `#card{position:fixed;left:50%;bottom:max(18px,env(safe-area-inset-bottom));transform:translate(-50%,20px);opacity:0;pointer-events:none;transition:.2s;
  min-width:220px;max-width:86vw;padding:14px 20px;border-radius:18px;background:rgba(255,248,240,.94);border:3px solid #2a1f35;box-shadow:0 6px 0 #2a1f35;font-family:system-ui,sans-serif;color:#2a1f35}
- #card.on{opacity:1;transform:translate(-50%,0)} #card .n{font-size:22px;font-weight:800} #card .r{font-size:14px;opacity:.75;margin-bottom:6px}
+ #card.on{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+ #card .chat{margin-top:10px;width:100%;min-height:44px;border:2px solid #2a1f35;border-radius:12px;background:#4fb3a9;color:#fff;font:700 16px system-ui,sans-serif;box-shadow:0 3px 0 #2a1f35;cursor:pointer}
+ #card .chat:active{transform:translateY(2px);box-shadow:0 1px 0 #2a1f35} #card .chat[hidden]{display:none} #card .note{font-size:12px;opacity:.75;margin-top:6px;max-width:260px} #card .note:empty{display:none} #card .n{font-size:22px;font-weight:800} #card .r{font-size:14px;opacity:.75;margin-bottom:6px}
  #card .a{font-size:15px;display:flex;align-items:center;gap:8px} #card .dot{width:10px;height:10px;border-radius:50%;background:#3ccf7a;box-shadow:0 0 6px #3ccf7a}`;
 document.head.appendChild(css);
 let selected = null;
 const ring = new THREE.Mesh(new THREE.RingGeometry(1.15, 1.4, 32), new THREE.MeshBasicMaterial({ color: 0xfff1a8, transparent: true, opacity: 0.85, depthWrite: false }));
 ring.rotation.x = -Math.PI / 2; ring.visible = false; scene.add(ring);
 function select(c) { selected = c; card.classList.toggle('on', !!c); ring.visible = !!c;
-  if (c) { card.querySelector('.n').textContent = c.userData.name; card.querySelector('.r').textContent = c.userData.role; } }
+  card.querySelector('.note').textContent = '';
+  if (c) { card.querySelector('.n').textContent = c.userData.name; card.querySelector('.r').textContent = c.userData.role; card.querySelector('.chat').hidden = !chatLink(c.userData.name); } }
+// 'Open chat' -> Grok Bot deep link; if the page is still visible shortly after, the app probably isn't installed.
+let chatTimer = 0;
+card.querySelector('.chat').addEventListener('click', e => { e.stopPropagation(); if (!selected) return; const url = chatLink(selected.userData.name); if (!url) return;
+  const note = card.querySelector('.note'); note.textContent = ''; clearTimeout(chatTimer);
+  window.__lastChatLink = url; window.location.href = url;
+  chatTimer = setTimeout(() => { if (document.visibilityState === 'visible') note.textContent = "Nothing opened? The Grok Bot app may not be installed on this device. Open it there and find " + selected?.userData.name + " in your agents."; }, 1600); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') clearTimeout(chatTimer); });
 const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(); let down = null;
 renderer.domElement.addEventListener('pointerdown', e => { down = [e.clientX, e.clientY]; });
 renderer.domElement.addEventListener('pointerup', e => { if (!down || Math.hypot(e.clientX - down[0], e.clientY - down[1]) > 10) return;

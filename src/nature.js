@@ -78,11 +78,11 @@ export function makeNature(scene) {
   [[-13.0, -3.5, 1.5], [-12.6, 3.8, 1.3], [-9.5, -10.2, 1.4], [-2.0, -12.4, 1.1], [8.6, -10.6, 1.5], [12.8, -4.4, 1.3], [13.4, 1.6, 1.1], [-11.0, 8.6, 1.2], [-9.2, 11.0, 0.9], [11.8, -7.6, 1.0]].forEach(([x, z, s]) => { const t = tree(s); t.position.set(x, 0, z); cast(x, z, 3.4 * s, 3.0 * s, 0, -0.03, 1.6); g.add(t); });
   // ---- grass detail (instanced, no outlines: cheap) ----
   const tuftGeo = new THREE.ConeGeometry(0.08, 0.38, 3, 1, true); tuftGeo.translate(0, 0.17, 0);
-  const NT = 1500; const tufts = new THREE.InstancedMesh(tuftGeo, toonMat(0x63b852), NT); tufts.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(NT * 3).map((_, i) => 0.85 + ((i * 7919) % 100) / 100 * 0.3), 3);
+  const NT = 1200; const tufts = new THREE.InstancedMesh(tuftGeo, toonMat(0x63b852), NT); tufts.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(NT * 3).map((_, i) => 0.85 + ((i * 7919) % 100) / 100 * 0.3), 3);
   let n = 0; while (n < NT) { const x = (rnd() - 0.5) * 2 * R, z = (rnd() - 0.5) * 2 * R; if (!onGrassRing(x, z) || Math.hypot((x - POOL.x) / (PL.rx + 0.6), (z - POOL.z) / (PL.rz + 0.6)) < 1 || (Math.abs(x - POOL.x) < 1 && z > POOL.z) || [[4.6, 11.0, 2.4, 1.5], [8.2, 10.0, 2.1, 1.4], [-8.6, 9.6, 1.8, 1.2]].some(([bx, bz, bw, bd]) => Math.hypot((x - bx) / bw, (z - bz) / bd) < 1)) continue;
     e.set((rnd() - 0.5) * 0.5, 0, (rnd() - 0.5) * 0.5); q.setFromEuler(e); M.compose(new THREE.Vector3(x, -0.05, z), q, new THREE.Vector3(1.3, 0.45 + rnd() * 0.5, 1.3)); tufts.setMatrixAt(n++, M); }
   g.add(tufts);
-  const flowerGeo = new THREE.IcosahedronGeometry(0.09, 0); const flowerCols = [0xffffff, 0xffd36a, 0xff9bb8, 0xb7a2ff];
+  const flowerGeo = new THREE.OctahedronGeometry(0.1, 0); const flowerCols = [0xffffff, 0xffd36a, 0xff9bb8, 0xb7a2ff];
   flowerCols.forEach(col => { const f = new THREE.InstancedMesh(flowerGeo, toonMat(col), 90); let k = 0;
     while (k < 90) { const x = (rnd() - 0.5) * 2 * R, z = (rnd() - 0.5) * 2 * R; if (!onGrassRing(x, z) || Math.hypot(x - POOL.x, z - POOL.z) < PL.rx + 0.8) continue; M.makeTranslation(x, 0.2, z); f.setMatrixAt(k++, M); } g.add(f); });
   // bushes on the rim
