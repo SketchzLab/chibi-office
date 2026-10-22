@@ -6,7 +6,8 @@ const MEM_KEY = 'chibiOffice.memory.v1';
 export const mem = { load() { try { return JSON.parse(localStorage.getItem(MEM_KEY)) || {}; } catch { return {}; } },
   get(n) { return this.load()[n]; }, set(n, topic) { const m = this.load(); m[n] = { topic, at: Date.now() }; try { localStorage.setItem(MEM_KEY, JSON.stringify(m)); } catch {} } };
 
-export function timeOfDay() { const h = new Date().getHours(); return h < 5 ? 'late' : h < 12 ? 'morning' : h < 17 ? 'afternoon' : h < 21 ? 'evening' : 'late'; }
+let hourOf = () => new Date().getHours(); export function setTalkClock(f) { hourOf = f; }
+export function timeOfDay() { const h = hourOf(); return h < 5 ? 'late' : h < 12 ? 'morning' : h < 17 ? 'afternoon' : h < 21 ? 'evening' : 'late'; }
 const TOD = {
   morning: { Pixel: 'Morning boss! Coffee number one is in.', Jun: 'Good morning! Fresh grid, fresh mind.', Sage: 'Good morning, Calvin. Mornings are for big decisions.', Mika: 'Mornin\'! Still waking up my ears.' },
   afternoon: { Pixel: 'Afternoon slump? Not with this build!', Jun: 'Afternoon light makes the colours pop.', Sage: 'Good afternoon. Halfway is a fine time to re-plan.', Mika: 'Afternoon vibes = lo-fi playlist.' },
@@ -43,7 +44,21 @@ const ACTIVITY = {
 const COFFEE = { t: '☕ Coffee together?', say: 'Coffee run? My treat.', react: { Pixel: 'Did someone say coffee?! Let\'s go!', Jun: 'Jasmine tea for me. Lead the way!', Sage: 'A walk and a brew. Splendid.', Mika: 'Smoothie for me! Race you!' }, emote: 'thumbs', act: 'coffee', topic: 'our coffee run' };
 const BYE = { t: '👋 See you later', say: 'Catch you later!', react: { Pixel: 'Later, boss! *finger guns*', Jun: 'Bye! *tidy wave*', Sage: 'Until next time, Calvin.', Mika: 'Byeee! *headphones back on*' }, emote: 'shywave', end: true };
 
+// evening by the campfire / asleep in bed: cozy, sleepy lines only (no work topics, no office invites)
+const NIGHT_TALK = {
+  home: { Pixel: ['Long day, boss. This fire is the best respawn point.', 'I toasted a marshmallow to a perfect golden brown. Speedrun record.'], Jun: ['Look at the sky, Calvin! I want to paint it.', 'The fireflies are out. I love this part of the day.'],
+    Sage: ['Evenings are for slow thoughts. Sit with us?', 'I like how quiet it gets out here.'], Mika: ['Shh… listen. Crickets make a great beat.', 'Garden check: tomatoes are thriving! 🍅'] },
+  sleep: { Pixel: ['*yawn* …boss? Is it morning? …nope. Zzz.', 'mm… saved my game… night…'], Jun: ['*rubs eyes* …night, Calvin… sweet dreams…', 'zzz… soft brushes… zzz'],
+    Sage: ['*half asleep* …we can discuss it tomorrow… zzz', 'Rest is productive too, Calvin… zzz'], Mika: ['*mumbles* …lullaby remix… zzz', 'mm… night night, boss…'] } };
+function nightRoot(n, ctx, act) { const asleep = ctx.asleep?.(n); const say = pick(NIGHT_TALK[asleep ? 'sleep' : 'home'][n]);
+  const replies = asleep ? [{ t: '🌙 Sweet dreams', react: { Pixel: 'zzz… you too… boss…', Jun: '…mm… night… 💤', Sage: '…goodnight, Calvin.', Mika: '…zzz 🎶' }, emote: 'nod', end: true },
+      { t: '🤫 Tiptoe out', react: { Pixel: '*snore*', Jun: '*tiny snore*', Sage: '*breathes slowly*', Mika: '*hums*' }, emote: 'nod', end: true }]
+    : [{ t: '🔥 Sit by the fire', react: { Pixel: 'Pull up a log, boss!', Jun: 'Yay! Cozy squad!', Sage: 'Good choice.', Mika: 'I\'ll play something soft.' }, emote: 'shywave' },
+      { t: '😴 Early night tonight', react: { Pixel: 'Same. My bed is calling.', Jun: 'Sleep well, Calvin!', Sage: 'Wise. See you at nine.', Mika: 'Night night, boss!' }, emote: 'wave', topic: 'an early night' },
+      { t: '✨ Lovely evening', react: { Pixel: 'Best part of the day!', Jun: 'The fireflies agree!', Sage: 'It really is.', Mika: 'Ten out of ten vibes.' }, emote: 'nod' }];
+  return { say, emote: asleep ? null : 'shywave', choices: [...replies.map(c => ({ ...c, topic: c.topic || 'a quiet night' })), BYE] }; }
 export function buildRoot(n, ctx) {
+  { const act = ctx.act?.(n); if (act === 'home' || act === 'sleep') return nightRoot(n, ctx, act); }
   const P = ctx.persona(n); const topics = [];
   const m = mem.get(n); if (m && Date.now() - m.at > 30000) topics.push({ w: 3, say: REMEMBER[n](m.topic), emote: 'nod', replies: [
     { t: '😄 Tell me more!', react: { Pixel: 'I added a secret level because of it!', Jun: 'I made three variants. You\'ll love #2.', Sage: 'I think it\'s a small bet with a big upside.', Mika: 'I cut a 15-second teaser of it!' }, emote: 'jump' },

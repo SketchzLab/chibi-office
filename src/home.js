@@ -41,7 +41,7 @@ export function makeHome(scene) {
   const ridge = new THREE.CylinderGeometry(1.5, 1.5, W + 0.7, 3, 1); ridge.rotateZ(Math.PI / 2); ridge.scale(1, 0.5, 1.45); const rm = add(toonMesh(ridge, 0xd8845a), (H.x0 + H.x1) / 2, H.h + 0.55, mz - 0.3);
   add(toonMesh(B3(W + 0.1, 0.18, 0.1), trim), (H.x0 + H.x1) / 2, H.h - 0.1, H.z0 - 0.02); // lintel
   const PC = { Pixel: 0x5aa0ff, Jun: 0xff8fb8, Sage: 0x7fc98a, Mika: 0xb48cff };
-  const windows = {};
+  const windows = {}, covers = {};
   H.rooms.forEach(r => { const c = r.cx;
     // banner over the opening in the persona colour
     add(toonMesh(B3(1.6, 0.42, 0.06), PC[r.who]), c, H.h - 0.45, H.z0 - 0.08);
@@ -54,6 +54,8 @@ export function makeHome(scene) {
     const bz = H.z1 - 0.85; add(toonMesh(B3(3.0, 0.32, 1.35), 0x9c6b45), c, 0.32, bz); add(toonMesh(B3(2.9, 0.18, 1.25), 0xfaf4ea), c, 0.56, bz);
     add(toonMesh(B3(0.12, 0.8, 1.4), 0x8a5a36), c - 1.5, 0.5, bz); add(toonMesh(B3(0.6, 0.16, 0.9), 0xffffff), c - 1.1, 0.72, bz);
     add(toonMesh(B3(1.9, 0.08, 1.3), PC[r.who]), c + 0.45, 0.67, bz);
+    { const cg = new THREE.CylinderGeometry(0.62, 0.62, 2.0, 12, 1, false, 0, Math.PI); cg.rotateZ(Math.PI / 2); cg.rotateX(-Math.PI / 2); cg.scale(1, 0.62, 1.05); // tucked-in blanket over a sleeper
+      const cv = toonMesh(cg, PC[r.who]); cv.position.set(c + 0.55, 0.66, bz); cv.rotation.x = Math.PI / 2; cv.visible = false; cv.userData.dynamic = true; scene.add(cv); covers[r.who] = cv; }
     add(toonMesh(new THREE.CylinderGeometry(0.6, 0.6, 0.02, 14), 0xf0d8b0, { outline: false }), c + 0.2, 0.135, H.z0 + 1.2); // rug
     cast(c, bz, 3.0, 1.35, 0, 0.14, 0.6);
     // persona corner (against the left partition, front half of the room)
@@ -107,7 +109,7 @@ export function makeHome(scene) {
   const flies = fireflies(scene, { cx: GARDEN.x + 1, cz: GARDEN.z - 0.5, r: 3.2, n: 28, seed: 23 });
   cast(cx, mz, W + 0.6, D + 1.0, 0, 0.012, 0.5);
   scene.add(g); bake(g);
-  return { group: g, windows, halo, flames, flies,
+  return { group: g, windows, covers, halo, flames, flies,
     update(t) { flameMat.uniforms.uTime.value = t; halo.material.uniforms.uTime.value = t; } };
 }
 function mergeTwo(a, b) { return mergeAll([a, b]); }

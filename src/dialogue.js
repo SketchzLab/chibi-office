@@ -1,7 +1,7 @@
 // Dialogue bank + deterministic scheduler.
 // Every device computes the same conversation for the same UTC slot: slot index -> seeded RNG,
 // and who is where comes from each brain's pure actAt(t). No network needed.
-export const ZONE = { pantry: 'pantry', game: 'lounge', read: 'lounge', sketch: 'lounge', meeting: 'meeting', work: 'desk', fidget: 'desk', bob: 'desk', stretch: 'desk', pace: 'desk' };
+export const ZONE = { home: 'campfire', sleep: 'bed', pantry: 'pantry', game: 'lounge', read: 'lounge', sketch: 'lounge', meeting: 'meeting', work: 'desk', fidget: 'desk', bob: 'desk', stretch: 'desk', pace: 'desk' };
 
 // Solo desk quips (said to nobody in particular).
 export const QUIPS = {
@@ -52,6 +52,11 @@ export const HI_BACK = {
   Pixel: 'Hi hi! *waves controller*', Jun: 'Hello! *neat little wave*', Sage: 'Hello, Calvin. Always a pleasure.', Mika: 'Heyyy! *headphones bob*',
 };
 
+// ---- night: campfire chit-chat + sleep talk (no work topics after hours) ----
+const CAMPFIRE = [[[0, 'Marshmallow? I got the good ones.'], [1, 'Yes please. Golden, not burnt!']], [[0, 'Look, a shooting star!'], [1, 'Quick, make a wish! ✨']],
+  [[0, 'Best part of the day, honestly.'], [1, 'Fire, fireflies, friends. Perfect.']], [[0, 'Who\'s up first tomorrow?'], [1, 'Not me. I\'m sleeping in till 7. 😴']],
+  [[0, '*yawns* I can barely keep my eyes open.'], [1, 'Bedtime soon. The beds here are so comfy.']], [[0, 'Hear the crickets?'], [1, 'Nature\'s lo-fi playlist 🎶']]];
+const SLEEPY = ['Zzz…', 'zzz… mm…', '*snore*', 'Zzz… 💤', '…five more minutes…'];
 // ---- deterministic scheduler ----
 export const SLOT = 22, LINE = 3.6;
 function rng(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
@@ -62,6 +67,9 @@ export function conversationFor(k, bots) {
   const r = rng(k * 2654435761), t0 = k * SLOT + 2; const zones = {};
   bots.forEach(b => { const z = ZONE[b.brain.actAt(t0 + 1)] || 'desk'; (zones[z] ||= []).push(b.name); });
   let conv = null;
+  if (zones.campfire?.length >= 2 && r() < 0.75) { const ppl = zones.campfire, a = ppl[Math.floor(r() * ppl.length)], rest = ppl.filter(n => n !== a), bb = rest[Math.floor(r() * rest.length)]; const e = CAMPFIRE[Math.floor(r() * CAMPFIRE.length)];
+    conv = { start: t0, lines: e.map(([i, tx]) => [i ? bb : a, tx]) }; cache.set(k, conv); return conv; }
+  if (zones.bed?.length && !zones.desk?.length && !zones.campfire?.length) { if (r() < 0.6) { const n = zones.bed[Math.floor(r() * zones.bed.length)]; conv = { start: t0 + r() * 6, lines: [[n, SLEEPY[Math.floor(r() * SLEEPY.length)]]] }; } cache.set(k, conv); return conv; }
   const social = ['pantry', 'lounge', 'meeting'].filter(z => zones[z]?.length >= 2);
   const zone = social.length ? social[Math.floor(r() * social.length)] : (r() < 0.55 && zones.desk?.length >= 2 ? 'desk' : null);
   if (zone) { const ppl = zones[zone]; const opts = EXCHANGES.filter(e => (e.where === zone || e.where === 'any') && (!e.who || e.who.every(n => ppl.includes(n))));

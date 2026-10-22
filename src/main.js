@@ -4,7 +4,7 @@ import { makeSky } from './sky.js';
 import { toonUniforms } from './toon.js';
 import { chatLink } from './agents.js';
 import { PERSONAS } from './personas.js';
-import { makeBrain, actEmoji, applyPose, seatPlaces } from './behavior.js';
+import { makeBrain, actEmoji, applyPose, seatPlaces, setDayClock } from './behavior.js';
 import { buildShadows, chibiShadow } from './shadows.js';
 import { makeIsland } from './island.js';
 import { makeNature } from './nature.js';
@@ -18,7 +18,7 @@ import { pickTier, makeAtmosphere, lightPools, steam, radial } from './fx.js';
 import { DESKS, BOSS_DESK, BOT_S, CALVIN_S, LOUNGE, GLASS, PANTRY, ROOF, BALCONY, PARK, heightAt } from './layout.js';
 import { makeDayClock, makeDayCycle, fireflies, glowPoints, dayUniforms } from './daycycle.js';
 import { speechAt, GREET, HI_BACK, ZONE } from './dialogue.js';
-import { buildRoot, buildGroup, pickLine, mem } from './talk.js';
+import { buildRoot, buildGroup, pickLine, mem, setTalkClock } from './talk.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 // resolution: desktop renders at up to 2x DPR (crisp text/outlines), touch devices cap at 1.5x. Quality: Auto / High / Low (localStorage, ?q= overrides)
@@ -47,7 +47,7 @@ makeOffice(scene); makeWorld(scene, nature.waterMat); const home = makeHome(scen
 // ---- Bots: look + persona + clock-driven brain ----
 const chibis = [], brains = [];
 for (const [name, per] of Object.entries(PERSONAS)) {
-  const c = makeChibi({ name, role: per.role, ...per.look }); c.scale.setScalar(BOT_S); c.userData.hit.scale.set(1.45, 1.2, 1.45); c.userData.persona = per;
+  per.name = name; const c = makeChibi({ name, role: per.role, ...per.look }); c.scale.setScalar(BOT_S); c.userData.hit.scale.set(1.45, 1.2, 1.45); c.userData.persona = per;
   const brain = makeBrain(c, per); c.userData.brain = brain; scene.add(c); chibis.push(c); brains.push(brain);
 }
 export { chibis }; window.__scene = scene; window.__camera = camera;
@@ -59,7 +59,7 @@ const atmos = makeAtmosphere(scene, tier);
 const steamFx = tier === 'low' ? null : steam(scene, [...DESKS, BOSS_DESK].map(([x, z]) => z > 0 ? [x + 0.8, 1.1, z - 0.2] : [x - 0.8, 1.1, z + 0.2])); window.__tier = () => tier;
 const pools = lightPools(scene, [[-3.9, 7.3, 2.6, 0xffc070, 0.55], [9.6, 3.2, 2.6, 0xffc070, 0.55], [-7.8, 4.6, 3.4, 0xffb060, 0.28], [8.2, -5.2, 3.0, 0xffd090, 0.3], [5.2, 2.0, 2.2, 0xffc890, 0.3], [-7.9, -5.1, 3.0, 0xfff0c0, 0.22]]);
 // ---- day / night (Calvin's local UTC+8 clock; ?t=HH:MM preview) ----
-const dayClock = makeDayClock(); const day = makeDayCycle({ skyMat: sky.mat, atmoEl: atmo, raysEl: atmos.rays });
+const dayClock = makeDayClock(); setDayClock(wt => ((dayClock() + wt - wallTime()) % 86400 + 86400) % 86400); setTalkClock(() => dayClock() / 3600); const day = makeDayCycle({ skyMat: sky.mat, atmoEl: atmo, raysEl: atmos.rays });
 const flies = [fireflies(scene, { cx: PARK.cx, cz: PARK.cz, r: PARK.r + 0.6, n: 34, seed: 11 }), home.flies];
 const lampGlow = glowPoints(scene, [[-3.9, 2.1, 7.3, 1.6], [9.6, 2.1, 3.2, 1.6]], { size: 70, color: 0xffc070 });
 window.__day = () => ({ ...day.state, sec: dayClock() });
@@ -150,7 +150,7 @@ const emoteBot = (n, name, dur = 1.8) => { botEmote[n] = { name, until: clock.ge
 const emoteCalvin = (name, dur = 1.6) => player.setEmote(name, dur, clock.getElapsedTime());
 const botBy = n => chibis.find(c => c.userData.name === n);
 const zoneOf = c => ZONE[c.userData.brain.state.act] || 'desk';
-const tctx = { persona: n => botBy(n).userData.persona, task: n => botBy(n).userData.task, zone: n => zoneOf(botBy(n)),
+const tctx = { act: n => botBy(n).userData.brain.state.act, asleep: n => !!botBy(n).userData.brain.state.asleep, persona: n => botBy(n).userData.persona, task: n => botBy(n).userData.task, zone: n => zoneOf(botBy(n)),
   calvinState: () => (flagUntil > wallTime() ? calvinFlag : null) || (player.carry ? 'mug' : player.seat?.kind === 'sofa' ? 'sofa' : null) };
 const actb = document.createElement('button'); actb.id = 'actb'; actb.className = 'hudb'; actb.type = 'button'; document.body.appendChild(actb);
 const imenu = document.createElement('div'); imenu.id = 'imenu'; document.body.appendChild(imenu);
@@ -246,7 +246,7 @@ function interact(wt, t, dt) {
   if (tg?.kind === 'pet' && tg.p.mode === 'wander') { tg.p.holdUntil = wt + 4; if (Math.hypot(tg.p.tx - tg.p.x, tg.p.tz - tg.p.z) > 0.2 && !tg.p.waitSet) { tg.p.tx = tg.p.x; tg.p.tz = tg.p.z; } }
   if (player.look) tg = null; target = tg; { const dsp = tg ? 'block' : 'none'; if (actb._d !== dsp) { actb._d = dsp; actb.style.display = dsp; } } if (tg) { const lb = mode && imenu.classList.contains('on') ? '✖ Close' : tg.label; if (actb.textContent !== lb) actb.textContent = lb; }
   // greet on approach (once per 25 s), group invite when walking up to 2+ bots
-  if (tg?.kind === 'bot') { const n = tg.c.userData.name; if (!greeted[n] || wt - greeted[n] > 25) { greeted[n] = wt; face[n] = wt + 5; emoteBot(n, pick(['wave', 'shywave', 'jump']), 2.0); const m = mem.get(n); say(n, m && Math.random() < 0.5 ? REMEMBER_HI(n, m.topic) : pick(GREET[n]), wt); } }
+  if (tg?.kind === 'bot') { const n = tg.c.userData.name; if (!greeted[n] || wt - greeted[n] > 25) { greeted[n] = wt; if (tg.c.userData.brain.state.asleep) { say(n, pick(SLEEP_MURMUR[n]), wt); } else { face[n] = wt + 5; emoteBot(n, pick(tg.c.userData.brain.state.act === 'home' ? ['wave', 'shywave'] : ['wave', 'shywave', 'jump']), 2.0); const m = mem.get(n); say(n, m && Math.random() < 0.5 ? REMEMBER_HI(n, m.topic) : pick(tg.c.userData.brain.state.act === 'home' ? EVENING_HI[n] : GREET[n]), wt); } } }
   if (tg?.kind === 'group' && (!greeted[tg.id] || wt - greeted[tg.id] > 40)) { greeted[tg.id] = wt; const a = tg.names[0]; say(a, pick(['Calvin! Come join us!', 'Boss! Pull up a chair!', 'Ooh, Calvin\'s here! 🎉']), wt); tg.names.forEach(n => { face[n] = wt + 6; emoteBot(n, 'wave', 1.8); }); }
   // floating button + menu beside Calvin's head (screen space, clamped, clear of the joystick)
   if (tg) { v3.set(cp.x, cp.y + 3.0 * CALVIN_S / 1.16, cp.z).project(camera); let x = (v3.x + 1) / 2 * innerWidth + 40, y = (1 - v3.y) / 2 * innerHeight + 24;
@@ -260,7 +260,7 @@ function interact(wt, t, dt) {
   chibis.forEach(c => { const n = c.userData.name, P = c.userData.parts, bs = c.userData.brain.state;
     // look-at: one smoothed target yaw, shortest-angle wrap, clamp, dead-zone, distance hysteresis
     const lk = c.userData.lk || (c.userData.lk = { on: false, yaw: 0 }); const dist = Math.hypot(cp.x - c.position.x, cp.z - c.position.z);
-    lk.on = face[n] > wt && (lk.on ? dist < 4.2 : dist < 3.4);
+    lk.on = !bs.asleep && face[n] > wt && (lk.on ? dist < 4.2 : dist < 3.4);
     let want = 0;
     if (lk.on) { let a = Math.atan2(cp.x - c.position.x, cp.z - c.position.z) - c.rotation.y; a = Math.atan2(Math.sin(a), Math.cos(a));
       // standing still & target far behind the shoulder: turn the body at a capped rate (routine leaves facing alone while idle)
@@ -268,8 +268,12 @@ function interact(wt, t, dt) {
       want = THREE.MathUtils.clamp(a, -0.85, 0.85); }
     const dy = want - lk.yaw; if (Math.abs(dy) > 0.04 || !lk.on) lk.yaw += dy * Math.min(1, dt * 5);
     c.userData.lookYaw = Math.abs(lk.yaw) < 0.005 ? 0 : lk.yaw;
-    const e = botEmote[n]; if (e && e.until > t) applyPose(c, e.name, t, dt, bs.seated, c.userData.persona); });
+    const e = botEmote[n]; if (e && e.until > t && e.name && !bs.asleep) applyPose(c, e.name, t, dt, bs.seated, c.userData.persona); });
 }
+const SLEEP_MURMUR = { Pixel: ['Zzz… five more minutes, boss…', 'mmh… boss level… zzz', '*snore* …respawn…'], Jun: ['Zzz… pastel… sunsets…', 'mm… night, Calvin… zzz', '*tiny snore*'],
+  Sage: ['Zzz… hypothesis… confirmed…', 'mm… goodnight, Calvin.', '*breathes slowly*'], Mika: ['Zzz… drop the beat… zzz', 'mmh… lullaby mix…', '*hums in sleep*'] };
+const EVENING_HI = { Pixel: ['Boss! Marshmallow? 🔥', 'Calvin came to the campfire!'], Jun: ['Calvin! The sky is so pretty tonight.', 'Welcome home-ish, Calvin!'],
+  Sage: ['Good evening, Calvin. Sit a while.', 'Calvin. Nice night for thinking.'], Mika: ['Hey boss! Garden\'s looking good, right?', 'Campfire playlist is on 🎶'] };
 const REMEMBER_HI = (n, topic) => ({ Pixel: `Boss! Still thinking about ${topic}!`, Jun: `Hi Calvin! I sketched something about ${topic}.`, Sage: `Calvin. I've been pondering ${topic}.`, Mika: `Heyy! Our ${topic} chat inspired a new cut!` })[n];
 const pick = a => a[Math.floor(Math.random() * a.length)];
 window.__seatAudit = () => [...OBJS.filter(o => o.seatDef).map(o => ({ who: 'Calvin', label: o.label, pos: o.seatDef.pos, rot: o.seatDef.rot })), ...seatPlaces().map(s => ({ who: 'bot', label: s.name, pos: s.pos, rot: s.rot }))];
@@ -304,7 +308,10 @@ function loop() { const t = clock.getElapsedTime(); toonUniforms.uTime.value = t
   island.children.forEach(c => { if (c.userData.float !== undefined) c.position.y += Math.sin(t + c.userData.float) * 0.003; });
   const ds = day.update(dayClock()); sky.mat.uniforms.uTime.value = t; lampGlow.material.uniforms.uTime.value = t;
   glows.forEach((h,i)=>{ const b = h.userData.base ?? (h.userData.base = h.material.opacity); h.material.opacity = b * (1 + (b < 0.3 ? 2.4 : 0.35) * ds.glow) * (0.92 + 0.08 * Math.sin(t * 2 + i)); });
-  pools.material.color.setScalar(1 + 1.4 * ds.glow); home.update(t); for (const n in home.windows) home.windows[n].material.uniforms.uGlow.value = ds.glow;
+  pools.material.color.setScalar(1 + 1.4 * ds.glow); home.update(t); chibis.forEach(c => { const n = c.userData.name, bs = c.userData.brain.state, w = home.windows[n]; if (!w) return;
+    // room light: on while the bot is home in the evening / getting ready, a dim night-light once asleep, off when they're out
+    const want = (bs.act === 'home' ? 0.75 : bs.act === 'sleep' ? (bs.asleep ? 0.32 : 1) : 0) * ds.glow; const u = w.material.uniforms.uGlow; u.value += (want - u.value) * Math.min(1, dt * 2);
+    home.covers[n].visible = !!bs.asleep; });
   flies.forEach(f => { f.visible = ds.fireflies > 0.01; f.material.uniforms.uA.value = ds.fireflies; f.material.uniforms.uTime.value = t; });
   frames++; const now=performance.now(); if(now-last>1000){window.__info=renderer.info.render; window.__fps=frames*1000/(now-last); autoTier(window.__fps, t); fpsEl.textContent=window.__fps.toFixed(0)+' fps'; frames=0; last=now;}
   player.update(dt, t); petsys.update(dt, t, wt); interact(wt, t, dt);

@@ -65,9 +65,9 @@ export function glowPoints(scene, pts, { size = 60, color = 0xffc878, always = f
 }
 // unlit "lamp/window" material: pale in daylight, warm glowing after dusk (per-mesh uniform so rooms can switch independently)
 export function glowMat(color = 0xffc874, own = false) {
-  return new THREE.ShaderMaterial({ uniforms: { uGlow: own ? { value: 0 } : dayUniforms.uGlow, uColor: { value: new THREE.Color(color) } },
+  return new THREE.ShaderMaterial({ uniforms: { uGlow: own ? { value: 0 } : dayUniforms.uGlow, uNight: dayUniforms.uNight, uColor: { value: new THREE.Color(color) } },
     vertexShader: `void main(){ gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
-    fragmentShader: `uniform float uGlow; uniform vec3 uColor; void main(){ vec3 day = mix(vec3(0.55,0.6,0.66), uColor, 0.35); gl_FragColor = vec4(mix(day, uColor*1.25, uGlow), 1.0); }` });
+    fragmentShader: `uniform float uGlow, uNight; uniform vec3 uColor; void main(){ vec3 day = mix(mix(vec3(0.55,0.6,0.66), uColor, 0.35), vec3(0.06,0.08,0.16), uNight); gl_FragColor = vec4(mix(day, uColor*1.25, uGlow), 1.0); }` });
 }
 // fireflies: one Points draw per swarm, drift + blink in the vertex shader, fade with uNight-ish factor
 export function fireflies(scene, { cx, cz, r, n = 36, y0 = 0.4, y1 = 2.2, seed = 5 }) {
