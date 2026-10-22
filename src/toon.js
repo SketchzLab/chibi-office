@@ -43,9 +43,9 @@ void main(){ vec3 n=normalize(vN); float d=dot(n,uKeyDir); vec3 alb = uColor*vC;
  // smoother 3-band ramp
  // matte cel ramp: 3 flat tones (shadow / mid / lit) with soft painted edges; shadows tinted warm (rose-violet), not grey-blue
  // pixel-art cel: world-space 'texel' cells (~12/unit) give square pixel clusters; band edges are dithered per cell
- vec3 cell = floor(vW*12.0 + 0.001); float px = mix(0.5, h21(cell.xy + cell.z*7.13), uDetail);
- float dq = dd + (px-0.5)*0.16;
- float b = 0.34 + 0.36*step(0.0, dq) + 0.30*step(0.5, dq);
+ vec3 cell = floor(vW*7.0 + 0.001); float px = mix(0.5, h21(cell.xy + cell.z*7.13), uDetail);
+ float dq = dd + (px-0.5)*0.3;
+ float b = 0.24 + 0.4*step(0.0, dq) + 0.36*step(0.5, dq); // stronger 3-tone pixel bands
  vec3 shade = uShadeColor*vec3(1.08,0.9,0.92) + vec3(0.03,0.01,0.0);
  vec3 light = mix(shade, uKeyColor, b);
  float term = smoothstep(-0.14,0.0,dd)*(1.0-smoothstep(0.0,0.18,dd)); light += vec3(0.11,0.035,-0.02)*term;
@@ -61,8 +61,8 @@ void main(){ vec3 n=normalize(vN); float d=dot(n,uKeyDir); vec3 alb = uColor*vC;
  vec3 v = normalize(cameraPosition - vW); float rim = pow(1.0-max(dot(n,v),0.0),3.0);
  rim = smoothstep(0.55,0.8, rim)*0.035*smoothstep(0.0,0.4,d); // barely-there warm edge, no plastic sheen
  // painted paper grain: low-contrast albedo mottling instead of specular highlights
- float paper = (px-0.5)*0.05; // blocky pixel mottling, no gloss
- vec3 c = alb*(1.0 + paper)*light + rim*uRimColor + uEmissive;
+ float paper = (px-0.5)*0.1; // blocky pixel mottling, no gloss
+ vec3 c = 0.92*alb*(1.0 + paper)*light + rim*uRimColor + uEmissive;
  float fd = length(cameraPosition - vW); c = mix(c, uFogColor, smoothstep(uFogRange.x, uFogRange.y, fd)*0.85);
  // colour grade: saturation, gentle tone curve, warm lift in the mids
  float lum = dot(c, vec3(0.299,0.587,0.114)); c = mix(vec3(lum), c, uGrade.x); c = pow(max(c, 0.0), vec3(uGrade.y)); c += uGrade.z*vec3(1.0,0.6,0.2)*(1.0-abs(lum*2.0-1.0));
@@ -79,7 +79,7 @@ export function toonMat(color, emissive = 0x000000) {
 
 // Inverted-hull outline
 const outlineMat = new THREE.ShaderMaterial({
-  uniforms: { uW: { value: 0.014 } }, side: THREE.BackSide,
+  uniforms: { uW: { value: 0.022 } }, side: THREE.BackSide,
   // depth-aware: hull grows with view distance so lines keep a steady screen width (thin up close, not vanishing far away)
   vertexShader: `uniform float uW; void main(){ vec4 mv0 = modelViewMatrix*vec4(position,1.0); float k = clamp(-mv0.z/22.0, 0.55, 1.7); vec3 p = position + normal*uW*k; gl_Position = projectionMatrix*modelViewMatrix*vec4(p,1.0);}`,
   fragmentShader: `void main(){ gl_FragColor=vec4(0.25,0.16,0.17,1.0);}`,

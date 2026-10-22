@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 // chunky chamfered low-poly blocks (style-ref): 1-segment rounded boxes read as bevelled voxels
-const Blk = (r) => new RoundedBoxGeometry(2 * r, 2 * r, 2 * r, 2, r * 0.22);
+const Blk = (r) => new RoundedBoxGeometry(2 * r, 2 * r, 2 * r, 2, r * 0.32);
 const BlkCap = (r, len) => new RoundedBoxGeometry(2 * r, len + 2 * r, 2 * r, 2, r * 0.3);
 import { toonMesh, toonMat } from './toon.js';
 import { bake } from './bake.js';
@@ -35,14 +35,14 @@ export function makeChibi({ name, role, skin = 0xffe0c8, hair, shirt, pants, hai
   if (sleepMouth === 'mumble') { anim = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), new THREE.MeshBasicMaterial({ color: MOUTH })); anim.scale.set(1, 0.35, 0.4); anim.position.set(0, -0.25, 0.62); }
   if (anim) { anim.visible = false; anim.userData.dynamic = true; head.add(anim); }
   // hair cap
-  const cap = toonMesh(new RoundedBoxGeometry(1.46, 0.66, 1.4, 2, 0.16), hair); cap.scale.set(1.06, 1, 1.02); cap.position.y = 0.5; cap.rotation.x = -0.28; head.add(cap);
+  const cap = toonMesh(new RoundedBoxGeometry(1.38, 0.62, 1.34, 2, 0.26), hair); cap.scale.set(1.06, 1, 1.02); cap.position.y = 0.47; cap.rotation.x = -0.28; head.add(cap);
   // soft fringe bangs
   [-0.32, 0, 0.32].forEach((x, i) => { const b = toonMesh(Blk(0.22), hair); b.scale.set(1.1, 0.75, 0.6); b.position.set(x, 0.36 - Math.abs(x) * 0.25, 0.52); head.add(b); });
   // little rounded ears/nose and a smile
   if (hairStyle === 'twintails') { [-1, 1].forEach(s => { const t = toonMesh(BlkCap(0.17, 0.55), hair); t.position.set(0.74 * s, -0.25, -0.1); t.rotation.z = 0.35 * s; head.add(t);
       const bow = toonMesh(new THREE.BoxGeometry(0.22, 0.14, 0.1), 0xffe066); bow.position.set(0.66 * s, 0.25, -0.05); head.add(bow); }); }
   if (hairStyle === 'spiky') { for (let i = 0; i < 7; i++) { const a = i / 7 * Math.PI * 2; const sp = toonMesh(new THREE.ConeGeometry(0.19, 0.42, 4), hair);
-      sp.position.set(Math.cos(a) * 0.4, 0.86, Math.sin(a) * 0.4 - 0.08); sp.rotation.set(Math.sin(a) * 0.7, 0, -Math.cos(a) * 0.7); head.add(sp); }
+      sp.position.set(Math.cos(a) * 0.38, 0.8, Math.sin(a) * 0.4 - 0.08); sp.rotation.set(Math.sin(a) * 0.7, 0, -Math.cos(a) * 0.7); head.add(sp); }
     const gl = toonMesh(new THREE.TorusGeometry(0.13, 0.025, 6, 14), 0x333344, { outline: false }); [-0.22, 0.22].forEach(x => { const g = gl.clone(); g.position.set(x, -0.04, 0.66); head.add(g); }); }
   if (hairStyle === 'bun') { const bun = toonMesh(Blk(0.3), hair); bun.position.set(0, 0.62, -0.38); head.add(bun);
     const pin = toonMesh(new THREE.CylinderGeometry(0.025, 0.025, 0.7, 6), 0x8b5a3c, { outline: false }); pin.rotation.z = 1.1; pin.position.set(0, 0.66, -0.4); head.add(pin);
@@ -53,9 +53,15 @@ export function makeChibi({ name, role, skin = 0xffe0c8, hair, shirt, pants, hai
   if (headphones) { const band = toonMesh(new THREE.TorusGeometry(0.78, 0.07, 6, 20, Math.PI), 0x2b2d42); band.position.set(0, 0.05, -0.05); head.add(band);
     [-1, 1].forEach(s => { const cup = toonMesh(new THREE.CylinderGeometry(0.22, 0.22, 0.16, 14), 0xff5d8f); cup.rotation.z = Math.PI / 2; cup.position.set(0.78 * s, 0.0, -0.05); head.add(cup); }); }
   const limb = (c, len, r, end, endR) => { const p = new THREE.Group(); const m = toonMesh(BlkCap(r, len), c); m.position.y = -len / 2 - r * 0.5; p.add(m);
-    if (end !== undefined) { const e = toonMesh(Blk(endR), end); e.position.y = -len - r; if (endR > 0.14) { e.scale.set(1, 0.7, 1.35); e.position.z = 0.05; } p.add(e); } return p; };
+    if (end !== undefined) { const e = toonMesh(Blk(endR), end); e.position.y = -len - r; if (endR > 0.14) { e.scale.set(1.05, 0.7, 1.4); e.position.z = 0.05;
+      const sole = toonMesh(new RoundedBoxGeometry(endR * 2.2, 0.07, endR * 2.9, 1, 0.02), 0xf3ead6); sole.position.set(0, -len - r - endR * 0.62, 0.05); p.add(sole); } p.add(e); }
+    if (!(endR > 0.14)) [0.3, 0.72].forEach(f => { const cuff = toonMesh(new RoundedBoxGeometry(r * 2.35, 0.07, r * 2.35, 1, 0.025), new THREE.Color(c).multiplyScalar(0.82)); cuff.position.y = -len * f - r * 0.3; p.add(cuff); }); // puffy sleeve segments
+    return p; };
   const armL = limb(shirt, 0.28, 0.12, skin, 0.12), armR = limb(shirt, 0.28, 0.12, skin, 0.12); armL.position.set(-0.44, 1.08, 0); armR.position.set(0.44, 1.08, 0); body.add(armL, armR);
   const legL = limb(pants, 0.24, 0.15, 0x4a3b3f, 0.16), legR = limb(pants, 0.24, 0.15, 0x4a3b3f, 0.16); legL.position.set(-0.16, 0.5, 0); legR.position.set(0.16, 0.5, 0); root.add(legL, legR);
+  // chunky knit scarf + hanging tail (style-ref), accent tone derived from the shirt so each bot keeps its palette
+  { const sc = new THREE.Color(shirt).lerp(new THREE.Color(0xd97a9c), 0.55); const ring = toonMesh(new RoundedBoxGeometry(0.86, 0.2, 0.74, 2, 0.08), sc); ring.position.y = 1.2; body.add(ring);
+    const tail = toonMesh(new RoundedBoxGeometry(0.2, 0.42, 0.1, 1, 0.04), sc.clone().multiplyScalar(0.9)); tail.position.set(0.18, 0.98, 0.36); tail.rotation.z = 0.12; body.add(tail); }
   // invisible fat hit-box for easy tapping
   const hit = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 2.6, 8), new THREE.MeshBasicMaterial({ visible: false })); hit.position.y = 1.3; hit.userData.chibi = root; root.add(hit);
   // merge each rigid part into one fill + one outline batch
