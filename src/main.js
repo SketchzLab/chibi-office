@@ -56,7 +56,7 @@ window.__setStatus = j => { status = j; applyStatus(); };
 // ---- Floating status bubbles (one small sprite per bot, redrawn only when text changes) ----
 // Speech bubbles (talk) + a tiny activity emoji when quiet. One sprite per chibi, canvas redrawn only on change.
 function makeBubble() { const cv = document.createElement('canvas'); cv.width = 512; cv.height = 176; const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
-  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false })); sp.renderOrder = 5; scene.add(sp); return { sp, cv, tex, text: null, big: false }; }
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false })); sp.renderOrder = 5; scene.add(sp); return { sp, cv, tex, text: null, big: false }; }
 function wrap(g, text, max) { const words = text.split(' '), lines = ['']; for (const w of words) { const tl = (lines.at(-1) ? lines.at(-1) + ' ' : '') + w; if (g.measureText(tl).width > max && lines.at(-1)) lines.push(w); else lines[lines.length - 1] = tl; } return lines.slice(0, 3); }
 function drawBubble(bb, emoji, text) { const key = emoji + '|' + (text || ''); if (bb.text === key) return; bb.text = key; bb.big = !!text; const g = bb.cv.getContext('2d'); g.clearRect(0, 0, 512, 176);
   g.fillStyle = 'rgba(255,250,242,0.96)'; g.strokeStyle = '#2a1f35'; g.lineWidth = 5;
