@@ -1,3 +1,4 @@
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { toonMesh } from './toon.js';
@@ -104,6 +105,9 @@ function glassRoom(g) {
   const pane = (w, px, pz, ry) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, H), glass); m.position.set(px, H / 2, pz); m.rotation.y = ry; g.add(m); };
   pane(door0 - x0, (x0 + door0) / 2, z1, 0);            // front pane, doorway gap door0..x1
   pane(z1 - z0, x1, cz, Math.PI / 2);                   // side pane
+  { const sg = []; const streak = (w, px, pz, ry) => { const q = new THREE.PlaneGeometry(w, H * 1.2); q.rotateZ(0.6); q.rotateY(ry); q.translate(px, H / 2, pz); sg.push(q); };
+    streak(0.35, x0 + 1.0, z1 + 0.01, 0); streak(0.14, x0 + 1.5, z1 + 0.01, 0); streak(0.35, x1 + 0.01, z0 + 1.4, Math.PI / 2); streak(0.14, x1 + 0.01, z0 + 1.9, Math.PI / 2);
+    const sm = new THREE.Mesh(mergeGeometries(sg), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.16, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending })); g.add(sm); }
   const F = 0x3f6f6a; const fr = (w, h, d, x, y, z) => { const m = toonMesh(B(w, h, d), F, { outline: false }); m.position.set(x, y, z); g.add(m); };
   fr(x1 - x0, 0.08, 0.08, cx, H, z1); fr(0.08, 0.08, z1 - z0, x1, H, cz);
   [x0 + 0.05, (x0 + door0) / 2, door0, x1].forEach(x => fr(0.07, H, 0.07, x, H / 2, z1));
@@ -142,6 +146,45 @@ function walkway(g) {
   const a = toonMesh(B(x1 - x0, 0.012, half * 2), col, { outline: false }); a.position.set((x0 + x1) / 2, 0.006, z); g.add(a);
   const b = toonMesh(B(half * 2, 0.012, 4.6), col, { outline: false }); b.position.set(7.6, 0.007, -2.3); g.add(b);
 }
+
+// ---- cozy details (all static -> baked into the shared vertex-colour meshes, ~0 extra draw calls) ----
+function cozy(g) {
+  const M = (geo, col, x, y, z, o = {}) => { const m = toonMesh(geo, col, { outline: o.outline ?? false }); m.position.set(x, y, z); if (o.r) m.rotation.set(...o.r); if (o.s) m.scale.set(...o.s); g.add(m); return m; };
+  const Z = BACK_Z + 0.17;
+  // whiteboard doodles: bar chart, arrow, smiley
+  [[2.05, 0.18], [2.2, 0.32], [2.35, 0.46]].forEach(([x, h]) => M(B(0.1, h, 0.02), 0x4fb3a9, x, 1.25 + h / 2, Z));
+  M(B(0.9, 0.025, 0.02), 0x2a1f35, 2.6, 1.3, Z, { r: [0, 0, 0.35] }); M(B(0.16, 0.025, 0.02), 0x2a1f35, 3.0, 1.43, Z, { r: [0, 0, -0.5] });
+  M(new THREE.TorusGeometry(0.16, 0.018, 4, 16), 0xff7a6a, 3.55, 1.38, Z); M(new THREE.TorusGeometry(0.08, 0.016, 4, 10, Math.PI), 0xff7a6a, 3.55, 1.35, Z, { r: [0, 0, Math.PI] });
+  // framed art above the bookshelves
+  [[-3.6, 0xffb3cf, 0x7ac8a0], [-1.9, 0x9fd6ff, 0xffd36a]].forEach(([x, a, b2]) => { M(RB(0.75, 0.5, 0.05, 0.02), 0xc98d55, x, 2.3, BACK_Z + 0.13, { outline: true }); M(B(0.62, 0.38, 0.02), a, x, 2.3, BACK_Z + 0.17);
+    M(new THREE.CircleGeometry(0.09, 10), b2, x + 0.12, 2.36, BACK_Z + 0.185); M(new THREE.ConeGeometry(0.16, 0.2, 3), 0x5fae5a, x - 0.12, 2.22, BACK_Z + 0.185, { s: [1, 1, 0.1] }); });
+  // desk lamps + book stacks on every desk (rotated with the desk)
+  [...DESKS, BOSS_DESK].forEach(([x, z]) => { const k = z > 0 ? -1 : 1; const lx = x + 0.85 * k, lz = z - 0.3 * k;
+    M(new THREE.CylinderGeometry(0.1, 0.12, 0.04, 10), 0x3a3340, lx, 0.97, lz); M(new THREE.CylinderGeometry(0.018, 0.018, 0.42, 6), 0x3a3340, lx, 1.18, lz, { r: [0.35 * k, 0, 0] });
+    M(new THREE.ConeGeometry(0.13, 0.16, 10, 1, true), 0xffd36a, lx, 1.38, lz + 0.1 * k, { outline: true, r: [Math.PI - 0.5 * k, 0, 0] });
+    [0xff8a7a, 0x9aa8ff].forEach((c, i) => M(B(0.32, 0.05, 0.22), c, x - 0.55 * k, 0.98 + i * 0.05, z - 0.32 * k, { r: [0, i * 0.3, 0] })); });
+  // lounge: cushions, throw, cat, patterned rug, coffee-table books + vase
+  const { cx, cz } = LOUNGE;
+  [[cx - 1.0, cz + 2.12, 0.25, 0xff9b7a], [cx + 0.9, cz + 2.12, -0.2, 0xfff1d8]].forEach(([x, z, rz, c]) => M(RB(0.5, 0.45, 0.16, 0.08, 2), c, x, 0.72, z, { outline: true, r: [0.25, 0, rz] }));
+  M(RB(0.16, 0.45, 0.5, 0.08, 2), 0xffd36a, cx - 2.42, 0.72, cz - 0.7, { outline: true, r: [0, 0, -0.25] });
+  M(RB(0.55, 0.05, 1.0, 0.02, 1), 0xe86a6a, cx + 1.5, 0.7, cz + 2.0, { outline: true }); [-0.3, 0, 0.3].forEach(dz => M(B(0.56, 0.055, 0.06), 0xfff1d8, cx + 1.5, 0.7, cz + 2.0 + dz));
+  const ctx = cx - 2.15, ctz = cz + 0.85; // sleepy orange cat curled on the side sofa
+  M(new THREE.SphereGeometry(0.26, 12, 8), 0xf2a05a, ctx, 0.6, ctz, { outline: true, s: [1.25, 0.6, 0.9] }); M(new THREE.SphereGeometry(0.14, 10, 8), 0xf2a05a, ctx + 0.02, 0.66, ctz - 0.24, { outline: true });
+  [-1, 1].forEach(k => M(new THREE.ConeGeometry(0.05, 0.1, 4), 0xe08a44, ctx + 0.02 + k * 0.07, 0.78, ctz - 0.26));
+  M(new THREE.TorusGeometry(0.22, 0.045, 5, 10, Math.PI), 0xe08a44, ctx, 0.56, ctz + 0.05, { r: [-Math.PI / 2, 0, 0.6] });
+  [-1, 1].forEach(k => M(B(0.05, 0.01, 0.01), 0x2a1f35, ctx + 0.02 + k * 0.05, 0.67, ctz - 0.37));
+  M(new THREE.CylinderGeometry(1.95, 1.95, 0.008, 32), 0xe4c79c, cx, 0.024, cz, { s: [1.15, 1, 0.92] }); M(new THREE.CylinderGeometry(1.75, 1.75, 0.008, 32), 0xf5e7cc, cx, 0.028, cz, { s: [1.15, 1, 0.92] });
+  for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; M(new THREE.CylinderGeometry(0.08, 0.08, 0.008, 4), 0xe8a07a, cx + Math.cos(a) * 1.85 * 1.15, 0.03, cz + Math.sin(a) * 1.85 * 0.92); }
+  [[0x7ac8a0, 0], [0xffd36a, 0.4]].forEach(([c, r], i) => M(B(0.32, 0.06, 0.24), c, cx - 0.15, 0.5 + i * 0.06, cz - 0.3, { r: [0, r, 0] }));
+  M(new THREE.CylinderGeometry(0.06, 0.08, 0.2, 8), 0x9fd6ff, cx + 0.35, 0.57, cz + 0.1); M(new THREE.SphereGeometry(0.07, 6, 4), 0xff8fb3, cx + 0.35, 0.72, cz + 0.1);
+  // plant variety: snake plant, monstera, trailing pothos on a shelf, mini cactus on the pantry counter
+  M(new THREE.CylinderGeometry(0.28, 0.22, 0.4, 10), 0x4fb3a9, -10.2, 0.2, 7.3, { outline: true });
+  for (let i = 0; i < 6; i++) { const a = i / 6 * 6.28; M(new THREE.ConeGeometry(0.08, 1.0 + (i % 3) * 0.2, 4), 0x3f8f45, -10.2 + Math.cos(a) * 0.1, 0.85, 7.3 + Math.sin(a) * 0.1, { outline: true, r: [Math.sin(a) * 0.15, 0, -Math.cos(a) * 0.15], s: [1, 1, 0.4] }); }
+  M(new THREE.CylinderGeometry(0.32, 0.26, 0.45, 10), 0xf4f1ea, 10.1, 0.22, 7.1, { outline: true });
+  [[0, 0.95, 0, 0], [0.3, 0.8, 0.1, 0.7], [-0.3, 0.85, -0.1, -0.7], [0.05, 1.15, -0.25, 2.6]].forEach(([dx, y, dz, ry]) => M(new THREE.SphereGeometry(0.34, 10, 6), 0x4f9e4a, 10.1 + dx, y, 7.1 + dz, { outline: true, s: [1, 0.25, 0.75], r: [0.4, ry, 0] }));
+  M(new THREE.CylinderGeometry(0.16, 0.12, 0.2, 8), 0xff9b7a, -1.4, 2.1, BACK_Z + 0.35, { outline: true });
+  for (let i = 0; i < 7; i++) M(new THREE.IcosahedronGeometry(0.09, 0), 0x6cc45a, -1.4 + (i % 2 ? 0.12 : -0.1), 2.15 - i * 0.16, BACK_Z + 0.5);
+}
 export function makeOffice(scene) {
   const g = new THREE.Group();
   shell(g); glassRoom(g); lounge(g); walkway(g);
@@ -163,6 +206,7 @@ export function makeOffice(scene) {
   cast(PANTRY.x + 0.4, PANTRY.z, 6.2, 2.4, PANTRY.ry); const p = pantry(); p.position.set(PANTRY.x, 0, PANTRY.z); p.rotation.y = PANTRY.ry; g.add(p);
   [[-4.6, -7.2], [7.4, 2.6], [-2.4, 7.2], [6.6, 6.9], [10.2, -1.2]].forEach(([x, z], i) => { const pl = plant(1.1 + (i % 2) * 0.4); pl.position.set(x, 0, z); cast(x, z, 1.4, 1.4); g.add(pl); });
   [[-3.9, 7.3], [9.6, 3.2]].forEach(([x, z]) => { const l = lamp(); l.position.set(x, 0, z); cast(x, z, 1.0, 1.0); g.add(l); });
+  cozy(g);
   scene.add(g); bake(g);
   return g;
 }

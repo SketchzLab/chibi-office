@@ -56,3 +56,16 @@ export function makeAtmosphere(scene, tier) {
   return { update(t) { sys.forEach(s => s.material.uniforms.uTime.value = t); }, systems: sys, rays,
     demote() { sys.forEach(s => s.visible = false); rays.remove(); } };
 }
+
+// Steam curling up from mugs: one Points draw for all mugs, animated in the vertex shader.
+export function steam(scene, spots, per = 7) {
+  const n = spots.length * per, p = new Float32Array(n * 3), a = new Float32Array(n);
+  spots.forEach(([x, y, z], i) => { for (let k = 0; k < per; k++) { const j = i * per + k; p.set([x, y, z], j * 3); a[j] = k / per + i * 0.37; } });
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(p, 3)); g.setAttribute('aSeed', new THREE.BufferAttribute(a, 1));
+  const mat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, uniforms: { uTime: { value: 0 }, uSize: { value: 10 * Math.min(devicePixelRatio, 1.75) } },
+    vertexShader: `uniform float uTime, uSize; attribute float aSeed; varying float vA;
+      void main(){ float ph = fract(uTime*0.32 + aSeed); vec3 q = position + vec3(sin(ph*7.0+aSeed*9.0)*0.06, ph*0.65, cos(ph*5.0+aSeed*4.0)*0.04);
+        vec4 mv = modelViewMatrix*vec4(q,1.0); gl_Position = projectionMatrix*mv; gl_PointSize = uSize*(0.5+ph)*(18.0 / -mv.z); vA = sin(ph*3.14159)*0.55; }`,
+    fragmentShader: `varying float vA; void main(){ float d = length(gl_PointCoord-0.5); float al = smoothstep(0.5,0.1,d)*vA; gl_FragColor = vec4(vec3(1.0), al); }` });
+  const pts = new THREE.Points(g, mat); pts.frustumCulled = false; pts.renderOrder = 4; scene.add(pts); return pts;
+}

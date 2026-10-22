@@ -11,7 +11,8 @@ import { makeNature } from './nature.js';
 import { makeOffice, glows } from './props.js';
 import { makeChibi } from './chibi.js';
 import { makePlayer } from './player.js';
-import { pickTier, makeAtmosphere, lightPools } from './fx.js';
+import { pickTier, makeAtmosphere, lightPools, steam } from './fx.js';
+import { DESKS, BOSS_DESK } from './layout.js';
 import { speechAt, GREET, HI_BACK } from './dialogue.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
@@ -46,7 +47,8 @@ const player = makePlayer({ scene, camera, controls, bots: chibis }); const calv
 player.setHome(camera.position, controls.target);
 // ---- cozy FX + quality tier ----
 let tier = pickTier(); if (tier === 'low') { toonUniforms.uDetail.value = 0; renderer.setPixelRatio(1); }
-const atmos = makeAtmosphere(scene, tier); window.__tier = () => tier;
+const atmos = makeAtmosphere(scene, tier);
+const steamFx = tier === 'low' ? null : steam(scene, [...DESKS, BOSS_DESK].map(([x, z]) => z > 0 ? [x + 0.8, 1.1, z - 0.2] : [x - 0.8, 1.1, z + 0.2])); window.__tier = () => tier;
 lightPools(scene, [[-3.9, 7.3, 2.6, 0xffc070, 0.55], [9.6, 3.2, 2.6, 0xffc070, 0.55], [-7.8, 4.6, 3.4, 0xffb060, 0.28], [8.2, -5.2, 3.0, 0xffd090, 0.3], [5.2, 2.0, 2.2, 0xffc890, 0.3], [-7.9, -5.1, 3.0, 0xfff0c0, 0.22]]);
 buildShadows(scene); const blobs = [...chibis, calvin].map(c => [c, chibiShadow(scene)]);
 const talkers = chibis.map(c => ({ name: c.userData.name, brain: c.userData.brain }));
@@ -146,8 +148,8 @@ function interact(wt, t, dt) { let best = null, bd = 2.7; chibis.forEach(c => { 
     if (face[n + 'wave'] > wt) { P.armR.rotation.x = -2.9; P.armR.rotation.z = -0.4 + Math.sin(t * 12) * 0.35; } }); }
 window.__near = () => near?.userData.name || null;
 let slow = 0; function autoTier(fps, t) { if (tier === 'low' || new URLSearchParams(location.search).get('q') || t < 4) return; slow = fps < 24 ? slow + 1 : 0;
-  if (slow >= 4) { tier = 'low'; toonUniforms.uDetail.value = 0; renderer.setPixelRatio(1); atmos.demote(); console.log('quality tier -> low'); } }
-function loop() { const t = clock.getElapsedTime(); toonUniforms.uTime.value = t; atmos.update(t); const dt = Math.min(0.1, t - prevT); prevT = t; const wt = wallTime(); brains.forEach(b => b.update(wt, dt, t));
+  if (slow >= 4) { tier = 'low'; toonUniforms.uDetail.value = 0; renderer.setPixelRatio(1); atmos.demote(); if (steamFx) steamFx.visible = false; console.log('quality tier -> low'); } }
+function loop() { const t = clock.getElapsedTime(); toonUniforms.uTime.value = t; atmos.update(t); if (steamFx) steamFx.material.uniforms.uTime.value = t; const dt = Math.min(0.1, t - prevT); prevT = t; const wt = wallTime(); brains.forEach(b => b.update(wt, dt, t));
   island.children.forEach(c => { if (c.userData.float !== undefined) c.position.y += Math.sin(t + c.userData.float) * 0.003; });
   glows.forEach((h,i)=>h.material.opacity=0.5+0.06*Math.sin(t*2+i));
   frames++; const now=performance.now(); if(now-last>1000){window.__info=renderer.info.render; window.__fps=frames*1000/(now-last); autoTier(window.__fps, t); fpsEl.textContent=window.__fps.toFixed(0)+' fps'; frames=0; last=now;}
