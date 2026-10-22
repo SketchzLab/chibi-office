@@ -16,9 +16,13 @@ function desk() {
   const top = toonMesh(B(2.2, 0.1, 1.1), 0xe9c38e); top.position.y = 0.9; g.add(top);
   [[-1, -0.45], [1, -0.45], [-1, 0.45], [1, 0.45]].forEach(([x, z]) => { const l = toonMesh(B(0.08, 0.9, 0.08), 0xf4f1ea, { outline: false }); l.position.set(x, 0.45, z); g.add(l); });
   const mon = toonMesh(B(1.1, 0.65, 0.07), 0xe8eef2); mon.position.set(0, 1.45, -0.3); g.add(mon);
-  const scr = new THREE.Mesh(B(1.0, 0.55, 0.01), new THREE.MeshBasicMaterial({ color: 0x7fd8ff })); scr.position.set(0, 1.45, -0.26); g.add(scr);
+  const scr = new THREE.Mesh(B(1.0, 0.55, 0.01), new THREE.MeshBasicMaterial({ color: 0xa8ecff })); scr.position.set(0, 1.45, -0.26); g.add(scr);
   const st = toonMesh(B(0.08, 0.4, 0.08), 0x2b2d42, { outline: false }); st.position.set(0, 1.1, -0.32); g.add(st);
-  const h = halo(0x5cc8ff, 2.4, 0.55); h.position.set(0, 1.45, -0.15); g.add(h); glows.push(h);
+  const h = halo(0x5cc8ff, 2.0, 0.55); h.position.set(0, 1.45, -0.15); g.add(h); glows.push(h);
+  // daylight-visible glow: normal-blended cyan halo + bright bezel rim + light spill on desk
+  const h2 = new THREE.Sprite(new THREE.SpriteMaterial({ map: haloTex, color: 0x8fe6ff, transparent: true, depthWrite: false, opacity: 0.55 })); h2.scale.set(1.7, 1.15, 1); h2.position.set(0, 1.45, -0.2); g.add(h2); glows.push(h2);
+  [-1, 1].forEach(k => { const back = new THREE.Mesh(B(1.0, 0.55, 0.01), new THREE.MeshBasicMaterial({ color: 0x7fd8ff })); back.position.set(0, 1.45, -0.34); if (k > 0) g.add(back); });
+  const spill = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.9), new THREE.MeshBasicMaterial({ map: haloTex, color: 0x7fdcff, transparent: true, opacity: 0.6, depthWrite: false })); spill.rotation.x = -Math.PI / 2; spill.position.set(0, 0.96, 0.05); g.add(spill);
   const kb = toonMesh(B(0.7, 0.04, 0.22), 0xdddde8, { outline: false }); kb.position.set(0, 0.98, 0.15); g.add(kb);
   // chair
   const ch = new THREE.Group(); ch.position.set(0, 0, 0.95);
@@ -87,10 +91,11 @@ function glassRoom(g) {
   const x0 = -6.3, x1 = -3.3, z0 = -4.8, z1 = -1.2, H = 2.2;
   const glass = new THREE.MeshBasicMaterial({ color: 0xbfe9f2, transparent: true, opacity: 0.28, depthWrite: false });
   const pane = (w, cx, cz, ry) => { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, H), glass); m.position.set(cx, H / 2, cz); m.rotation.y = ry; g.add(m); };
-  pane(x1 - x0, (x0 + x1) / 2, z1, 0); pane(z1 - z0, x1, (z0 + z1) / 2, Math.PI / 2);
+  const door0 = -4.35; pane(door0 - x0, (x0 + door0) / 2, z1, 0); // doorway gap door0..x1 pane(z1 - z0, x1, (z0 + z1) / 2, Math.PI / 2);
   const F = 0x3f6f6a; const fr = (w, h, d, x, y, z) => { const m = toonMesh(B(w, h, d), F, { outline: false }); m.position.set(x, y, z); g.add(m); };
   fr(x1 - x0, 0.08, 0.08, (x0 + x1) / 2, H, z1); fr(0.08, 0.08, z1 - z0, x1, H, (z0 + z1) / 2);
-  [x0 + 0.05, (x0 + x1) / 2, x1].forEach(x => fr(0.07, H, 0.07, x, H / 2, z1)); [z0 + 0.1, (z0 + z1) / 2].forEach(z => fr(0.07, H, 0.07, x1, H / 2, z));
+  [x0 + 0.05, (x0 + door0) / 2, door0, x1].forEach(x => fr(0.07, H, 0.07, x, H / 2, z1));
+  const mat = toonMesh(B(x1 - door0 - 0.1, 0.02, 0.5), 0x3f6f6a, { outline: false }); mat.position.set((door0 + x1) / 2, 0.01, z1 + 0.3); g.add(mat); [z0 + 0.1, (z0 + z1) / 2].forEach(z => fr(0.07, H, 0.07, x1, H / 2, z));
   // door gap: leave open by not adding a pane on part? (kept simple)
   const tbl = toonMesh(new THREE.CylinderGeometry(0.9, 0.9, 0.08, 20), 0xe9c38e); tbl.position.set(-4.8, 0.78, -3.0); tbl.scale.z = 1.3; g.add(tbl);
   const leg = toonMesh(new THREE.CylinderGeometry(0.08, 0.2, 0.75, 8), 0xf4f1ea); leg.position.set(-4.8, 0.38, -3.0); g.add(leg);
@@ -130,8 +135,8 @@ export function makeOffice(scene) {
   spots.forEach(([x, z], i) => { const d = desk(); d.position.set(x, 0, z); if (z > 0) d.rotation.y = Math.PI; g.add(d); });
   const p = pantry(); p.position.set(4.8, 0, -3.4); p.rotation.y = -Math.PI / 4 - Math.PI / 2 + Math.PI; g.add(p);
   p.rotation.y = -0.53; // face island centre
-  [[-3.0, -1.0], [5.9, 0.4], [-2.6, 4.6], [5.6, 4.6]].forEach(([x, z], i) => { const pl = plant(1 + (i % 2) * 0.4); pl.position.set(x, 0, z); g.add(pl); });
-  [[-3.0, 0.0], [5.9, 3.0]].forEach(([x, z]) => { const l = lamp(); l.position.set(x, 0, z); g.add(l); });
+  [[-6.0, -0.5], [5.9, 0.4], [-2.6, 4.6], [5.6, 4.6]].forEach(([x, z], i) => { const pl = plant(1 + (i % 2) * 0.4); pl.position.set(x, 0, z); g.add(pl); });
+  [[-5.6, 0.6], [5.9, 3.0]].forEach(([x, z]) => { const l = lamp(); l.position.set(x, 0, z); g.add(l); });
   scene.add(g); bake(g);
   return g;
 }
