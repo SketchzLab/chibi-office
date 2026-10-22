@@ -15,6 +15,7 @@ import { makeChibi } from './chibi.js';
 import { makePlayer } from './player.js';
 import { pickTier, makeAtmosphere, lightPools, steam, radial } from './fx.js';
 import { DESKS, BOSS_DESK, BOT_S, CALVIN_S, LOUNGE, GLASS, PANTRY, ROOF, BALCONY, PARK, heightAt } from './layout.js';
+import { makeDayClock, makeDayCycle, fireflies, glowPoints, dayUniforms } from './daycycle.js';
 import { speechAt, GREET, HI_BACK, ZONE } from './dialogue.js';
 import { buildRoot, buildGroup, pickLine, mem } from './talk.js';
 
@@ -45,14 +46,19 @@ for (const [name, per] of Object.entries(PERSONAS)) {
   const c = makeChibi({ name, role: per.role, ...per.look }); c.scale.setScalar(BOT_S); c.userData.hit.scale.set(1.45, 1.2, 1.45); c.userData.persona = per;
   const brain = makeBrain(c, per); c.userData.brain = brain; scene.add(c); chibis.push(c); brains.push(brain);
 }
-export { chibis }; window.__scene = scene;
+export { chibis }; window.__scene = scene; window.__camera = camera;
 const player = makePlayer({ scene, camera, controls, bots: chibis }); const calvin = player.chibi; window.__player = player;
 player.setHome(camera.position, controls.target);
 // ---- cozy FX + quality tier ----
 let tier = pickTier(); if (tier === 'low') { toonUniforms.uDetail.value = 0; renderer.setPixelRatio(Math.min(devicePixelRatio, 1)); }
 const atmos = makeAtmosphere(scene, tier);
 const steamFx = tier === 'low' ? null : steam(scene, [...DESKS, BOSS_DESK].map(([x, z]) => z > 0 ? [x + 0.8, 1.1, z - 0.2] : [x - 0.8, 1.1, z + 0.2])); window.__tier = () => tier;
-lightPools(scene, [[-3.9, 7.3, 2.6, 0xffc070, 0.55], [9.6, 3.2, 2.6, 0xffc070, 0.55], [-7.8, 4.6, 3.4, 0xffb060, 0.28], [8.2, -5.2, 3.0, 0xffd090, 0.3], [5.2, 2.0, 2.2, 0xffc890, 0.3], [-7.9, -5.1, 3.0, 0xfff0c0, 0.22]]);
+const pools = lightPools(scene, [[-3.9, 7.3, 2.6, 0xffc070, 0.55], [9.6, 3.2, 2.6, 0xffc070, 0.55], [-7.8, 4.6, 3.4, 0xffb060, 0.28], [8.2, -5.2, 3.0, 0xffd090, 0.3], [5.2, 2.0, 2.2, 0xffc890, 0.3], [-7.9, -5.1, 3.0, 0xfff0c0, 0.22]]);
+// ---- day / night (Calvin's local UTC+8 clock; ?t=HH:MM preview) ----
+const dayClock = makeDayClock(); const day = makeDayCycle({ skyMat: sky.mat, atmoEl: atmo, raysEl: atmos.rays });
+const flies = [fireflies(scene, { cx: PARK.cx, cz: PARK.cz, r: PARK.r + 0.6, n: 34, seed: 11 })];
+const lampGlow = glowPoints(scene, [[-3.9, 2.1, 7.3, 1.6], [9.6, 2.1, 3.2, 1.6]], { size: 70, color: 0xffc070 });
+window.__day = () => ({ ...day.state, sec: dayClock() });
 buildShadows(scene); const blobsExtra = []; const blobs = [...chibis, calvin].map(c => [c, chibiShadow(scene)]);
 const talkers = chibis.map(c => ({ name: c.userData.name, brain: c.userData.brain }));
 // ---- Live status (public/status.json, cache-busted every 60 s) ----
@@ -287,7 +293,10 @@ function autoTier(fps, t) { if (new URLSearchParams(location.search).get('q') ||
 window.__quality = () => ({ tier, mid, pr: renderer.getPixelRatio() });
 function loop() { const t = clock.getElapsedTime(); toonUniforms.uTime.value = t; atmos.update(t); if (steamFx) steamFx.material.uniforms.uTime.value = t; const dt = Math.min(0.1, t - prevT); prevT = t; const wt = wallTime(); brains.forEach(b => b.update(wt, dt, t));
   island.children.forEach(c => { if (c.userData.float !== undefined) c.position.y += Math.sin(t + c.userData.float) * 0.003; });
-  glows.forEach((h,i)=>h.material.opacity=0.5+0.06*Math.sin(t*2+i));
+  const ds = day.update(dayClock()); sky.mat.uniforms.uTime.value = t; lampGlow.material.uniforms.uTime.value = t;
+  glows.forEach((h,i)=>{ const b = h.userData.base ?? (h.userData.base = h.material.opacity); h.material.opacity = b * (1 + (b < 0.3 ? 2.4 : 0.35) * ds.glow) * (0.92 + 0.08 * Math.sin(t * 2 + i)); });
+  pools.material.color.setScalar(1 + 1.4 * ds.glow);
+  flies.forEach(f => { f.visible = ds.fireflies > 0.01; f.material.uniforms.uA.value = ds.fireflies; f.material.uniforms.uTime.value = t; });
   frames++; const now=performance.now(); if(now-last>1000){window.__info=renderer.info.render; window.__fps=frames*1000/(now-last); autoTier(window.__fps, t); fpsEl.textContent=window.__fps.toFixed(0)+' fps'; frames=0; last=now;}
   player.update(dt, t); petsys.update(dt, t, wt); interact(wt, t, dt);
   const sp = speechAt(wt, talkers);

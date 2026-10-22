@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { dayUniforms } from './daycycle.js';
 import { toonMesh, toonMat } from './toon.js';
 import { bake } from './bake.js';
 import { cast } from './shadows.js';
@@ -19,30 +20,30 @@ export function makeNature(scene) {
   const g = new THREE.Group(); const updates = [];
   // ---- pool + stream + waterfall ----
   const rim = toonMesh(new THREE.CylinderGeometry(PL.rx + 0.35, PL.rx + 0.35, 0.25, 28), 0xd8cdb8); rim.scale.z = PL.rz / PL.rx; rim.position.set(POOL.x, -0.05, POOL.z); g.add(rim);
-  const waterMat = new THREE.ShaderMaterial({ transparent: true, uniforms: { uT: { value: 0 } },
+  const waterMat = new THREE.ShaderMaterial({ transparent: true, uniforms: { uT: { value: 0 }, uNight: dayUniforms.uNight },
     vertexShader: `varying vec2 vU; varying vec3 vW; void main(){ vU=uv; vec4 w=modelMatrix*vec4(position,1.); vW=w.xyz; gl_Position=projectionMatrix*viewMatrix*w; }`,
-    fragmentShader: `uniform float uT; varying vec2 vU; varying vec3 vW;
+    fragmentShader: `uniform float uT, uNight; varying vec2 vU; varying vec3 vW;
       void main(){ float r = sin(vW.x*3.0+uT*1.5)*sin(vW.z*3.5-uT*1.2) + 0.35*sin(vW.x*7.0-vW.z*5.0+uT*2.3);
         float edge = length(vU-0.5)*2.0; // 0 centre .. 1 rim (circle uv)
         vec3 deep = vec3(0.16,0.58,0.78), shallow = vec3(0.45,0.88,0.92);
         vec3 c = mix(deep, shallow, smoothstep(0.2,0.95,edge)); c = mix(c, c*1.15, smoothstep(-0.2,0.7,r));
         vec3 V = normalize(cameraPosition - vW); float fr = pow(1.0-abs(V.y),3.0); c = mix(c, vec3(0.85,0.95,1.0), fr*0.5);
         c = mix(c, vec3(1.0), step(1.05, r)*0.6); { vec2 g = floor(vW.xz*6.0); float hh = fract(sin(dot(g, vec2(12.9898,78.233)))*43758.5453); float tw = pow(max(0.0, sin(uT*2.5 + hh*40.0)), 24.0)*step(0.86, hh); c += vec3(1.0,0.98,0.9)*tw*0.8; float ca = sin(vW.x*5.0+sin(vW.z*4.0+uT)*1.5+uT*0.8)*sin(vW.z*5.5-uT*0.6); c += vec3(0.08,0.12,0.12)*smoothstep(0.6,0.95,ca); } c = mix(c, vec3(1.0), smoothstep(0.88,0.97,edge)*0.8);
-        gl_FragColor = vec4(c, 0.94);
+        c *= mix(vec3(1.0), vec3(0.16,0.2,0.38), uNight); gl_FragColor = vec4(c, 0.94);
         #include <colorspace_fragment>
       }` });
   const pool = new THREE.Mesh(new THREE.CircleGeometry(PL.rx, 28), waterMat); pool.rotation.x = -Math.PI / 2; pool.scale.y = PL.rz / PL.rx; pool.position.set(POOL.x, 0.09, POOL.z); g.add(pool);
   // stream from pool to cliff edge
   const stream = new THREE.Mesh(new THREE.PlaneGeometry(1.4, R - PL.z - PL.rz + 0.6), waterMat); stream.rotation.x = -Math.PI / 2; stream.position.set(POOL.x, 0.0, (PL.z + PL.rz + Math.sqrt(R * R - PL.x * PL.x)) / 2); g.add(stream);
-  const fallMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, uniforms: { uT: { value: 0 } },
+  const fallMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, uniforms: { uT: { value: 0 }, uNight: dayUniforms.uNight },
     vertexShader: `varying vec2 vU; void main(){ vU=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
-    fragmentShader: `uniform float uT; varying vec2 vU;
+    fragmentShader: `uniform float uT, uNight; varying vec2 vU;
       float h(float x){return fract(sin(x*91.7)*437.5);}
       void main(){ float col = floor(vU.x*14.0); float streak = fract(vU.y*3.0 + uT*(1.6+h(col)*0.8) + h(col)*5.0);
         vec3 c = mix(vec3(0.55,0.85,0.95), vec3(1.0), smoothstep(0.75,0.95,streak));
         float edge = smoothstep(0.0,0.12,vU.x)*smoothstep(1.0,0.88,vU.x); float fade = smoothstep(0.0,0.25,vU.y);
         c = mix(c, vec3(1.0), smoothstep(0.93,1.0,vU.y)*0.9); c = mix(c, vec3(0.3,0.7,0.85), 0.25*(1.0-abs(vU.x-0.5)*2.0)*smoothstep(0.4,0.9,streak));
-        gl_FragColor = vec4(c, 0.88*edge*fade);
+        c *= mix(vec3(1.0), vec3(0.2,0.24,0.42), uNight); gl_FragColor = vec4(c, 0.88*edge*fade);
         #include <colorspace_fragment>
       }` });
   const fallGeo = new THREE.PlaneGeometry(2.0, 20, 1, 24); const fp = fallGeo.attributes.position;
