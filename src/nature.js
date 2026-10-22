@@ -2,11 +2,11 @@ import * as THREE from 'three';
 import { toonMesh, toonMat } from './toon.js';
 import { bake } from './bake.js';
 import { cast } from './shadows.js';
-import { ISLAND_R as R, FLOOR, POOL as PL, BACK_Z } from './layout.js';
+import { ISLAND_R as R, FLOOR, POOL as PL, BACK_Z, TREES, ROOF, STAIRS, BALCONY, PARK, inR } from './layout.js';
 let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 const POOL = new THREE.Vector3(PL.x, 0, PL.z);
-function onGrassRing(x, z) { const r = Math.hypot(x, z); return r < R - 0.7 && (x < FLOOR.x0 - 0.3 || x > FLOOR.x1 + 0.3 || z < FLOOR.z0 - 0.3 || z > FLOOR.z1 + 0.3) && !(z < BACK_Z - 0.2 && z > BACK_Z - 3 && x > -7.2 && x < 5.2); }
-function tree(s = 1) {
+function onGrassRing(x, z) { const r = Math.hypot(x, z); return r < R - 0.7 && (x < FLOOR.x0 - 0.3 || x > FLOOR.x1 + 0.3 || z < FLOOR.z0 - 0.3 || z > FLOOR.z1 + 0.3) && !inR(ROOF, x, z, 0.2) && !inR(STAIRS, x, z, 0.2) && !inR(BALCONY, x, z, 0.1) && Math.abs(Math.hypot(x - PARK.cx, z - PARK.cz) - PARK.r) > 0.5 && Math.hypot(x - PARK.cx, z - PARK.cz) > 1.3; }
+export function tree(s = 1) {
   const g = new THREE.Group();
   const trunk = toonMesh(new THREE.CylinderGeometry(0.16, 0.24, 1.6, 6), 0x9a6a44); trunk.position.y = 0.8; g.add(trunk);
   const greens = [0x5fb550, 0x6cc45a, 0x4fa548];
@@ -63,7 +63,7 @@ export function makeNature(scene) {
     const addStone = (x, z) => { if (si < 40) { e.set(0, rnd() * 3, 0); q.setFromEuler(e); M.compose(new THREE.Vector3(x, -0.03, z), q, new THREE.Vector3(1, 1, 0.85)); stones.setMatrixAt(si++, M); } };
   for (let t = 0; t <= 1; t += 0.12) { addStone(0.5 - 3.0 * t, FLOOR.z1 + 0.7 + 2.9 * t); } for (let t = 0.1; t <= 1; t += 0.16) { addStone(0.6 + 2.6 * t, FLOOR.z1 + 1.9 + 2.4 * t); }
   stones.count = si; g.add(stones);
-  [[4.6, 11.0, 2.2, 1.3], [8.2, 10.0, 1.9, 1.2], [-8.6, 9.6, 1.6, 1.0]].forEach(([x, z, w, d]) => {
+  [[-8.6, 9.6, 1.6, 1.0]].forEach(([x, z, w, d]) => {
     const bed = toonMesh(new THREE.CylinderGeometry(1, 1, 0.25, 16), 0x9a6a44); bed.scale.set(w, 1, d); bed.position.set(x, 0.0, z); g.add(bed);
     const soil = toonMesh(new THREE.CylinderGeometry(0.92, 0.92, 0.05, 16), 0x6b4a33, { outline: false }); soil.scale.set(w, 1, d); soil.position.set(x, 0.13, z); g.add(soil);
     const cols = [0xff9bb8, 0xffd36a, 0xffffff, 0xb7a2ff, 0xff7a59];
@@ -75,7 +75,7 @@ export function makeNature(scene) {
   const bk = toonMesh(new THREE.BoxGeometry(1.8, 0.45, 0.08), 0xc98d55); bk.position.set(0, 0.8, -0.26); bench.add(bk);
   [-0.75, 0.75].forEach(x => { const l = toonMesh(new THREE.BoxGeometry(0.1, 0.48, 0.5), 0x3f6f6a, { outline: false }); l.position.set(x, 0.24, 0); bench.add(l); }); g.add(bench);
   // ---- trees ----
-  [[-13.0, -3.5, 1.5], [-12.6, 3.8, 1.3], [-9.5, -10.2, 1.4], [-2.0, -12.4, 1.1], [8.6, -10.6, 1.5], [12.8, -4.4, 1.3], [13.4, 1.6, 1.1], [-11.0, 8.6, 1.2], [-9.2, 11.0, 0.9], [11.8, -7.6, 1.0]].forEach(([x, z, s]) => { const t = tree(s); t.position.set(x, 0, z); cast(x, z, 3.4 * s, 3.0 * s, 0, -0.03, 1.6); g.add(t); });
+  TREES.forEach(([x, z, s]) => { const t = tree(s); t.position.set(x, 0, z); cast(x, z, 3.4 * s, 3.0 * s, 0, -0.03, 1.6); g.add(t); });
   // ---- grass detail (instanced, no outlines: cheap) ----
   const tuftGeo = new THREE.ConeGeometry(0.08, 0.38, 3, 1, true); tuftGeo.translate(0, 0.17, 0);
   const NT = 950; const tufts = new THREE.InstancedMesh(tuftGeo, toonMat(0x63b852), NT); tufts.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(NT * 3).map((_, i) => 0.85 + ((i * 7919) % 100) / 100 * 0.3), 3);
@@ -93,29 +93,7 @@ export function makeNature(scene) {
   const vines = new THREE.InstancedMesh(vineGeo, toonMat(0x3f8f45), 72); for (let i = 0; i < 72; i++) { const a = i / 72 * 6.28 + rnd() * 0.06; const x = Math.cos(a) * (R - 0.32), z = Math.sin(a) * (R - 0.32); e.set(0, -a + Math.PI / 2, 0.08 * (rnd() - 0.5)); q.setFromEuler(e);
     if (Math.abs(x - POOL.x) < 1.4 && z > 0) { M.makeScale(0, 0, 0); } else M.compose(new THREE.Vector3(x, -0.45, z), q, new THREE.Vector3(0.8 + rnd() * 0.6, 0.5 + rnd() * 1.4, 1)); vines.setMatrixAt(i, M); }
   g.add(vines);
-  // ---- rooftop garden on a back annex (becomes the back wall block of the office at 75%) ----
-  const annex = new THREE.Group(); annex.position.set(-1.0, 0, BACK_Z - 1.3);
-  const block = toonMesh(new THREE.BoxGeometry(12, 3, 2.4), 0xf4f1ea); block.position.y = 1.5; annex.add(block);
-  const trim = toonMesh(new THREE.BoxGeometry(12.2, 0.25, 2.6), 0x4fb3a9); trim.position.y = 3.1; annex.add(trim);
-  const roofGrass = toonMesh(new THREE.BoxGeometry(11.8, 0.12, 2.2), 0x86cf5e, { outline: false }); roofGrass.position.y = 3.28; annex.add(roofGrass);
-  // railing
-  for (let x = -5.9; x <= 5.95; x += 0.65) { const p = toonMesh(new THREE.BoxGeometry(0.06, 0.5, 0.06), 0x3f6f6a, { outline: false }); p.position.set(x, 3.55, 1.2); annex.add(p); }
-  const rail = toonMesh(new THREE.BoxGeometry(12, 0.07, 0.07), 0x3f6f6a, { outline: false }); rail.position.set(0, 3.8, 1.2); annex.add(rail);
-  // planters + mini tree + bushes
-  [[-5, 0.2], [-3.4, -0.5], [-1.4, 0.3], [4.6, -0.5]].forEach(([x, z]) => { const pl = toonMesh(new THREE.BoxGeometry(0.9, 0.35, 0.6), 0xb98250); pl.position.set(x, 3.5, z); annex.add(pl);
-    const b = toonMesh(new THREE.SphereGeometry(0.42, 7, 5), 0x6cc45a); b.position.set(x, 3.9, z); annex.add(b); });
-  const rt = tree(0.75); rt.position.set(0.3, 3.3, -0.3); annex.add(rt);
-  // telescope on tripod
-  const tel = new THREE.Group(); tel.position.set(2.4, 3.34, 0.4);
-  [0, 2.1, 4.2].forEach(a => { const l = toonMesh(new THREE.CylinderGeometry(0.03, 0.03, 1.1), 0x8b5a3c, { outline: false }); l.position.set(Math.cos(a) * 0.22, 0.5, Math.sin(a) * 0.22); l.rotation.set(Math.sin(a) * 0.4, 0, -Math.cos(a) * 0.4); tel.add(l); });
-  const tube = toonMesh(new THREE.CylinderGeometry(0.1, 0.14, 1.1, 12), 0x2f3b4f); tube.rotation.z = -1.1; tube.position.set(0.15, 1.15, 0); tel.add(tube);
-  const lens = toonMesh(new THREE.CylinderGeometry(0.15, 0.15, 0.08, 12), 0xd9b35a); lens.rotation.z = -1.1; lens.position.set(0.62, 1.38, 0); tel.add(lens);
-  annex.add(tel);
-  // flag
-  const pole = toonMesh(new THREE.CylinderGeometry(0.03, 0.03, 1.6), 0x8b5a3c, { outline: false }); pole.position.set(3.5, 4.1, -0.6); annex.add(pole);
-  const flag = toonMesh(new THREE.BoxGeometry(0.7, 0.42, 0.02), 0xff7a59); flag.position.set(3.85, 4.65, -0.6); flag.userData.dynamic = true; annex.add(flag);
-  updates.push(t => { flag.rotation.y = Math.sin(t * 3) * 0.25; });
-  g.add(annex);
+  // (rooftop + stairs + balcony + park live in world.js)
   scene.add(g); bake(g);
-  return { update: t => updates.forEach(u => u(t)) };
+  return { update: t => updates.forEach(u => u(t)), waterMat, updates };
 }

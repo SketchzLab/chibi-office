@@ -9,6 +9,7 @@ import { buildShadows, chibiShadow } from './shadows.js';
 import { makeIsland } from './island.js';
 import { makeNature } from './nature.js';
 import { makeOffice, glows } from './props.js';
+import { makeWorld } from './world.js';
 import { makeChibi } from './chibi.js';
 import { makePlayer } from './player.js';
 import { pickTier, makeAtmosphere, lightPools, steam, radial } from './fx.js';
@@ -27,7 +28,7 @@ const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.3, 90
 const CAM_DIR = new THREE.Vector3(1, 0.56, 1).normalize();
 // Fit the whole island (radius ~R plus clouds of breathing room) for any aspect, incl. Fold cover (≈0.43) and inner (≈0.84) screens.
 function fitDistance() { const vf = THREE.MathUtils.degToRad(camera.fov) / 2, hf = Math.atan(Math.tan(vf) * camera.aspect);
-  return Math.max(13.5 / Math.tan(vf), 18.5 / Math.tan(hf)); }
+  return Math.max(15.5 / Math.tan(vf), 21.5 / Math.tan(hf)); }
 camera.position.copy(CAM_DIR).multiplyScalar(fitDistance()).add(new THREE.Vector3(0, -2.5, 0));
 const camP = new URLSearchParams(location.search).get('cam'); if (camP) camera.position.set(...camP.split(',').map(Number));
 const controls = new OrbitControls(camera, renderer.domElement);
@@ -36,7 +37,7 @@ controls.minDistance = 12; controls.maxDistance = 110; controls.minPolarAngle = 
 const sky = makeSky(scene);
 const island = makeIsland(scene);
 const nature = makeNature(scene);
-makeOffice(scene);
+makeOffice(scene); makeWorld(scene, nature.waterMat);
 // ---- Bots: look + persona + clock-driven brain ----
 const chibis = [], brains = [];
 for (const [name, per] of Object.entries(PERSONAS)) {

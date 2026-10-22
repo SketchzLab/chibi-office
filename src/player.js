@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { makeChibi } from './chibi.js';
 import { applyPose } from './behavior.js';
-import { CALVIN_S, DESKS, BOSS_DESK, GLASS, LOUNGE, PANTRY, BACK_Z } from './layout.js';
+import { CALVIN_S, DESKS, BOSS_DESK, GLASS, LOUNGE, PANTRY, BACK_Z, FLOOR, LEFT_X, ROOF, STAIRS, BALCONY, PARK, TREES, POOL, WALK_R, inR, heightAt } from './layout.js';
 
 const R = 0.42; // body radius
 // furniture AABBs [x0,z0,x1,z1] (world space) + circles [x,z,r]
@@ -14,14 +14,34 @@ const BOXES = [
   [L.cx - 1.9, L.cz + 1.85, L.cx + 1.9, L.cz + 2.7], [L.cx - 2.8, L.cz - 1.6, L.cx - 2.0, L.cz + 1.6], // sofas
   [PANTRY.x - 1.9, PANTRY.z - 0.75, PANTRY.x + 2.0, PANTRY.z + 0.6], [3.5, BACK_Z, 6.3, BACK_Z + 0.95], [-4.5, BACK_Z, -1.0, BACK_Z + 0.75],
 ];
-const CIRCLES = [[L.cx, L.cz, 0.65], [(GLASS.x0 + GLASS.x1) / 2, (GLASS.z0 + GLASS.z1) / 2, 1.25], [-4.6, -7.2, 0.5], [7.4, 2.6, 0.5], [-2.4, 7.2, 0.5], [6.6, 6.9, 0.5], [10.2, -1.2, 0.5], [-3.9, 7.3, 0.3], [9.6, 3.2, 0.3], [-10.2, 7.3, 0.4], [10.1, 7.1, 0.5], [0.6, 7.0, 0.4]];
-const BOUND = { x0: -10.5, x1: 10.5, z0: -7.5, z1: 7.5 };
-export function collide(p, others = []) {
+const CIRCLES = [[L.cx, L.cz, 0.65], [(GLASS.x0 + GLASS.x1) / 2, (GLASS.z0 + GLASS.z1) / 2, 1.25], [-4.6, -7.2, 0.5], [7.4, 2.6, 0.5], [-2.4, 7.2, 0.5], [6.6, 6.9, 0.5], [10.2, -1.2, 0.5], [-3.9, 7.3, 0.3], [9.6, 3.2, 0.3], [-10.2, 7.3, 0.4], [10.1, 7.1, 0.5]];
+// ---- two-level collision: ground (office + lawn), stairs (ramp, side-clamped), rooftop ----
+const P = PARK;
+const GROUND_BOXES = [[FLOOR.x0, BACK_Z - 0.12, FLOOR.x1, BACK_Z + 0.1], [LEFT_X - 0.12, FLOOR.z0, LEFT_X + 0.12, FLOOR.z1], // back wall, left wall
+  [ROOF.x0, ROOF.z0, ROOF.x1, ROOF.z1], // annex block (only reachable from above)
+  [STAIRS.x0, STAIRS.z0 - 0.1, STAIRS.x1 - 0.5, STAIRS.z0 + 0.02], [STAIRS.x0, STAIRS.z1 - 0.02, STAIRS.x1 - 0.5, STAIRS.z1 + 0.1]]; // stair sides
+const GROUND_CIRCLES = [...TREES.map(([x, z, s]) => [x, z, 0.35 * s]), [POOL.x, POOL.z, 2.5], [-8.6, 9.6, 1.4], [-1.2, 13.0, 0.8], [P.cx, P.cz, 1.15],
+  ...[0, 2.1, 4.2].map(a => [P.cx + Math.cos(a + 0.5) * 1.75, P.cz + Math.sin(a + 0.5) * 1.75, 0.5]), ...P.benches.map(([x, z]) => [x, z, 0.75]),
+  [BALCONY.x0 + 0.9, BALCONY.z1 - 0.35, 0.35], [BALCONY.x0 + 0.9, BALCONY.z0 + 0.35, 0.35]];
+const ROOF_CIRCLES = [[-6.3, -8.5, 0.5], [-6.3, -11.0, 0.5], [4.3, -11.0, 0.5], [2.0, -8.5, 0.5], [-5.3, -9.7, 0.45], [0.2, -10.0, 0.62], [-0.8, -10.0, 0.3], [1.2, -10.0, 0.3], [2.6, -11.0, 0.35],
+  [-4.4, -9.95, 0.12], [-1.6, -9.95, 0.12], [-4.4, -11.45, 0.12], [-1.6, -11.45, 0.12]];
+const ROOF_BOXES = [[-3.9, -11.3, -2.1, -10.8]]; // bench
+function pushOut(p, boxes, circles) {
+  for (const [x0, z0, x1, z1] of boxes) { const cx = Math.max(x0, Math.min(p.x, x1)), cz = Math.max(z0, Math.min(p.z, z1)); const dx = p.x - cx, dz = p.z - cz, d = Math.hypot(dx, dz);
+    if (d < R) { if (d > 1e-4) { p.x = cx + dx / d * R; p.z = cz + dz / d * R; } else { const m = [p.x - x0, x1 - p.x, p.z - z0, z1 - p.z], i = m.indexOf(Math.min(...m)); if (i === 0) p.x = x0 - R; else if (i === 1) p.x = x1 + R; else if (i === 2) p.z = z0 - R; else p.z = z1 + R; } } }
+  for (const [x, z, r] of circles) { const dx = p.x - x, dz = p.z - z, d = Math.hypot(dx, dz), m = r + R; if (d < m && d > 1e-4) { p.x = x + dx / d * m; p.z = z + dz / d * m; } } }
+// p = proposed {x,z}; from = current position (decides which level we're on)
+export function collide(p, others = [], from = null) {
+  const fx = from ? from.x : p.x, fz = from ? from.z : p.z;
+  if (inR(STAIRS, fx, fz)) { p.z = Math.max(STAIRS.z0 + R, Math.min(STAIRS.z1 - R, p.z)); p.x = Math.min(STAIRS.x1 + 0.6, Math.max(STAIRS.x0 - 0.6, p.x)); return p; }
+  if (inR(ROOF, fx, fz)) { const toStairs = p.x > ROOF.x1 - R && p.z > STAIRS.z0 + R && p.z < STAIRS.z1 - R;
+    if (!toStairs) p.x = Math.max(ROOF.x0 + R, Math.min(ROOF.x1 - R, p.x)); p.z = Math.max(ROOF.z0 + R, Math.min(ROOF.z1 - R, p.z));
+    pushOut(p, ROOF_BOXES, [...ROOF_CIRCLES, ...others]); return p; }
+  if (inR(STAIRS, p.x, p.z) && fx < STAIRS.x1 - 0.3) p.x = Math.max(p.x, STAIRS.x1 + 0.01); // no side entry onto the ramp
   for (let it = 0; it < 2; it++) {
-    for (const [x0, z0, x1, z1] of BOXES) { const cx = Math.max(x0, Math.min(p.x, x1)), cz = Math.max(z0, Math.min(p.z, z1)); const dx = p.x - cx, dz = p.z - cz, d = Math.hypot(dx, dz);
-      if (d < R) { if (d > 1e-4) { p.x = cx + dx / d * R; p.z = cz + dz / d * R; } else { const m = [p.x - x0, x1 - p.x, p.z - z0, z1 - p.z], i = m.indexOf(Math.min(...m)); if (i === 0) p.x = x0 - R; else if (i === 1) p.x = x1 + R; else if (i === 2) p.z = z0 - R; else p.z = z1 + R; } } }
-    for (const [x, z, r] of [...CIRCLES, ...others]) { const dx = p.x - x, dz = p.z - z, d = Math.hypot(dx, dz), m = r + R; if (d < m && d > 1e-4) { p.x = x + dx / d * m; p.z = z + dz / d * m; } }
-    p.x = Math.max(BOUND.x0, Math.min(BOUND.x1, p.x)); p.z = Math.max(BOUND.z0, Math.min(BOUND.z1, p.z));
+    pushOut(p, [...BOXES, ...GROUND_BOXES], [...CIRCLES, ...GROUND_CIRCLES, ...others]);
+    if (!inR(BALCONY, p.x, p.z, -0.05) && !inR(STAIRS, p.x, p.z)) { const r = Math.hypot(p.x, p.z); if (r > WALK_R) { p.x *= WALK_R / r; p.z *= WALK_R / r; } }
+    if (inR(BALCONY, p.x, p.z, 0.4)) { p.x = Math.min(p.x, BALCONY.x1 - R); if (p.x > BALCONY.x0 - 0.2) p.z = Math.max(BALCONY.z0 + R, Math.min(BALCONY.z1 - R, p.z)); }
   }
   return p;
 }
@@ -60,13 +80,14 @@ body.cardon #actb,body.cardon #imenu{display:none!important}`;
     let ix = 0, iy = 0; if (keys.has('a') || keys.has('arrowleft')) ix -= 1; if (keys.has('d') || keys.has('arrowright')) ix += 1; if (keys.has('w') || keys.has('arrowup')) iy -= 1; if (keys.has('s') || keys.has('arrowdown')) iy += 1;
     let mag; if (ix || iy) { const l = Math.hypot(ix, iy); ix /= l; iy /= l; mag = keys.has('shift') ? 1 : 0.6; } else { ix = joy.x; iy = joy.y; mag = Math.min(1, Math.hypot(ix, iy)); if (mag < 0.12) mag = 0; else { ix /= mag; iy /= mag; } }
     camera.getWorldDirection(fwd); fwd.y = 0; fwd.normalize(); right.set(-fwd.z, 0, fwd.x);
+    if (api.debugDir) { const d = api.debugDir; mag = d[2] ?? 0.6; fwd.set(d[0], 0, d[1]).normalize(); right.set(-fwd.z, 0, fwd.x); ix = 0; iy = -1; } // test hook: world-space walk direction
     const run = mag > 0.72, speed = mag ? (run ? 4.6 : 1.2 + mag * 2.2) : 0; api.speed = speed;
     if (speed) { mvv.copy(right).multiplyScalar(ix).addScaledVector(fwd, -iy).normalize(); if (!api.moved) { api.moved = true; setFollow(true); }
-      const p = collide({ x: c.position.x + mvv.x * speed * dt, z: c.position.z + mvv.z * speed * dt }, bots.map(b => [b.position.x, b.position.z, 0.45]));
+      const p = collide({ x: c.position.x + mvv.x * speed * dt, z: c.position.z + mvv.z * speed * dt }, bots.filter(b => Math.abs(b.position.y - c.position.y) < 1).map(b => [b.position.x, b.position.z, 0.45]), c.position);
       c.position.x = p.x; c.position.z = p.z; let dr = Math.atan2(mvv.x, mvv.z) - c.rotation.y; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); c.rotation.y += dr * Math.min(1, dt * 10); }
-    if (api.seat) { if (speed) api.stand(); else { const S = api.seat; c.position.set(S.pos[0], c.position.y + (S.y - c.position.y) * Math.min(1, dt * 7), S.pos[1]); let dr = S.rot - c.rotation.y; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); c.rotation.y += dr * Math.min(1, dt * 8);
+    if (api.seat) { if (speed) api.stand(); else { const S = api.seat; c.position.set(S.pos[0], c.position.y + (S.y + heightAt(S.pos[0], S.pos[1]) - c.position.y) * Math.min(1, dt * 7), S.pos[1]); let dr = S.rot - c.rotation.y; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); c.rotation.y += dr * Math.min(1, dt * 8);
         applyPose(c, api.emote && api.emote.until > t ? api.emote.name : S.pose, t, dt, true, { cup: 0x6b4226 }); api.afterPose?.(t); followCam(dt, S.camDist); return; } }
-    else c.position.y += (0 - c.position.y) * Math.min(1, dt * 7);
+    else { const gy = heightAt(c.position.x, c.position.z); c.position.y += (gy - c.position.y) * Math.min(1, dt * 14); }
     applyPose(c, api.emote && api.emote.until > t ? api.emote.name : api.waveUntil > t ? 'wave' : speed ? 'walk' : 'stand', speed ? t * (run ? 1.45 : 0.8 + mag * 0.4) : t, dt, false, {});
     if (api.carry && !(api.emote && api.emote.until > t)) { const P = c.userData.parts; c.userData.props.cup.visible = true; P.armR.rotation.x = -1.3; P.armR.rotation.z = -0.25; }
     api.afterPose?.(t); followCam(dt);
@@ -80,7 +101,7 @@ body.cardon #actb,body.cardon #imenu{display:none!important}`;
   }
   // seats: { pos:[x,z], rot, y, pose, camDist, onStand }
   api.sitAt = s => { api.seat = s; api.carry = s.keepMug ? api.carry : api.carry; if (!follow) setFollow(true); };
-  api.stand = () => { const s = api.seat; api.seat = null; if (!s) return; const P = collide({ x: s.pos[0] + Math.sin(s.rot) * -0.9, z: s.pos[1] + Math.cos(s.rot) * -0.9 }); c.position.x = P.x; c.position.z = P.z; s.onStand?.(); };
+  api.stand = () => { const s = api.seat; api.seat = null; if (!s) return; const P = collide({ x: s.pos[0] + Math.sin(s.rot) * -0.9, z: s.pos[1] + Math.cos(s.rot) * -0.9 }, [], { x: s.pos[0], z: s.pos[1] }); c.position.x = P.x; c.position.z = P.z; s.onStand?.(); };
   api.setEmote = (name, dur, t) => { api.emote = { name, until: t + dur }; };
   api.setHome = (pos, tgt) => { home.pos.copy(pos); home.target.copy(tgt); };
   return api;

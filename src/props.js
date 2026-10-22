@@ -177,9 +177,6 @@ function cozy(g) {
   for (let i = 0; i < 10; i++) { const a = i / 10 * Math.PI * 2; M(new THREE.CylinderGeometry(0.08, 0.08, 0.008, 4), 0xe8a07a, cx + Math.cos(a) * 1.85 * 1.15, 0.03, cz + Math.sin(a) * 1.85 * 0.92); }
   [[0x7ac8a0, 0], [0xffd36a, 0.4]].forEach(([c, r], i) => M(B(0.32, 0.06, 0.24), c, cx - 0.15, 0.5 + i * 0.06, cz - 0.3, { r: [0, r, 0] }));
   M(new THREE.CylinderGeometry(0.06, 0.08, 0.2, 8), 0x9fd6ff, cx + 0.35, 0.57, cz + 0.1); M(new THREE.SphereGeometry(0.07, 6, 4), 0xff8fb3, cx + 0.35, 0.72, cz + 0.1);
-  // brass telescope by the front railing (Calvin can look through it)
-  [0, 2.1, 4.2].forEach(a => M(new THREE.CylinderGeometry(0.03, 0.03, 1.3), 0x8b5a3c, 0.6 + Math.cos(a) * 0.25, 0.6, 7.0 + Math.sin(a) * 0.25, { r: [Math.sin(a) * 0.4, 0, -Math.cos(a) * 0.4] }));
-  M(new THREE.CylinderGeometry(0.1, 0.15, 1.2, 12), 0xd9b35a, 0.6, 1.4, 7.15, { outline: true, r: [1.1, 0, 0] }); M(new THREE.CylinderGeometry(0.16, 0.16, 0.08, 12), 0x2f3b4f, 0.6, 1.62, 7.65, { r: [1.1, 0, 0] });
   // plant variety: snake plant, monstera, trailing pothos on a shelf, mini cactus on the pantry counter
   M(new THREE.CylinderGeometry(0.28, 0.22, 0.4, 10), 0x4fb3a9, -10.2, 0.2, 7.3, { outline: true });
   for (let i = 0; i < 6; i++) { const a = i / 6 * 6.28; M(new THREE.ConeGeometry(0.08, 1.0 + (i % 3) * 0.2, 4), 0x3f8f45, -10.2 + Math.cos(a) * 0.1, 0.85, 7.3 + Math.sin(a) * 0.1, { outline: true, r: [Math.sin(a) * 0.15, 0, -Math.cos(a) * 0.15], s: [1, 1, 0.4] }); }
