@@ -94,6 +94,9 @@ body.cardon #actb,body.cardon #imenu{display:none!important}`;
   };
   function followCam(dt, near) {
     // camera: follow with smoothing (shift target and camera by the same delta, so orbiting still works)
+    const SL = api.seat?.look; if (SL && !api.look) { const k = 1 - Math.exp(-dt * 1.6); controls.target.lerp(SL.tgt.clone().sub(SL.pos).setLength(6).add(SL.pos), k); camera.position.lerp(SL.pos, k); return; }
+    if (api.seat && api.seat.camYaw !== undefined && !api.look) { const S2 = api.seat, d = S2.camDist || 11, a = S2.rot + S2.camYaw; tmp.set(c.position.x, c.position.y + 1.0, c.position.z); const k = 1 - Math.exp(-dt * 2.4);
+      controls.target.lerp(tmp, k); camera.position.lerp(new THREE.Vector3(tmp.x + Math.sin(a) * d * 0.78, tmp.y + d * 0.55, tmp.z + Math.cos(a) * d * 0.78), k); return; }
     if (api.look) { const L = api.look; const k = 1 - Math.exp(-dt * 2); controls.target.lerp(L.tgt, k); camera.position.lerp(L.pos, k); return; }
     if (follow) { tmp.set(c.position.x, 1.2, c.position.z); const k = 1 - Math.exp(-dt * 3.2); const delta = tmp.sub(controls.target).multiplyScalar(k); controls.target.add(delta); camera.position.add(delta);
       const off = camera.position.clone().sub(controls.target); const want = near || (innerWidth < innerHeight ? 17 : 13); off.setLength(off.length() + (want - off.length()) * Math.min(1, dt * 1.5)); camera.position.copy(controls.target).add(off); controls.minDistance = 8; }

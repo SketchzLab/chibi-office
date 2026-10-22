@@ -5,6 +5,7 @@ const b = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', arg
 const p = await b.newPage(); await p.setViewport({ width: w, height: h, isMobile: !!mobile, hasTouch: !!mobile }); p.on('pageerror', e => console.log('ERR', e.message));
 await p.goto(url, { waitUntil: 'networkidle0' }); await new Promise(r => setTimeout(r, 2500));
 for (const st of plan.split(';')) { const [a, bb, ms, mg] = st.split(','); if (a === 'tp') { await p.evaluate((x, z) => { const c = window.__player.chibi; c.position.x = x; c.position.z = z; if (!window.__nofollow) window.__player.setFollow(true); }, +bb, +ms); await new Promise(r => setTimeout(r, 1500)); continue; }
+  if (a === 'tpp') { await p.evaluate(i => { const pt = window.__pets.pets[i]; pt.mode = 'sit'; const c = window.__player.chibi; c.position.x = pt.x + 1.1; c.position.z = pt.z + 0.3; c.rotation.y = -Math.PI / 2; window.__player.setFollow(true); }, +bb); await new Promise(r => setTimeout(r, +ms || 1800)); continue; }
   if (a === 'act') { await p.evaluate(() => document.getElementById('actb').click()); await new Promise(r => setTimeout(r, +bb)); continue; }
   if (a === 'pick') { await p.evaluate(i => window.__choose(+i), bb); await new Promise(r => setTimeout(r, +ms || 2500)); continue; }
   if (a === 'wait') { await new Promise(r => setTimeout(r, +bb)); continue; }

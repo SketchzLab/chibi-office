@@ -10,10 +10,11 @@ import { makeIsland } from './island.js';
 import { makeNature } from './nature.js';
 import { makeOffice, glows } from './props.js';
 import { makeWorld } from './world.js';
+import { makePets } from './pets.js';
 import { makeChibi } from './chibi.js';
 import { makePlayer } from './player.js';
 import { pickTier, makeAtmosphere, lightPools, steam, radial } from './fx.js';
-import { DESKS, BOSS_DESK, BOT_S, CALVIN_S, LOUNGE, GLASS, PANTRY } from './layout.js';
+import { DESKS, BOSS_DESK, BOT_S, CALVIN_S, LOUNGE, GLASS, PANTRY, ROOF, BALCONY, PARK, heightAt } from './layout.js';
 import { speechAt, GREET, HI_BACK, ZONE } from './dialogue.js';
 import { buildRoot, buildGroup, pickLine, mem } from './talk.js';
 
@@ -52,7 +53,7 @@ let tier = pickTier(); if (tier === 'low') { toonUniforms.uDetail.value = 0; ren
 const atmos = makeAtmosphere(scene, tier);
 const steamFx = tier === 'low' ? null : steam(scene, [...DESKS, BOSS_DESK].map(([x, z]) => z > 0 ? [x + 0.8, 1.1, z - 0.2] : [x - 0.8, 1.1, z + 0.2])); window.__tier = () => tier;
 lightPools(scene, [[-3.9, 7.3, 2.6, 0xffc070, 0.55], [9.6, 3.2, 2.6, 0xffc070, 0.55], [-7.8, 4.6, 3.4, 0xffb060, 0.28], [8.2, -5.2, 3.0, 0xffd090, 0.3], [5.2, 2.0, 2.2, 0xffc890, 0.3], [-7.9, -5.1, 3.0, 0xfff0c0, 0.22]]);
-buildShadows(scene); const blobs = [...chibis, calvin].map(c => [c, chibiShadow(scene)]);
+buildShadows(scene); const blobsExtra = []; const blobs = [...chibis, calvin].map(c => [c, chibiShadow(scene)]);
 const talkers = chibis.map(c => ({ name: c.userData.name, brain: c.userData.brain }));
 // ---- Live status (public/status.json, cache-busted every 60 s) ----
 const STATUS_URL = import.meta.env.BASE_URL + 'status.json'; const FRESH_MS = 2 * 3600 * 1000; let status = { bots: {} };
@@ -73,7 +74,7 @@ function drawBubble(bb, emoji, text) { const key = emoji + '|' + (text || ''); i
   g.font = '600 32px system-ui, "Noto Color Emoji", sans-serif'; const lines = wrap(g, text, 440); const w = Math.min(500, Math.max(...lines.map(l => g.measureText(l).width)) + 48), h = lines.length * 38 + 26, y0 = 150 - h;
   const x0 = (512 - w) / 2; g.beginPath(); g.roundRect(x0, y0, w, h, 26); g.fill(); g.stroke(); g.beginPath(); g.moveTo(240, 148); g.lineTo(256, 172); g.lineTo(274, 148); g.closePath(); g.fill(); g.stroke();
   g.fillStyle = '#2a1f35'; g.textAlign = 'center'; lines.forEach((l, i) => g.fillText(l, 256, y0 + 44 + i * 38)); g.textAlign = 'left'; bb.tex.needsUpdate = true; }
-const talkersAll = [...chibis, calvin]; const catSpot = new THREE.Object3D(); catSpot.position.set(LOUNGE.cx - 2.15, -0.9, LOUNGE.cz + 0.85); catSpot.userData.name = 'Mochi'; talkersAll.push(catSpot);
+const petsys = makePets(scene, () => calvin); window.__pets = petsys; petsys.pets.forEach(p => { p.g.userData.pet = true; const sh = chibiShadow(scene); sh.scale.setScalar(0.45); blobs.push([p.g, sh]); }); const talkersAll = [...chibis, calvin, petsys.cat.g, petsys.dog.g];
 const bubbles = talkersAll.map(() => makeBubble());
 let prevT = 0;
 // --- Name card ---
@@ -149,7 +150,7 @@ function showMenu(choices) { imenu.replaceChildren(...choices.map((ch, i) => { c
 function closeTalk() { mode = null; imenu.classList.remove('on'); }
 function openTalk(c) { const n = c.userData.name, wt = wallTime(); const node = buildRoot(n, tctx); mode = { type: 'talk', bot: c, node }; face[n] = wt + 30; say(n, node.say, wt, 6); emoteBot(n, node.emote); showMenu(node.choices); }
 function openGroup(names, wt) { const g = buildGroup(names); mode = { type: 'group', names, node: g }; names.forEach(n => face[n] = wt + 30); say(g.speaker, g.say, wt, 6); emoteBot(g.speaker, g.emote); showMenu(g.choices); }
-function choose(ch) { const wt = wallTime(); imenu.classList.remove('on'); const m = mode; if (!m) return;
+function choose(ch) { const wt = wallTime(); imenu.classList.remove('on'); if (ch.run) { mode = null; ch.run(); return; } const m = mode; if (!m) return;
   say('Calvin', ch.say || strip(ch.t), wt, 2.6); emoteCalvin(ch.hf ? 'highfive' : 'nod', 1.4);
   if (ch.act === 'chat') { const n = m.bot?.userData.name; const url = n && chatLink(n); if (url) { window.__lastChatLink = url; window.location.href = url; } closeTalk(); return; }
   setTimeout(() => { const wt2 = wallTime();
@@ -170,16 +171,22 @@ function runAct(a, bot, wt) { const n = bot?.userData.name;
 // interactable objects: { label, x, z, r, run }
 const { cx: LX, cz: LZ } = LOUNGE; const HIPC = 0.37 * (1.5 - CALVIN_S);
 const bossGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: radial, color: 0x9ff0ff, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending })); bossGlow.scale.set(2.4, 1.4, 1); bossGlow.position.set(BOSS_DESK[0], 1.45, BOSS_DESK[1] + 0.22); bossGlow.visible = false; scene.add(bossGlow);
-const seat = (kind, pos, rot, y, pose, label, extra = {}) => ({ label, x: pos[0], z: pos[1], r: 1.4, run: () => { player.sitAt({ kind, pos, rot, y, pose, ...extra }); closeTalk(); onSit(kind); } });
+const seat = (kind, pos, rot, y, pose, label, extra = {}) => ({ label, x: pos[0], z: pos[1], y: extra.y0 || 0, r: 1.4, run: () => { player.sitAt({ kind, pos, rot, y, pose, ...extra }); closeTalk(); onSit(kind); } });
 const OBJS = [
-  seat('desk', [BOSS_DESK[0], BOSS_DESK[1] - 1.0], 0, 0.07 + HIPC, 'type', '💼 Sit & work', { camDist: 9.5, onStand: () => { bossGlow.visible = false; } }),
-  seat('sofa', [LX - 1.95, LZ + 0.5], Math.PI / 2, -0.06 + HIPC, 'stand', '🛋️ Sit on sofa', { camDist: 13 }),
-  seat('sofa', [LX + 2.1, LZ - 0.9], -1.1 + Math.PI, -0.04 + HIPC, 'stand', '🪑 Sit in armchair', { camDist: 13 }),
-  seat('meeting', [(GLASS.x0 + GLASS.x1) / 2 - 2.1, (GLASS.z0 + GLASS.z1) / 2], Math.PI / 2, -0.05 + HIPC, 'stand', '🪑 Sit at meeting table', { camDist: 12 }),
+  seat('desk', [BOSS_DESK[0], BOSS_DESK[1] - 1.0], 0, 0.07 + HIPC, 'type', '💼 Sit & work', { camDist: 8.5, camYaw: Math.PI - 0.7, onStand: () => { bossGlow.visible = false; } }),
+  seat('sofa', [LX - 1.95, LZ + 0.5], Math.PI / 2, -0.06 + HIPC, 'stand', '🛋️ Sit on sofa', { camDist: 11, camYaw: 0.55 }),
+  seat('sofa', [LX + 2.1, LZ - 0.9], -1.1 + Math.PI, -0.04 + HIPC, 'stand', '🪑 Sit in armchair', { camDist: 11, camYaw: 0.5 }),
+  seat('meeting', [(GLASS.x0 + GLASS.x1) / 2 - 2.1, (GLASS.z0 + GLASS.z1) / 2], Math.PI / 2, -0.05 + HIPC, 'stand', '🪑 Sit at meeting table', { camDist: 10, camYaw: -0.6 }),
   { label: () => player.carry ? '🍵 Sip coffee' : '☕ Make coffee', x: PANTRY.x - 0.3, z: PANTRY.z + 1.4, r: 1.6, run: () => { const t = clock.getElapsedTime(); if (player.carry) { emoteCalvin('sip', 2.4); say('Calvin', pick(['Ahh, perfect.', 'Mmm. Founder fuel.', 'Best brew on the island.']), wallTime(), 2.5); return; }
     emoteCalvin('water', 2.0); say('Calvin', 'Brewing… ☕', wallTime(), 2); setTimeout(() => { player.carry = true; say('Calvin', 'Fresh brew! ☕', wallTime(), 2.5); }, 2000); } },
   { label: '🐱 Pet the cat', x: LX - 2.15, z: LZ + 0.85, r: 1.5, run: () => { emoteCalvin('pet', 2.8); const wt = wallTime(); say('Mochi', '💕 purrr… 💕', wt + 0.6, 4); calvinFlag = 'cat'; flagUntil = wt + 90; } },
-  { label: '🔭 Look through telescope', x: 0.6, z: 6.9, r: 1.4, run: () => { emoteCalvin('look', 5); player.look = { pos: new THREE.Vector3(0.6, 3.0, 8.2), tgt: new THREE.Vector3(9, 6, 60) }; say('Calvin', pick(['Is that… another island? 🏝️', 'I can see the Imagine.ooo blimp!', 'Clouds shaped like a roadmap.']), wallTime() + 1, 3.5); setTimeout(() => { player.look = null; }, 5000); } },
+  { label: '🔭 Look through telescope', x: 2.6, z: -10.35, y: ROOF.y, r: 1.3, run: () => { emoteCalvin('look', 5); player.look = { pos: new THREE.Vector3(2.6, ROOF.y + 2.2, -9.6), tgt: new THREE.Vector3(-8, 6, -70) }; say('Calvin', pick(['Is that… another island? 🏝️', 'I can see the Imagine.ooo blimp!', 'Clouds shaped like a roadmap.', 'A whale-shaped cloud! 🐋']), wallTime() + 1, 3.5); setTimeout(() => { player.look = null; }, 5000); } },
+  seat('roof', [-2.5, -10.75], 0, -0.05 + HIPC, 'stand', '🌿 Sit under the pergola', { camDist: 10, camYaw: 0.5, y0: ROOF.y }),
+  seat('roof', [1.2, -10.0], -Math.PI / 2, -0.05 + HIPC, 'stand', '☂️ Sit at the parasol table', { camDist: 10, camYaw: 0.6, y0: ROOF.y }),
+  { label: '🌅 Lean on railing · Enjoy the view', x: BALCONY.x1 - 0.65, z: 0.1, r: 1.3, run: () => { player.sitAt({ kind: 'view', pos: [BALCONY.x1 - 0.65, 0.1], rot: Math.PI / 2, y: 0, pose: 'lean', look: { pos: new THREE.Vector3(BALCONY.x1 - 4.2, 2.4, -1.2), tgt: new THREE.Vector3(70, -4, 14) } }); closeTalk(); say('Calvin', pick(['What a view… ☁️', 'This is why we built on a floating island.', 'Breathe in. Breathe out. 🌤️']), wallTime() + 0.8, 4); } },
+  ...PARK.benches.map(([x, z, ry]) => seat('park', [x + Math.sin(ry) * 0.05, z + Math.cos(ry) * 0.05], ry, -0.05 + HIPC, 'stand', '🪑 Sit on park bench', { camDist: 10, camYaw: 0.5 })),
+  seat('park', [PARK.blanket[0], PARK.blanket[1] - 0.2], -2.4, -0.32 + HIPC, 'stand', '🧺 Picnic on the blanket', { camDist: 9, camYaw: 0.6 }),
+  { label: '⛲ Toss a coin in the fountain', x: PARK.cx - 1.4, z: PARK.cz - 0.6, r: 0.9, run: () => { emoteCalvin('water', 1.6); say('Calvin', pick(['🪙 *plink* I wish for… more cozy days.', '🪙 Wish: the build stays green.', '🪙 Wish granted? We\'ll see ✨']), wallTime(), 3.5); } },
   { label: '📚 Browse books', x: -2.75, z: -6.7, r: 1.6, run: () => { emoteCalvin('read', 2.5); say('Calvin', pick(['"Zero to One"… classic.', '"The Cozy Startup". Must read.', '"Shaders for Cats". Hmm.']), wallTime(), 3); } },
   { label: '🖍️ Doodle on whiteboard', x: 2.9, z: -6.8, r: 1.4, run: () => { emoteCalvin('sketch', 2.5); say('Calvin', pick(['Drew a tiny cat. 🐱', 'Q4 plan: ☕ → 🚀', 'Added a smiley. Morale +10.']), wallTime(), 3); } },
   ...[[-4.6, -7.2], [7.4, 2.6], [-2.4, 7.2], [6.6, 6.9], [10.2, -1.2], [-10.2, 7.3], [10.1, 7.1]].map(([x, z]) => ({ label: '💧 Water plant', x, z, r: 1.3, run: () => { emoteCalvin('water', 2.4); say('Calvin', pick(['There you go, buddy 🌱', 'Grow big and leafy!', 'Hydration is self-care 💧']), wallTime(), 3); } })),
@@ -193,19 +200,26 @@ actb.addEventListener('click', e => { e.stopPropagation(); if (mode && imenu.cla
   if (target.kind === 'stand') { player.stand(); closeTalk(); return; }
   if (target.kind === 'group') return openGroup(target.names, wt);
   if (target.kind === 'bot') return openTalk(target.c);
-  if (target.kind === 'obj') target.o.run(); });
+  if (target.kind === 'obj') target.o.run();
+  if (target.kind === 'pet') { const p = target.p, t = clock.getElapsedTime();
+    if (p === petsys.cat) { emoteCalvin('pet', 2.8); petsys.pet(p, t); say('Mochi', pick(['💕 purrr… 💕', '😽 mrrp!', '💕 *slow blink* 💕']), wt + 0.5, 3.5); calvinFlag = 'cat'; flagUntil = wt + 90; }
+    else { mode = { type: 'pet' }; showMenu([{ t: '🐾 Pet Biscuit', run: () => { emoteCalvin('pet', 2.6); petsys.pet(p, clock.getElapsedTime()); say('Biscuit', pick(['Arf! 💛', '*happy wiggles* 🐶', 'Woof woof! 💛']), wallTime() + 0.4, 3); } },
+      { t: '🎾 Play fetch', run: () => { emoteCalvin('highfive', 0.9); petsys.throwBall(calvin, clock.getElapsedTime()); say('Calvin', pick(['Fetch, Biscuit!', 'Go get it! 🎾', 'Who\'s a good pup?']), wallTime(), 2.2); setTimeout(() => say('Biscuit', 'Woof! 🎾', wallTime(), 2.5), 3500); } },
+      { t: '🐕 Come along, Biscuit!', run: () => { p.mode = 'follow'; p.slot = Math.floor(wallTime() / 11 + p.seed) + 2; say('Biscuit', '*trots after you* 🐾', wallTime(), 2.5); } }]); } } });
 const v3 = new THREE.Vector3();
 function interact(wt, t, dt) {
   // pick the best target: seated -> Stand; group of 2+ bots; nearest bot; nearest object
   let tg = null; const cp = calvin.position;
   const near = chibis.map(c => [c, Math.hypot(c.position.x - cp.x, c.position.z - cp.z)]).filter(([, d]) => d < 3.2).sort((a, b) => a[1] - b[1]);
-  let closeObj = null; { let bd = 0.95; OBJS.forEach(o => { const d = Math.hypot(o.x - cp.x, o.z - cp.z); if (d < bd) { bd = d; closeObj = o; } }); }
+  const sameLv = o => Math.abs((o.y || 0) - cp.y) < 1.2;
+  let closeObj = null; { let bd = 0.95; OBJS.forEach(o => { const d = Math.hypot(o.x - cp.x, o.z - cp.z); if (d < bd && sameLv(o)) { bd = d; closeObj = o; } }); }
   const social = near.filter(([c]) => zoneOf(c) !== 'desk');
   if (player.seat) tg = { kind: 'stand', label: player.seat.kind === 'desk' ? '⬆️ Stand up' : '⬆️ Stand', id: 'stand' };
   else if (closeObj) tg = { kind: 'obj', o: closeObj, label: typeof closeObj.label === 'function' ? closeObj.label() : closeObj.label, id: 'o' + closeObj.x + closeObj.z };
   else if (social.length >= 2 && social[1][1] < 3.2) tg = { kind: 'group', names: social.map(([c]) => c.userData.name), label: '🎉 Join the chat', id: 'g' + social.map(([c]) => c.userData.name).join() };
+  else if ((() => { const pp = petsys.pets.map(p => [p, Math.hypot(p.x - cp.x, p.z - cp.z)]).filter(([p, d]) => d < 1.7 && Math.abs(p.g.position.y - cp.y) < 1).sort((a, b) => a[1] - b[1])[0]; if (pp && !(near.length && near[0][1] < pp[1])) { tg = { kind: 'pet', p: pp[0], label: pp[0] === petsys.cat ? '🐱 Pet Mochi' : '🐶 Play with Biscuit', id: pp[0].name }; return true; } return false; })()) {}
   else if (near.length && near[0][1] < 2.5) tg = { kind: 'bot', c: near[0][0], label: '💬 Talk to ' + near[0][0].userData.name, id: near[0][0].userData.name };
-  else { let bd = 1e9; OBJS.forEach(o => { const d = Math.hypot(o.x - cp.x, o.z - cp.z); if (d < o.r && d < bd) { bd = d; tg = { kind: 'obj', o, label: typeof o.label === 'function' ? o.label() : o.label, id: 'o' + o.x + o.z }; } }); }
+  else { let bd = 1e9; OBJS.forEach(o => { const d = Math.hypot(o.x - cp.x, o.z - cp.z); if (d < o.r && d < bd && sameLv(o)) { bd = d; tg = { kind: 'obj', o, label: typeof o.label === 'function' ? o.label() : o.label, id: 'o' + o.x + o.z }; } }); }
   if ((tg?.id) !== (target?.id)) { if (mode && !(tg && (tg.id === mode.bot?.userData.name || tg.kind === 'group' || tg.kind === 'stand'))) closeTalk(); }
   if (player.look) tg = null; target = tg; actb.style.display = tg ? 'block' : 'none'; if (tg) actb.textContent = mode && imenu.classList.contains('on') ? '✖ Close' : tg.label;
   // greet on approach (once per 25 s), group invite when walking up to 2+ bots
@@ -234,12 +248,12 @@ function loop() { const t = clock.getElapsedTime(); toonUniforms.uTime.value = t
   island.children.forEach(c => { if (c.userData.float !== undefined) c.position.y += Math.sin(t + c.userData.float) * 0.003; });
   glows.forEach((h,i)=>h.material.opacity=0.5+0.06*Math.sin(t*2+i));
   frames++; const now=performance.now(); if(now-last>1000){window.__info=renderer.info.render; window.__fps=frames*1000/(now-last); autoTier(window.__fps, t); fpsEl.textContent=window.__fps.toFixed(0)+' fps'; frames=0; last=now;}
-  player.update(dt, t); interact(wt, t, dt);
+  player.update(dt, t); petsys.update(dt, t, wt); interact(wt, t, dt);
   const sp = speechAt(wt, talkers);
   talkersAll.forEach((c, i) => { const nm = c.userData.name, bs = c.userData.brain?.state; const loc = localSay[nm]; let text = loc && loc.until > wt ? loc.text : (sp && sp.name === nm ? sp.text : '');
     drawBubble(bubbles[i], bs ? (bs.walking ? '🚶' : actEmoji(bs.act)) : '', text); const bb = bubbles[i]; bb.sp.visible = bb.big || !!bs;
-    const dcam = camera.position.distanceTo(c.position), sc = (bb.big ? THREE.MathUtils.clamp(dcam * 0.16, 3.0, 7.5) : THREE.MathUtils.clamp(dcam * 0.05, 0.8, 2.6)); bb.sp.scale.set(sc, sc * 0.344, 1); bb.sp.position.set(c.position.x, c.position.y + 3.7 * BOT_S / 1.5 + sc * 0.17, c.position.z); });
-  blobs.forEach(([c, m]) => m.position.set(c.position.x + 0.2, 0.02, c.position.z - 0.15));
+    const dcam = camera.position.distanceTo(c.position), sc = (bb.big ? THREE.MathUtils.clamp(dcam * 0.16, 3.0, 7.5) : THREE.MathUtils.clamp(dcam * 0.05, 0.8, 2.6)); bb.sp.scale.set(sc, sc * 0.344, 1); bb.sp.position.set(c.position.x, c.position.y + (c.userData.pet ? 1.0 : 3.7 * BOT_S / 1.5) + sc * 0.17, c.position.z); });
+  blobs.forEach(([c, m]) => m.position.set(c.position.x + 0.2, heightAt(c.position.x, c.position.z) + 0.02, c.position.z - 0.15));
   if (selected) { const bs = selected.userData.brain.state; card.querySelector('.t').textContent = bs.label + (bs.override ? ' (live)' : ''); card.querySelector('.wt').textContent = selected.userData.task || '—'; ring.position.set(selected.position.x, 0.04, selected.position.z); }
   sky.clouds.children.forEach(c => { c.position.y += Math.sin(t * 0.3 + c.userData.drift * 6) * 0.004; });
   nature.update(t);
