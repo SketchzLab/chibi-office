@@ -9,9 +9,11 @@ export function makeSky(scene) {
       vec3 below=vec3(0.55,0.82,0.86), hor=vec3(0.78,0.92,1.0), mid=vec3(0.5,0.76,0.97), top=vec3(0.24,0.52,0.9);
       vec3 c = y<0.0? mix(hor, below, smoothstep(0.0,-0.5,y)) : y<0.25? mix(hor,mid,smoothstep(0.0,0.25,y)) : mix(mid,top,smoothstep(0.25,0.9,y));
       // sun glow
-      float s = max(dot(vP, normalize(vec3(-0.6,0.5,0.45))),0.0); c += vec3(1.0,0.95,0.8)*pow(s,24.0)*0.35;
+      float s = max(dot(vP, normalize(vec3(-0.6,0.5,0.45))),0.0); c += vec3(1.0,0.95,0.8)*pow(s,24.0)*0.35 + vec3(1.0,0.98,0.9)*smoothstep(0.9985,0.9992,s)*0.9 + vec3(1.0,0.9,0.7)*pow(s,300.0)*0.4;
+      // soft high cirrus streaks for depth
+      float ci = sin(vP.x*9.0+vP.z*3.0)*sin(vP.z*7.0-vP.x*2.0); c = mix(c, vec3(0.92,0.97,1.0), smoothstep(0.55,0.95,ci)*smoothstep(0.25,0.6,y)*0.25);
       gl_FragColor=vec4(c,1.0);} `});
-  scene.add(new THREE.Mesh(new THREE.SphereGeometry(300, 32, 16), mat));
+  scene.add(new THREE.Mesh(new THREE.SphereGeometry(400, 32, 16), mat));
   // puffy 3D clouds: clusters of soft-toon spheres, no outline
   const cloudMat = toonMat(0xffffff); const sph = new THREE.SphereGeometry(1, 10, 7);
   const clouds = new THREE.Group(); let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
@@ -36,5 +38,12 @@ export function makeSky(scene) {
     isl.add(g);
   }
   scene.add(isl); bake(isl); clouds.children.forEach(c => bake(c));
+  // depth layers: far horizon cloud bank + soft cloud sea far below the island (each baked to 1 fill + 1 outline-free batch)
+  const bank = new THREE.Group(), sea = new THREE.Group(); const bankMat = toonMat(0xf3f8ff);
+  for (let i = 0; i < 46; i++) { const a = i / 46 * 6.28 + rnd() * 0.1, r = 230 + rnd() * 30; const m = new THREE.Mesh(sph, bankMat); const s = 12 + rnd() * 12;
+    m.scale.set(s * 1.7, s * 0.4, s); m.position.set(Math.cos(a) * r, -34 + rnd() * 10, Math.sin(a) * r); bank.add(m); }
+  for (let i = 0; i < 34; i++) { const a = rnd() * 6.28, r = 70 + rnd() * 150; const m = new THREE.Mesh(sph, bankMat); const s = 8 + rnd() * 10;
+    m.scale.set(s * 1.5, s * 0.4, s * 1.2); m.position.set(Math.cos(a) * r, -95 - rnd() * 14, Math.sin(a) * r); sea.add(m); }
+  scene.add(bank, sea); bake(bank); bake(sea);
   return { clouds };
 }

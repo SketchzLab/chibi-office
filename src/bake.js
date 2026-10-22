@@ -6,9 +6,11 @@ import { vcolToonMat, getOutlineMat } from './toon.js';
 const sharedMat = vcolToonMat();
 function prep(geo, mat4, color) {
   let g = geo.index ? geo.toNonIndexed() : geo.clone();
-  for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k);
+  for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'color') g.deleteAttribute(k);
   g.applyMatrix4(mat4);
-  if (color) { const n = g.attributes.position.count, a = new Float32Array(n * 3); for (let i = 0; i < n; i++) { a[i * 3] = color.r; a[i * 3 + 1] = color.g; a[i * 3 + 2] = color.b; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); }
+  if (color) { const n = g.attributes.position.count, a = new Float32Array(n * 3), src = g.attributes.color; // per-vertex tint (e.g. grass/cliff variation) x material colour
+    for (let i = 0; i < n; i++) { const t = src ? [src.getX(i), src.getY(i), src.getZ(i)] : [1, 1, 1]; a[i * 3] = color.r * t[0]; a[i * 3 + 1] = color.g * t[1]; a[i * 3 + 2] = color.b * t[2]; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); }
+  else if (g.attributes.color) g.deleteAttribute('color');
   return g;
 }
 export function bake(root) {

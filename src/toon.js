@@ -15,7 +15,14 @@ void main(){ vC = vec3(1.0);
 #ifdef USE_COLOR
  vC = color;
 #endif
- vN = normalize(mat3(modelMatrix)*normal); vec4 w = modelMatrix*vec4(position,1.0); vW=w.xyz; gl_Position = projectionMatrix*viewMatrix*w; }`;
+ mat4 mm = modelMatrix;
+#ifdef USE_INSTANCING
+ mm = modelMatrix * instanceMatrix;
+#endif
+#ifdef USE_INSTANCING_COLOR
+ vC *= instanceColor;
+#endif
+ vN = normalize(mat3(mm)*normal); vec4 w = mm*vec4(position,1.0); vW=w.xyz; gl_Position = projectionMatrix*viewMatrix*w; }`;
 const fs = `uniform vec3 uColor; uniform vec3 uKeyDir; uniform vec3 uKeyColor; uniform vec3 uShadeColor; uniform vec3 uEmissive; uniform vec3 uFogColor; uniform vec2 uFogRange; uniform vec3 uSkyAmb; uniform vec3 uGroundAmb;
 varying vec3 vN; varying vec3 vW; varying vec3 vC;
 void main(){ vec3 n=normalize(vN); float d=dot(n,uKeyDir);

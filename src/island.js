@@ -2,13 +2,17 @@ import * as THREE from 'three';
 import { toonMesh } from './toon.js';
 import { bake } from './bake.js';
 import { ISLAND_R as R, FLOOR } from './layout.js';
+function tint(geo, f) { if (geo.index) { const ng = geo.toNonIndexed(); geo.copy(ng); } const p = geo.attributes.position, a = new Float32Array(p.count * 3);
+  for (let i = 0; i < p.count; i++) { const c = f(p.getX(i), p.getY(i), p.getZ(i), i); a[i * 3] = c[0]; a[i * 3 + 1] = c[1]; a[i * 3 + 2] = c[2]; } geo.setAttribute('color', new THREE.BufferAttribute(a, 3)); }
 export function makeIsland(scene) {
   const g = new THREE.Group();
   let seed = 3; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   // lush grass top (rounded, slightly irregular)
-  const grassGeo = new THREE.CylinderGeometry(R, R - 0.4, 0.7, 40, 1);
+  const grassGeo = new THREE.CylinderGeometry(R, R - 0.4, 0.7, 64, 1);
   const gp = grassGeo.attributes.position; for (let i = 0; i < gp.count; i++) { const x = gp.getX(i), z = gp.getZ(i); const k = 1 + 0.05 * Math.sin(Math.atan2(z, x) * 5); gp.setX(i, x * k); gp.setZ(i, z * k); }
   grassGeo.computeVertexNormals();
+  tint(grassGeo, (x, y, z) => { const r = Math.hypot(x, z) / R; const nz = 0.5 + 0.5 * Math.sin(x * 0.55 + Math.sin(z * 0.4) * 2) * Math.cos(z * 0.5 - x * 0.2);
+    const base = y > 0 ? 1.0 - 0.12 * nz : 0.78; return [base * (1.02 - 0.1 * r), base * (1.0 + 0.04 * nz), base * (0.95 - 0.08 * nz)]; });
   const grass = toonMesh(grassGeo, 0x86cf5e); grass.position.y = -0.4; g.add(grass);
   // wood office floor platform
   const FW = FLOOR.x1 - FLOOR.x0, FD = FLOOR.z1 - FLOOR.z0; const floor = toonMesh(new THREE.BoxGeometry(FW, 0.16, FD), 0xd9a46a); floor.position.y = -0.08; g.add(floor);
@@ -19,7 +23,10 @@ export function makeIsland(scene) {
   tiers.forEach(([r, h, c], ti) => {
     const geo = new THREE.CylinderGeometry(r, tiers[ti + 1] ? tiers[ti + 1][0] : 0.8, h, 30, 2);
     const p = geo.attributes.position; for (let i = 0; i < p.count; i++) { const k = 0.9 + rnd() * 0.18; p.setX(i, p.getX(i) * k); p.setZ(i, p.getZ(i) * k); }
-    geo.computeVertexNormals(); const m = toonMesh(geo, c); m.position.y = y - h / 2; g.add(m); y -= h * 0.92;
+    geo.computeVertexNormals(); const top = y; 
+    tint(geo, (x, yy, z) => { const wy = top - h / 2 + yy; const band = 0.9 + 0.1 * Math.sin(wy * 3.1 + Math.sin(Math.atan2(z, x) * 4) * 0.8);
+      const moss = ti === 0 && yy > h * 0.15 ? 1 : 0; return moss ? [0.62, 0.95, 0.55] : [band * 1.02, band, band * 0.96]; });
+    const m = toonMesh(geo, c); m.position.y = y - h / 2; g.add(m); y -= h * 0.92;
   });
   // boulders on the cliff rim
   for (let i = 0; i < 18; i++) { const a = rnd() * 6.28, b = toonMesh(new THREE.DodecahedronGeometry(0.8 + rnd() * 1.2, 0), 0xbdb09a);
