@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { toonMesh, toonMat } from './toon.js';
 import { bake } from './bake.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 // Procedural big-head chibi (~2.3 units tall; head ~45% of height).
 export function makeChibi({ name, role, skin = 0xffe0c8, hair, shirt, pants, hairStyle, headphones }) {
   const root = new THREE.Group(); root.userData = { name, role, activity: 'Working at desk' };
@@ -9,10 +10,16 @@ export function makeChibi({ name, role, skin = 0xffe0c8, hair, shirt, pants, hai
   const head = new THREE.Group(); head.position.y = 1.72; body.add(head);
   const face = toonMesh(new THREE.SphereGeometry(0.66, 18, 14), skin); face.scale.set(1.06, 0.96, 1); head.add(face);
   // eyes
-  [-0.22, 0.22].forEach(x => { const e = new THREE.Mesh(new THREE.SphereGeometry(0.1, 12, 10), new THREE.MeshBasicMaterial({ color: 0x2a1f3a }));
-    e.scale.set(0.95, 1.4, 0.5); e.position.set(x, -0.04, 0.6); head.add(e);
-    const sh = new THREE.Mesh(new THREE.SphereGeometry(0.03, 6, 4), new THREE.MeshBasicMaterial({ color: 0xffffff })); sh.position.set(x + 0.03, 0.03, 0.66); head.add(sh);
-    const bl = new THREE.Mesh(new THREE.CircleGeometry(0.08, 10), new THREE.MeshBasicMaterial({ color: 0xffb8bc })); bl.position.set(x * 1.5, -0.2, 0.58); bl.rotation.y = x > 0 ? 0.45 : -0.45; head.add(bl); });
+  // face: open eyes + sparkles + blush merged into ONE vertex-coloured mesh, shut ^ ^ lids into another; swapped by setSleepFace (kept out of bake)
+  const fg = (geo, col, x, y, z, sx = 1, sy = 1, sz = 1, ry = 0) => { const g = geo.toNonIndexed(); g.scale(sx, sy, sz); g.rotateY(ry); g.translate(x, y, z); const c = new THREE.Color(col), n = g.attributes.position.count, a = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) { a[i * 3] = c.r; a[i * 3 + 1] = c.g; a[i * 3 + 2] = c.b; } g.setAttribute('color', new THREE.BufferAttribute(a, 3)); for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'color') g.deleteAttribute(k); return g; };
+  const openG = [], shutG = [];
+  [-0.22, 0.22].forEach(x => { openG.push(fg(new THREE.SphereGeometry(0.1, 12, 10), 0x2a1f3a, x, -0.04, 0.6, 0.95, 1.4, 0.5), fg(new THREE.SphereGeometry(0.03, 6, 4), 0xffffff, x + 0.03, 0.03, 0.66),
+      fg(new THREE.CircleGeometry(0.08, 10), 0xffb8bc, x * 1.5, -0.2, 0.58, 1, 1, 1, x > 0 ? 0.45 : -0.45));
+    shutG.push(fg(new THREE.TorusGeometry(0.085, 0.022, 5, 12, Math.PI), 0x2a1f3a, x, -0.08, 0.64)); });
+  const faceMat = new THREE.MeshBasicMaterial({ vertexColors: true });
+  const faceOpen = new THREE.Mesh(mergeGeometries(openG), faceMat), faceShut = new THREE.Mesh(mergeGeometries(shutG), faceMat); faceShut.visible = false;
+  faceOpen.userData.dynamic = faceShut.userData.dynamic = true; head.add(faceOpen, faceShut);
   // hair cap
   const cap = toonMesh(new THREE.SphereGeometry(0.72, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.56), hair); cap.scale.set(1.06, 1, 1.02); cap.position.y = 0.04; cap.rotation.x = -0.28; head.add(cap);
   // soft fringe bangs
@@ -53,5 +60,6 @@ export function makeChibi({ name, role, skin = 0xffe0c8, hair, shirt, pants, hai
   ctrl.rotation.x = -0.5; ctrl.position.set(0, 0.8, 0.62); body.add(ctrl);
   const props = { cup, liq, spinner, pencil, book, pad, ctrl }; Object.values(props).forEach(o => { if (o !== liq) o.visible = false; });
   root.userData.parts = { body, head, armL, armR, legL, legR }; root.userData.hit = hit; root.userData.props = props;
+  let asleep = false; root.userData.setSleepFace = on => { if (on === asleep) return; asleep = on; faceOpen.visible = !on; faceShut.visible = on; };
   return root;
 }

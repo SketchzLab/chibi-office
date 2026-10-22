@@ -50,7 +50,7 @@ function homePlace(b) { const i = homeSpot[b.name] ?? b.slot;
     const via = oz > FIRE.z ? [[ox < FIRE.x ? FIRE.x - 2.9 : FIRE.x + 2.9, FIRE.z - 0.6]] : [];
     return { pos: [x, z], rot, seat: SEAT_STOOL + 0.06, approach: [...TO_HOME, ...via, [ox, oz], [x, z]] }; }
   return { pos: [GARDEN.x + 1.6, GARDEN.z - 1.1], rot: Math.atan2(-1.0, 0.9), seat: null, approach: [...TO_HOME, [GARDEN.x + 1.6, GARDEN.z - 1.1]] }; }
-export const SLEEP_Y = 0.5;
+export const SLEEP_Y = 0.86; // flat on the back: torso on the mattress, head on the pillow
 function bedPlace(b) { const r = HOUSE.rooms.find(r => r.who === b.name) || HOUSE.rooms[b.slot % 4]; const bz = HOUSE.z1 - 0.85;
   return { pos: [r.cx + 0.95, bz], rot: Math.PI / 2, seat: SLEEP_Y, lie: true, approach: [...TO_HOME, [r.cx + 0.4, HOUSE.z0 - 1.2], [r.cx + 0.4, HOUSE.z0 + 1.4], [r.cx + 0.95, bz - 0.2], [r.cx + 0.95, bz]] }; }
 const ACTS = {
@@ -117,7 +117,8 @@ export function makeBrain(chibi, persona) {
         if (to.pace) { const L2 = pathLen(to.pace), u = ((r.elapsed - travel) * 1.1) % (2 * L2), d = u < L2 ? u : 2 * L2 - u; const pp = along(u < L2 ? to.pace : [...to.pace].reverse(), u < L2 ? d : u - L2); [x, z] = pp; rot = pp[2]; walking = true; pose = 'walk'; } }
       st.act = r.act; st.walking = walking; st.label = walking && pose === 'walk' && !to.pace ? (r.act === 'work' ? 'Heading back to the desk' : 'On the way: ' + (b.labels[r.act] || r.act).toLowerCase()) : (b.labels[r.act] || r.act);
       st.seated = !walking && pose !== 'stand' && to.seat !== null; st.asleep = !walking && pose === 'sleep';
-      if (st.asleep) { const k = Math.min(1, dt * 4); chibi.rotation.x += (-1.48 - chibi.rotation.x) * k; } else chibi.rotation.x += (0 - chibi.rotation.x) * Math.min(1, dt * 6);
+      chibi.userData.setSleepFace?.(!!st.asleep);
+      if (st.asleep) { const k = Math.min(1, dt * 4); chibi.rotation.x += (-1.57 - chibi.rotation.x) * k; } else chibi.rotation.x += (0 - chibi.rotation.x) * Math.min(1, dt * 6);
       chibi.position.x = x; chibi.position.z = z;
       const ty = st.seated ? to.seat : 0; st.sy = (st.sy || 0) + (ty - (st.sy || 0)) * Math.min(1, dt * 7); chibi.position.y = heightAt(x, z) + st.sy;
       if (st.seated) chibi.rotation.y = rot; // snap to the seat's defined facing
@@ -135,7 +136,7 @@ export function applyPose(c, pose, t, dt, seated, b) {
   pr.cup.visible = pose === 'sip'; pr.spinner.visible = pose === 'fidget'; pr.pencil.visible = pose === 'sketch'; pr.pad.visible = pose === 'sketch'; pr.book.visible = pose === 'read'; pr.ctrl.visible = pose === 'game';
   if (pose === 'sip') pr.liq.material.uniforms.uColor.value.set(b.cup);
   switch (pose) {
-    case 'sleep': { const br = Math.sin(t * 1.3); tgt.armL = [0.05, -0.12]; tgt.armR = [0.05, 0.12]; tgt.bodyY = br * 0.015; tgt.headZ = 0.18; tgt.headX = 0.05; tgt.headY = 0; break; }
+    case 'sleep': { const br = Math.sin(t * 1.3); tgt.armL = [0.05, -0.12]; tgt.armR = [0.05, 0.12]; tgt.legL = [0, 0]; tgt.legR = [0, 0]; tgt.bodyY = br * 0.012; tgt.headZ = 0; tgt.headX = -0.12; tgt.headY = 0.55; break; } // lying face-up, head turned a little toward the room
     case 'warm': { tgt.armL = [-1.3, 0.3 + Math.sin(t * 0.8) * 0.05]; tgt.armR = [-1.3, -0.3 - Math.sin(t * 0.8) * 0.05]; tgt.headX = 0.08; tgt.headZ = Math.sin(t * 0.5) * 0.08; tgt.bodyY = Math.sin(t * 1.2) * 0.01; break; }
     case 'walk': { const w = Math.sin(t * 9); tgt.legL = [w * 0.7, 0]; tgt.legR = [-w * 0.7, 0]; tgt.armL = [-w * 0.6, -0.1]; tgt.armR = [w * 0.6, 0.1]; tgt.bodyY = Math.abs(Math.cos(t * 9)) * 0.08; tgt.headZ = w * 0.05; break; }
     case 'type': case 'bob': { const a = Math.sin(t * 14), c2 = Math.sin(t * 13 + 1.3); tgt.armL = [-1.05 + a * 0.06, 0.25]; tgt.armR = [-1.05 + c2 * 0.06, -0.25]; tgt.headX = 0.12;

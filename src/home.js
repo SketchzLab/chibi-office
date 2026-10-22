@@ -54,8 +54,8 @@ export function makeHome(scene) {
     const bz = H.z1 - 0.85; add(toonMesh(B3(3.0, 0.32, 1.35), 0x9c6b45), c, 0.32, bz); add(toonMesh(B3(2.9, 0.18, 1.25), 0xfaf4ea), c, 0.56, bz);
     add(toonMesh(B3(0.12, 0.8, 1.4), 0x8a5a36), c - 1.5, 0.5, bz); add(toonMesh(B3(0.6, 0.16, 0.9), 0xffffff), c - 1.1, 0.72, bz);
     add(toonMesh(B3(1.9, 0.08, 1.3), PC[r.who]), c + 0.45, 0.67, bz);
-    { const cg = new THREE.CylinderGeometry(0.62, 0.62, 2.0, 12, 1, false, 0, Math.PI); cg.rotateZ(Math.PI / 2); cg.rotateX(-Math.PI / 2); cg.scale(1, 0.62, 1.05); // tucked-in blanket over a sleeper
-      const cv = toonMesh(cg, PC[r.who]); cv.position.set(c + 0.55, 0.66, bz); cv.rotation.x = Math.PI / 2; cv.visible = false; cv.userData.dynamic = true; scene.add(cv); covers[r.who] = cv; }
+    { const cg = new THREE.SphereGeometry(1, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2); cg.scale(1.12, 0.62, 0.7); // tucked-in blanket dome over the sleeper's body (head left out on the pillow)
+      const cv = toonMesh(cg, PC[r.who]); cv.position.set(c + 0.5, 0.64, bz); cv.visible = false; cv.userData.dynamic = true; scene.add(cv); covers[r.who] = cv; }
     add(toonMesh(new THREE.CylinderGeometry(0.6, 0.6, 0.02, 14), 0xf0d8b0, { outline: false }), c + 0.2, 0.135, H.z0 + 1.2); // rug
     cast(c, bz, 3.0, 1.35, 0, 0.14, 0.6);
     // persona corner (against the left partition, front half of the room)
