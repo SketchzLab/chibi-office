@@ -117,7 +117,7 @@ function loop() { const t = clock.getElapsedTime(); const dt = Math.min(0.1, t -
   island.children.forEach(c => { if (c.userData.float !== undefined) c.position.y += Math.sin(t + c.userData.float) * 0.003; });
   glows.forEach((h,i)=>h.material.opacity=0.5+0.06*Math.sin(t*2+i));
   frames++; const now=performance.now(); if(now-last>1000){window.__info=renderer.info.render; window.__fps=frames*1000/(now-last); fpsEl.textContent=window.__fps.toFixed(0)+' fps'; frames=0; last=now;}
-  chibis.forEach((c, i) => { const bs = c.userData.brain.state; drawBubble(bubbles[i], bs.walking ? '🚶' : actEmoji(bs.act), bs.act === 'work' || bs.walking ? (c.userData.task || bs.label) : bs.label); bubbles[i].sp.position.set(c.position.x, c.position.y + 4.9 + (i % 2) * 1.1, c.position.z); });
+  chibis.forEach((c, i) => { const bs = c.userData.brain.state; drawBubble(bubbles[i], bs.walking ? '🚶' : actEmoji(bs.act), bs.act === 'work' || bs.walking ? (c.userData.task || bs.label) : bs.label); const dcam = camera.position.distanceTo(c.position), bs2 = THREE.MathUtils.clamp(dcam * 0.11, 1.4, 6.5); bubbles[i].sp.scale.set(bs2, bs2 * 0.219, 1); bubbles[i].sp.position.set(c.position.x, c.position.y + 4.3 + bs2 * 0.12 + (i % 2) * bs2 * 0.24, c.position.z); });
   blobs.forEach(([c, m]) => m.position.set(c.position.x + 0.2, 0.02, c.position.z - 0.15));
   if (selected) { const bs = selected.userData.brain.state; card.querySelector('.t').textContent = bs.label + (bs.override ? ' (live)' : ''); card.querySelector('.wt').textContent = selected.userData.task || '—'; ring.position.set(selected.position.x, 0.04, selected.position.z); }
   sky.clouds.children.forEach(c => { c.position.y += Math.sin(t * 0.3 + c.userData.drift * 6) * 0.004; });
