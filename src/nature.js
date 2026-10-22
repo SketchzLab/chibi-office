@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { toonMesh, toonMat } from './toon.js';
 import { bake } from './bake.js';
+import { cast } from './shadows.js';
 import { ISLAND_R as R, FLOOR, POOL as PL, BACK_Z } from './layout.js';
 let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 const POOL = new THREE.Vector3(PL.x, 0, PL.z);
@@ -49,7 +50,7 @@ export function makeNature(scene) {
   for (let i = 0; i < 7; i++) { const a = i / 7 * 6.28; const r = toonMesh(new THREE.DodecahedronGeometry(0.28 + rnd() * 0.2, 0), 0xc9bca6); r.position.set(POOL.x + Math.cos(a) * (PL.rx + 0.3), 0.08, POOL.z + Math.sin(a) * (PL.rz + 0.3)); if (Math.sin(a) < 0.7) g.add(r); }
   [[-0.5, 0.2], [0.7, -0.3]].forEach(([x, z]) => { const l = new THREE.Mesh(new THREE.CircleGeometry(0.25, 10), toonMat(0x5fb550)); l.rotation.x = -Math.PI / 2; l.position.set(POOL.x + x, 0.11, POOL.z + z); g.add(l); });
   // ---- trees ----
-  [[-13.0, -3.5, 1.5], [-12.6, 3.8, 1.3], [-9.5, -10.2, 1.4], [-2.0, -12.4, 1.1], [8.6, -10.6, 1.5], [12.8, -4.4, 1.3], [13.4, 1.6, 1.1], [-11.0, 8.6, 1.2], [-9.2, 11.0, 0.9], [11.8, -7.6, 1.0]].forEach(([x, z, s]) => { const t = tree(s); t.position.set(x, 0, z); g.add(t); });
+  [[-13.0, -3.5, 1.5], [-12.6, 3.8, 1.3], [-9.5, -10.2, 1.4], [-2.0, -12.4, 1.1], [8.6, -10.6, 1.5], [12.8, -4.4, 1.3], [13.4, 1.6, 1.1], [-11.0, 8.6, 1.2], [-9.2, 11.0, 0.9], [11.8, -7.6, 1.0]].forEach(([x, z, s]) => { const t = tree(s); t.position.set(x, 0, z); cast(x, z, 3.4 * s, 3.0 * s, 0, -0.03, 1.6); g.add(t); });
   // ---- grass detail (instanced, no outlines: cheap) ----
   const tuftGeo = new THREE.ConeGeometry(0.07, 0.35, 4); tuftGeo.translate(0, 0.17, 0);
   const NT = 1500; const tufts = new THREE.InstancedMesh(tuftGeo, toonMat(0x5fb550), NT); const M = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();

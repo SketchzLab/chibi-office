@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { makeSky } from './sky.js';
 import { toonUniforms } from './toon.js';
+import { buildShadows, chibiShadow } from './shadows.js';
 import { makeIsland } from './island.js';
 import { makeNature } from './nature.js';
 import { makeOffice, glows } from './props.js';
@@ -11,6 +12,8 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffe
 renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
 renderer.setSize(innerWidth, innerHeight);
 document.body.appendChild(renderer.domElement);
+const atmo = document.createElement('div'); atmo.style.cssText = 'position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at 18% 8%, rgba(255,246,214,.38), rgba(255,246,214,0) 45%), radial-gradient(ellipse at 50% 55%, rgba(0,0,0,0) 60%, rgba(30,60,110,.18) 100%)';
+document.body.appendChild(atmo);
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 500);
 const CAM_DIR = new THREE.Vector3(1, 0.56, 1).normalize();
@@ -32,6 +35,7 @@ const jun = makeChibi({ name: 'Jun', role: 'UI Designer', hair: 0x2f3b66, shirt:
 Object.assign(jun.userData, { faceDesk: 0, facePantry: 2.79, deskActivity: 'Sketching UI mockups', pantryActivity: 'Making bubble tea' });
 pixel.scale.setScalar(1.5); jun.scale.setScalar(1.5);
 scene.add(pixel, jun);
+buildShadows(scene); const blobs = [pixel, jun].map(c => [c, chibiShadow(scene)]);
 export const chibis = [pixel, jun];
 const walkers = [
   makeWalker(pixel, [[1.0, -1.3], [1.5, 0], [6.0, 0], [6.9, -4.97]], { offset: 0 }),
@@ -75,6 +79,7 @@ function loop() { const t = clock.getElapsedTime(); const dt = Math.min(0.1, t -
   island.children.forEach(c => { if (c.userData.float !== undefined) c.position.y += Math.sin(t + c.userData.float) * 0.003; });
   glows.forEach((h,i)=>h.material.opacity=0.5+0.06*Math.sin(t*2+i));
   frames++; const now=performance.now(); if(now-last>1000){window.__info=renderer.info.render; window.__fps=frames*1000/(now-last); fpsEl.textContent=window.__fps.toFixed(0)+' fps'; frames=0; last=now;}
+  blobs.forEach(([c, m]) => m.position.set(c.position.x + 0.2, 0.02, c.position.z - 0.15));
   if (selected) { card.querySelector('.t').textContent = selected.userData.activity; ring.position.set(selected.position.x, 0.04, selected.position.z); }
   sky.clouds.children.forEach(c => { c.position.y += Math.sin(t * 0.3 + c.userData.drift * 6) * 0.004; });
   nature.update(t);

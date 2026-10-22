@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { toonMesh } from './toon.js';
 import { bake } from './bake.js';
+import { cast } from './shadows.js';
 import { FLOOR, BACK_Z, LEFT_X, GLASS, LOUNGE, DESKS, PANTRY, WALKWAY } from './layout.js';
 // Phone-friendly glow: emissive screen + additive soft halo quad (no post-process bloom).
 const haloTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
@@ -69,6 +70,7 @@ const WALL = 0xf6f3ec, TEAL = 0x4fb3a9;
 function shell(g) {
   const W = FLOOR.x1 - FLOOR.x0;
   // back wall full height, left wall stepping down toward the front = cut-away look
+  cast(0, BACK_Z + 0.5, W, 1.6, 0, 0.012, 0.3); cast(LEFT_X + 0.5, 0, 1.4, FLOOR.z1 - FLOOR.z0, 0, 0.012, 0.3);
   const bw = toonMesh(B(W, 2.6, 0.2), WALL); bw.position.set(0, 1.3, BACK_Z); g.add(bw);
   const bt = toonMesh(B(W + 0.1, 0.18, 0.3), TEAL); bt.position.set(0, 2.65, BACK_Z); g.add(bt);
   const bb = toonMesh(B(W, 0.14, 0.24), TEAL, { outline: false }); bb.position.set(0, 0.07, BACK_Z + 0.12); g.add(bb);
@@ -101,6 +103,7 @@ function glassRoom(g) {
   [z0 + 0.1, cz].forEach(z => fr(0.07, H, 0.07, x1, H / 2, z));
   const mat = toonMesh(B(x1 - door0 - 0.1, 0.02, 0.6), F, { outline: false }); mat.position.set((door0 + x1) / 2, 0.01, z1 + 0.4); g.add(mat);
   const rug = toonMesh(B(x1 - x0 - 0.8, 0.02, z1 - z0 - 0.8), 0xdfe9ee, { outline: false }); rug.position.set(cx, 0.012, cz); g.add(rug);
+  cast(cx, cz, 4.2, 2.8); cast(x1 - 0.3, cz, 0.8, z1 - z0, 0, 0.015, 0.3);
   const tbl = toonMesh(new THREE.CylinderGeometry(1.0, 1.0, 0.08, 24), 0xe9c38e); tbl.position.set(cx, 0.78, cz); tbl.scale.x = 1.5; g.add(tbl);
   const leg = toonMesh(new THREE.CylinderGeometry(0.1, 0.25, 0.75, 10), 0xf4f1ea); leg.position.set(cx, 0.38, cz); g.add(leg);
   [[-2.1, 0], [2.1, 0], [-0.8, -1.3], [0.8, -1.3], [-0.8, 1.3], [0.8, 1.3]].forEach(([dx, dz]) => { const c = toonMesh(new THREE.CylinderGeometry(0.3, 0.3, 0.5, 12), 0xf0ece4); c.position.set(cx + dx, 0.25, cz + dz); g.add(c); });
@@ -118,6 +121,7 @@ function lounge(g) {
     [-1, 1].forEach(k => { const arm = toonMesh(B(0.22, 0.55, 0.9), SD); arm.position.set(k * (w / 2 - 0.05), 0.4, 0); s.add(arm); });
     g.add(s); };
   sofa(3.2, cx, cz + 2.0, Math.PI); sofa(2.4, cx - 2.2, cz - 0.1, Math.PI / 2);
+  cast(cx, cz + 2.0, 4.0, 1.8); cast(cx - 2.2, cz - 0.1, 1.8, 3.2); cast(cx + 0.1, cz - 0.1, 1.8, 1.8); cast(cx + 2.1, cz - 0.9, 1.6, 1.6);
   const ct = toonMesh(new THREE.CylinderGeometry(0.65, 0.65, 0.1, 18), 0xe9c38e); ct.position.set(cx + 0.1, 0.42, cz - 0.1); g.add(ct);
   const cl = toonMesh(new THREE.CylinderGeometry(0.06, 0.06, 0.4), 0xf4f1ea, { outline: false }); cl.position.set(cx + 0.1, 0.2, cz - 0.1); g.add(cl);
   const book = toonMesh(B(0.3, 0.05, 0.22), 0xff8a7a, { outline: false }); book.position.set(cx + 0.2, 0.5, cz - 0.1); g.add(book);
@@ -134,16 +138,16 @@ function walkway(g) {
 export function makeOffice(scene) {
   const g = new THREE.Group();
   shell(g); glassRoom(g); lounge(g); walkway(g);
-  [[-3.6, BACK_Z + 0.35], [-1.9, BACK_Z + 0.35]].forEach(([x, z]) => { const b = bookshelf(); b.position.set(x, 0, z); g.add(b); });
+  [[-3.6, BACK_Z + 0.35], [-1.9, BACK_Z + 0.35]].forEach(([x, z]) => { const b = bookshelf(); b.position.set(x, 0, z); cast(x, z + 0.4, 2.2, 1.4, 0, 0.015, 0.5); g.add(b); });
   // kitchen cabinets along back wall
   const kx = 4.9, kz = BACK_Z + 0.5;
-  const cab = toonMesh(B(2.6, 1.0, 0.7), 0xf4f1ea); cab.position.set(kx, 0.5, kz); g.add(cab);
+  cast(kx, kz + 0.4, 3.4, 1.6, 0, 0.015, 0.5); const cab = toonMesh(B(2.6, 1.0, 0.7), 0xf4f1ea); cab.position.set(kx, 0.5, kz); g.add(cab);
   const cabTop = toonMesh(B(2.7, 0.08, 0.8), 0x8b6b4a); cabTop.position.set(kx, 1.04, kz); g.add(cabTop);
   const sink = toonMesh(B(0.6, 0.05, 0.4), 0xc8d3dc, { outline: false }); sink.position.set(kx - 0.5, 1.09, kz + 0.05); g.add(sink);
-  DESKS.forEach(([x, z]) => { const d = desk(); d.position.set(x, 0, z); if (z > 0) d.rotation.y = Math.PI; g.add(d); });
-  const p = pantry(); p.position.set(PANTRY.x, 0, PANTRY.z); p.rotation.y = PANTRY.ry; g.add(p);
-  [[-4.4, -4.8], [7.4, 2.6], [-4.3, 6.9], [6.6, 6.9], [10.2, -1.2]].forEach(([x, z], i) => { const pl = plant(1.1 + (i % 2) * 0.4); pl.position.set(x, 0, z); g.add(pl); });
-  [[-4.6, 0.9], [9.6, 3.2]].forEach(([x, z]) => { const l = lamp(); l.position.set(x, 0, z); g.add(l); });
+  DESKS.forEach(([x, z]) => { cast(x, z + (z > 0 ? -0.3 : 0.3), 3.0, 2.6); const d = desk(); d.position.set(x, 0, z); if (z > 0) d.rotation.y = Math.PI; g.add(d); });
+  cast(PANTRY.x + 0.4, PANTRY.z, 6.2, 2.4, PANTRY.ry); const p = pantry(); p.position.set(PANTRY.x, 0, PANTRY.z); p.rotation.y = PANTRY.ry; g.add(p);
+  [[-4.4, -4.8], [7.4, 2.6], [-4.3, 6.9], [6.6, 6.9], [10.2, -1.2]].forEach(([x, z], i) => { const pl = plant(1.1 + (i % 2) * 0.4); pl.position.set(x, 0, z); cast(x, z, 1.4, 1.4); g.add(pl); });
+  [[-4.6, 0.9], [9.6, 3.2]].forEach(([x, z]) => { const l = lamp(); l.position.set(x, 0, z); cast(x, z, 1.0, 1.0); g.add(l); });
   scene.add(g); bake(g);
   return g;
 }
