@@ -10,6 +10,8 @@ import { makeIsland } from './island.js';
 import { makeNature } from './nature.js';
 import { makeOffice, glows } from './props.js';
 import { makeChibi } from './chibi.js';
+import { makePlayer } from './player.js';
+import { speechAt, GREET, HI_BACK } from './dialogue.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
@@ -39,7 +41,10 @@ for (const [name, per] of Object.entries(PERSONAS)) {
   const brain = makeBrain(c, per); c.userData.brain = brain; scene.add(c); chibis.push(c); brains.push(brain);
 }
 export { chibis }; window.__scene = scene;
-buildShadows(scene); const blobs = chibis.map(c => [c, chibiShadow(scene)]);
+const player = makePlayer({ scene, camera, controls, bots: chibis }); const calvin = player.chibi; window.__player = player;
+player.setHome(camera.position, controls.target);
+buildShadows(scene); const blobs = [...chibis, calvin].map(c => [c, chibiShadow(scene)]);
+const talkers = chibis.map(c => ({ name: c.userData.name, brain: c.userData.brain }));
 // ---- Live status (public/status.json, cache-busted every 60 s) ----
 const STATUS_URL = import.meta.env.BASE_URL + 'status.json'; const FRESH_MS = 2 * 3600 * 1000; let status = { bots: {} };
 async function loadStatus() { try { const r = await fetch(STATUS_URL + '?t=' + Date.now(), { cache: 'no-store' }); if (!r.ok) return; status = await r.json(); applyStatus(); } catch (e) { /* offline: keep last */ } }
@@ -49,14 +54,18 @@ function applyStatus() { const up = Date.parse(status.updatedAt || 0); const fre
 loadStatus(); setInterval(loadStatus, 60000);
 window.__setStatus = j => { status = j; applyStatus(); };
 // ---- Floating status bubbles (one small sprite per bot, redrawn only when text changes) ----
-function makeBubble() { const cv = document.createElement('canvas'); cv.width = 512; cv.height = 112; const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
-  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false })); sp.scale.set(5.2, 1.14, 1); sp.renderOrder = 5; scene.add(sp); return { sp, cv, tex, text: '' }; }
-function drawBubble(bb, emoji, text) { const key = emoji + text; if (bb.text === key) return; bb.text = key; const g = bb.cv.getContext('2d'); g.clearRect(0, 0, 512, 112);
-  g.font = '600 34px system-ui, "Noto Color Emoji", sans-serif'; const t = text.length > 22 ? text.slice(0, 21) + '…' : text; const w = Math.min(500, g.measureText(t).width + 96);
-  const x0 = (512 - w) / 2; g.fillStyle = 'rgba(255,250,242,0.95)'; g.strokeStyle = '#2a1f35'; g.lineWidth = 5;
-  g.beginPath(); g.roundRect(x0, 6, w, 76, 36); g.fill(); g.stroke(); g.beginPath(); g.moveTo(246, 82); g.lineTo(256, 104); g.lineTo(268, 82); g.closePath(); g.fill(); g.stroke();
-  g.fillStyle = '#2a1f35'; g.fillText(t, x0 + 70, 57); g.font = '36px "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji", sans-serif'; g.fillText(emoji, x0 + 16, 58); bb.tex.needsUpdate = true; }
-const bubbles = chibis.map(() => makeBubble());
+// Speech bubbles (talk) + a tiny activity emoji when quiet. One sprite per chibi, canvas redrawn only on change.
+function makeBubble() { const cv = document.createElement('canvas'); cv.width = 512; cv.height = 176; const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false })); sp.renderOrder = 5; scene.add(sp); return { sp, cv, tex, text: null, big: false }; }
+function wrap(g, text, max) { const words = text.split(' '), lines = ['']; for (const w of words) { const tl = (lines.at(-1) ? lines.at(-1) + ' ' : '') + w; if (g.measureText(tl).width > max && lines.at(-1)) lines.push(w); else lines[lines.length - 1] = tl; } return lines.slice(0, 3); }
+function drawBubble(bb, emoji, text) { const key = emoji + '|' + (text || ''); if (bb.text === key) return; bb.text = key; bb.big = !!text; const g = bb.cv.getContext('2d'); g.clearRect(0, 0, 512, 176);
+  g.fillStyle = 'rgba(255,250,242,0.96)'; g.strokeStyle = '#2a1f35'; g.lineWidth = 5;
+  if (!text) { g.globalAlpha = 0.85; g.beginPath(); g.arc(256, 120, 40, 0, 7); g.fill(); g.stroke(); g.font = '44px "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji", sans-serif'; g.textAlign = 'center'; g.fillStyle = '#000'; g.fillText(emoji, 256, 136); g.globalAlpha = 1; g.textAlign = 'left'; bb.tex.needsUpdate = true; return; }
+  g.font = '600 32px system-ui, "Noto Color Emoji", sans-serif'; const lines = wrap(g, text, 440); const w = Math.min(500, Math.max(...lines.map(l => g.measureText(l).width)) + 48), h = lines.length * 38 + 26, y0 = 150 - h;
+  const x0 = (512 - w) / 2; g.beginPath(); g.roundRect(x0, y0, w, h, 26); g.fill(); g.stroke(); g.beginPath(); g.moveTo(240, 148); g.lineTo(256, 172); g.lineTo(274, 148); g.closePath(); g.fill(); g.stroke();
+  g.fillStyle = '#2a1f35'; g.textAlign = 'center'; lines.forEach((l, i) => g.fillText(l, 256, y0 + 44 + i * 38)); g.textAlign = 'left'; bb.tex.needsUpdate = true; }
+const talkersAll = [...chibis, calvin];
+const bubbles = talkersAll.map(() => makeBubble());
 let prevT = 0;
 // --- Name card ---
 const card = document.createElement('div'); card.id = 'card';
@@ -81,7 +90,7 @@ document.head.appendChild(css);
 let selected = null;
 const ring = new THREE.Mesh(new THREE.RingGeometry(1.15, 1.4, 32), new THREE.MeshBasicMaterial({ color: 0xfff1a8, transparent: true, opacity: 0.85, depthWrite: false }));
 ring.rotation.x = -Math.PI / 2; ring.visible = false; scene.add(ring);
-function select(c) { selected = c; card.classList.toggle('on', !!c); ring.visible = !!c;
+function select(c) { selected = c; document.body.classList.toggle('cardon', !!c); card.classList.toggle('on', !!c); ring.visible = !!c;
   card.querySelector('.note').textContent = '';
   if (c) { const per = c.userData.persona; card.querySelector('.n').textContent = c.userData.name; card.querySelector('.r').textContent = c.userData.role; card.querySelector('.chat').hidden = !chatLink(c.userData.name);
     const fill = (sel, arr, tag) => { const el = card.querySelector(sel); el.replaceChildren(...arr.map(x => { const e = document.createElement(tag); e.textContent = x; return e; })); };
@@ -113,11 +122,33 @@ const clock = new THREE.Clock();
 // so every device shows each bot at the same spot at the same moment. ?at=<sec> pins the phase for tests.
 const atParam = new URLSearchParams(location.search).get('at');
 const wallTime = atParam !== null ? (() => { const t0 = performance.now(); return () => +atParam + (performance.now() - t0) / 1000; })() : () => Date.now() / 1000;
+// ---- Calvin <-> bot interaction (local to this device) ----
+const localSay = {}; const face = {}; let near = null, greeted = {}; const pick = a => a[Math.floor(Math.random() * a.length)];
+const say = (n, text, wt, dur = 4) => { localSay[n] = { text, until: wt + dur }; };
+const actb = document.createElement('button'); actb.id = 'actb'; actb.className = 'hudb'; actb.type = 'button'; document.body.appendChild(actb);
+const imenu = document.createElement('div'); imenu.id = 'imenu'; imenu.innerHTML = '<button class="hudb" data-a="hi" type="button">👋 Say hi</button><button class="hudb" data-a="work" type="button">💼 What are you working on?</button><button class="hudb" data-a="chat" type="button">💬 Open chat</button>'; document.body.appendChild(imenu);
+actb.addEventListener('click', () => imenu.classList.toggle('on'));
+imenu.addEventListener('click', e => { const a = e.target.closest('button')?.dataset.a; if (!a || !near) return; const n = near.userData.name, wt = wallTime(); face[n] = wt + 6;
+  if (a === 'hi') { say('Calvin', 'Hey ' + n + '! 👋', wt, 2.5); setTimeout(() => say(n, HI_BACK[n], wallTime()), 900); face[n + 'wave'] = wt + 2.5; player.waveUntil = clock.getElapsedTime() + 1.6; }
+  if (a === 'work') { say('Calvin', 'What are you working on?', wt, 2.5); const task = near.userData.task; setTimeout(() => say(n, task ? 'Right now: ' + task + '!' : (near.userData.brain.state.label + '!'), wallTime(), 5), 900); }
+  if (a === 'chat') { const url = chatLink(n); if (url) { window.__lastChatLink = url; window.location.href = url; say(n, 'Opening our chat…', wt, 3); } }
+  imenu.classList.remove('on'); });
+function interact(wt, t, dt) { let best = null, bd = 2.7; chibis.forEach(c => { const d = Math.hypot(c.position.x - calvin.position.x, c.position.z - calvin.position.z); if (d < bd) { bd = d; best = c; } });
+  if (best !== near) { near = best; imenu.classList.remove('on'); actb.style.display = near ? 'block' : 'none'; if (near) actb.textContent = '✨ Interact · ' + near.userData.name; }
+  if (near) { const n = near.userData.name; if (!greeted[n] || wt - greeted[n] > 25) { greeted[n] = wt; face[n] = wt + 5; face[n + 'wave'] = wt + 2.2; say(n, pick(GREET[n]), wt); } }
+  chibis.forEach(c => { const n = c.userData.name; if (!(face[n] > wt)) return; const P = c.userData.parts, bs = c.userData.brain.state; let a = Math.atan2(calvin.position.x - c.position.x, calvin.position.z - c.position.z) - c.rotation.y; a = Math.atan2(Math.sin(a), Math.cos(a));
+    if (bs.seated || bs.walking) P.head.rotation.y = THREE.MathUtils.clamp(a, -0.9, 0.9); else c.rotation.y += a * Math.min(1, dt * 6);
+    if (face[n + 'wave'] > wt) { P.armR.rotation.x = -2.9; P.armR.rotation.z = -0.4 + Math.sin(t * 12) * 0.35; } }); }
+window.__near = () => near?.userData.name || null;
 function loop() { const t = clock.getElapsedTime(); const dt = Math.min(0.1, t - prevT); prevT = t; const wt = wallTime(); brains.forEach(b => b.update(wt, dt, t));
   island.children.forEach(c => { if (c.userData.float !== undefined) c.position.y += Math.sin(t + c.userData.float) * 0.003; });
   glows.forEach((h,i)=>h.material.opacity=0.5+0.06*Math.sin(t*2+i));
   frames++; const now=performance.now(); if(now-last>1000){window.__info=renderer.info.render; window.__fps=frames*1000/(now-last); fpsEl.textContent=window.__fps.toFixed(0)+' fps'; frames=0; last=now;}
-  chibis.forEach((c, i) => { const bs = c.userData.brain.state; drawBubble(bubbles[i], bs.walking ? '🚶' : actEmoji(bs.act), bs.act === 'work' || bs.walking ? (c.userData.task || bs.label) : bs.label); const dcam = camera.position.distanceTo(c.position), bs2 = THREE.MathUtils.clamp(dcam * 0.11, 1.4, 6.5); bubbles[i].sp.scale.set(bs2, bs2 * 0.219, 1); bubbles[i].sp.position.set(c.position.x, c.position.y + 4.3 + bs2 * 0.12 + (i % 2) * bs2 * 0.24, c.position.z); });
+  player.update(dt, t); interact(wt, t, dt);
+  const sp = speechAt(wt, talkers);
+  talkersAll.forEach((c, i) => { const nm = c.userData.name, bs = c.userData.brain?.state; const loc = localSay[nm]; let text = loc && loc.until > wt ? loc.text : (sp && sp.name === nm ? sp.text : '');
+    drawBubble(bubbles[i], bs ? (bs.walking ? '🚶' : actEmoji(bs.act)) : '', text); const bb = bubbles[i]; bb.sp.visible = bb.big || !!bs;
+    const dcam = camera.position.distanceTo(c.position), sc = THREE.MathUtils.clamp(dcam * 0.1, 1.5, 6.0) * (bb.big ? 1 : 0.42); bb.sp.scale.set(sc, sc * 0.344, 1); bb.sp.position.set(c.position.x, c.position.y + 3.7 + sc * 0.17, c.position.z); });
   blobs.forEach(([c, m]) => m.position.set(c.position.x + 0.2, 0.02, c.position.z - 0.15));
   if (selected) { const bs = selected.userData.brain.state; card.querySelector('.t').textContent = bs.label + (bs.override ? ' (live)' : ''); card.querySelector('.wt').textContent = selected.userData.task || '—'; ring.position.set(selected.position.x, 0.04, selected.position.z); }
   sky.clouds.children.forEach(c => { c.position.y += Math.sin(t * 0.3 + c.userData.drift * 6) * 0.004; });

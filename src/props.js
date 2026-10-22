@@ -3,7 +3,7 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { toonMesh } from './toon.js';
 import { bake } from './bake.js';
 import { cast } from './shadows.js';
-import { FLOOR, BACK_Z, LEFT_X, GLASS, LOUNGE, DESKS, PANTRY, WALKWAY } from './layout.js';
+import { FLOOR, BACK_Z, LEFT_X, GLASS, LOUNGE, DESKS, PANTRY, WALKWAY, BOSS_DESK } from './layout.js';
 // Phone-friendly glow: emissive screen + additive soft halo quad (no post-process bloom).
 const haloTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
   const r = g.createRadialGradient(32, 32, 0, 32, 32, 32); r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(1, 'rgba(255,255,255,0)');
@@ -152,6 +152,14 @@ export function makeOffice(scene) {
   const cabTop = toonMesh(B(2.7, 0.08, 0.8), 0x8b6b4a); cabTop.position.set(kx, 1.04, kz); g.add(cabTop);
   const sink = toonMesh(B(0.6, 0.05, 0.4), 0xc8d3dc, { outline: false }); sink.position.set(kx - 0.5, 1.09, kz + 0.05); g.add(sink);
   DESKS.forEach(([x, z]) => { cast(x, z + (z > 0 ? -0.3 : 0.3), 3.0, 2.6); const d = desk(); d.position.set(x, 0, z); if (z > 0) d.rotation.y = Math.PI; g.add(d); });
+  { // Calvin's (boss) desk: same base + walnut top, second monitor, gold nameplate, mini trophy, rug
+    const [x, z] = BOSS_DESK; cast(x, z - 0.3, 3.2, 2.8); const d = desk(); d.position.set(x, 0, z); d.rotation.y = Math.PI; g.add(d);
+    const top = toonMesh(RB(2.5, 0.06, 1.25, 0.03), 0x9a6a45); top.position.y = 0.97; d.add(top);
+    const m2 = toonMesh(RB(0.7, 0.5, 0.06, 0.03), 0xe8eef2); m2.position.set(0.85, 1.4, -0.22); m2.rotation.y = -0.4; d.add(m2);
+    const s2 = new THREE.Mesh(B(0.62, 0.42, 0.01), new THREE.MeshBasicMaterial({ color: 0xa8ecff })); s2.position.set(0.835, 1.4, -0.185); s2.rotation.y = -0.4; d.add(s2);
+    const plate = toonMesh(RB(0.5, 0.12, 0.08, 0.02), 0xffc94a); plate.position.set(-0.5, 1.06, 0.45); plate.rotation.x = -0.3; d.add(plate);
+    const cupT = toonMesh(new THREE.CylinderGeometry(0.1, 0.05, 0.16, 8), 0xffc94a); cupT.position.set(-0.95, 1.12, -0.2); d.add(cupT);
+    const rug = toonMesh(new THREE.CylinderGeometry(1.9, 1.9, 0.02, 24), 0xc94f4f, { outline: false }); rug.scale.set(1, 1, 0.75); rug.position.set(x, 0.012, z - 0.3); g.add(rug); }
   cast(PANTRY.x + 0.4, PANTRY.z, 6.2, 2.4, PANTRY.ry); const p = pantry(); p.position.set(PANTRY.x, 0, PANTRY.z); p.rotation.y = PANTRY.ry; g.add(p);
   [[-4.6, -7.2], [7.4, 2.6], [-2.4, 7.2], [6.6, 6.9], [10.2, -1.2]].forEach(([x, z], i) => { const pl = plant(1.1 + (i % 2) * 0.4); pl.position.set(x, 0, z); cast(x, z, 1.4, 1.4); g.add(pl); });
   [[-3.9, 7.3], [9.6, 3.2]].forEach(([x, z]) => { const l = lamp(); l.position.set(x, 0, z); cast(x, z, 1.0, 1.0); g.add(l); });

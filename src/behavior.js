@@ -62,6 +62,7 @@ export function makeBrain(chibi, persona) {
   return {
     state: st, cycle,
     setOverride(o) { st.override = o; },
+    actAt(t) { return resolve(t).act; }, // pure: used by the dialogue scheduler (same answer on every device)
     update(t, dt, time) {
       const r = resolve(t); const A = ACTS[r.act]; const to = A.place(b); const pts = route(r.fromAct === r.act ? null : r.from, to);
       const travel = r.fromAct === r.act ? 0 : pathLen(pts) / SPEED + 0.6; // +stand-up/sit-down
@@ -79,7 +80,7 @@ export function makeBrain(chibi, persona) {
   };
 }
 // ---------- Poses ----------
-function applyPose(c, pose, t, dt, seated, b) {
+export function applyPose(c, pose, t, dt, seated, b) {
   const P = c.userData.parts, pr = c.userData.props, k = Math.min(1, dt * 9);
   const tgt = { legL: [0, 0], legR: [0, 0], armL: [0, -0.1], armR: [0, 0.1], bodyY: 0, headX: 0, headZ: Math.sin(t * 1.1) * 0.05, headY: 0 };
   const s = Math.sin(t * 2.2);
@@ -98,6 +99,7 @@ function applyPose(c, pose, t, dt, seated, b) {
     case 'game': { const a = Math.sin(t * 18) * 0.05; tgt.armL = [-1.15 + a, 0.35]; tgt.armR = [-1.15 - a, -0.35]; tgt.headX = 0.12; tgt.bodyY = Math.abs(Math.sin(t * 3)) * 0.02; tgt.headZ = Math.sin(t * 2.6) * 0.08; break; }
     case 'sketch': { tgt.armL = [-1.1, 0.35]; tgt.armR = [-1.2 + Math.sin(t * 6) * 0.08, -0.3 + Math.cos(t * 6) * 0.08]; tgt.headX = 0.25; break; }
     case 'stretch': { const u = Math.sin(t * 1.4); tgt.armL = [-2.9, 0.15 + u * 0.1]; tgt.armR = [-2.9, -0.15 - u * 0.1]; tgt.bodyY = 0.03 + u * 0.03; tgt.headX = -0.15; break; }
+    case 'wave': { tgt.armR = [-2.9, -0.4 + Math.sin(t * 12) * 0.35]; tgt.headX = -0.1; break; }
     case 'talk': { const a = Math.sin(t * 3.2), c2 = Math.sin(t * 2.3 + 1); tgt.armL = [-0.9 + a * 0.3, 0.3]; tgt.armR = [-0.7 + c2 * 0.35, -0.3]; tgt.headZ = Math.sin(t * 1.6) * 0.08; tgt.headY = Math.sin(t * 0.9) * 0.2; break; }
     default: { tgt.armL = [0, -0.1 - s * 0.04]; tgt.armR = [0, 0.1 + s * 0.04]; tgt.bodyY = s * 0.025; }
   }

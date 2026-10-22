@@ -8,3 +8,4 @@ export const DESKS = [[-2.4, -2.6], [1.0, -2.6], [4.4, -2.6], [-2.4, 2.6], [1.0,
 export const PANTRY = { x: 8.2, z: -6.2, ry: -0.35 };
 export const POOL = { x: -4.5, z: 11.3, rx: 2.4, rz: 1.7 };
 export const WALKWAY = { z: 0, half: 0.7, x0: -4.6, x1: 9.2 };
+export const BOSS_DESK = [5.2, 2.6]; // Calvin's desk (front row, right)
