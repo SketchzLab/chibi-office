@@ -23,8 +23,9 @@ const HB = HOUSE.rooms.flatMap(r => { const lx = r.x0 + 0.1, fz = HOUSE.z0 + 0.9
 const HOUSE_TALL = [[HOUSE.x0, HOUSE.z1 - 0.08, HOUSE.x1, HOUSE.z1 + 0.08], ...HOUSE.walls.map(x => [x - 0.08, HOUSE.z0 - 0.07, x + 0.08, HOUSE.z1]),
   ...HOUSE.rooms.flatMap(r => { const lx = r.x0 + 0.1, fz = HOUSE.z0 + 0.9; return { Pixel: [[lx, fz - 0.58, lx + 0.48, fz + 0.58]], Jun: [[lx + 0.35, fz - 0.4, lx + 1.15, fz + 0.4]], Sage: [[lx, fz - 0.65, lx + 0.45, fz + 1.05]], Mika: [] }[r.who]; })];
 const HOME_CIRCLES = [[FIRE.x, FIRE.z, 0.82], ...FIRE.logs.flatMap(L => [-0.55, 0, 0.55].map(k => [L.x + Math.cos(L.a + Math.PI) * 0 + Math.sin(-L.a) * 0 + Math.cos(-L.a) * k, L.z + Math.sin(-L.a) * k * -1 + 0, 0.34])),
-  ...[[BRIDGE.x - 1.7, 15.9], [BRIDGE.x + 1.7, 15.9], [BRIDGE.x - 1.7, 24.1], [BRIDGE.x + 1.7, 24.1], [HOUSE.rooms[1].x1 - 1.4 + 0.0, FIRE.z + 1.8], [HOUSE.rooms[2].x0 + 1.4, FIRE.z + 1.8]].map(([x, z]) => [x, z, 0.1])];
-const HOME_BOXES = [...HB, [GARDEN.x - GARDEN.w / 2, GARDEN.z - GARDEN.d / 2, GARDEN.x + GARDEN.w / 2, GARDEN.z + GARDEN.d / 2]];
+  ...[[BRIDGE.x - 1.7, 15.9], [BRIDGE.x + 1.7, 15.9], [BRIDGE.x - 1.7, 24.1], [BRIDGE.x + 1.7, 24.1], [HOUSE.rooms[1].x1 - 1.4 + 0.0, FIRE.z + 1.8], [HOUSE.rooms[2].x0 + 1.4, FIRE.z + 1.8]].map(([x, z]) => [x, z, 0.1]), ...[-1, 1].flatMap(sd => [BRIDGE.s0 - 0.6, BRIDGE.s1 + 0.6].map(z => [BRIDGE.x + sd * BRIDGE.half, z, 0.14]))];
+const HOME_BOXES = [...HB, [HOUSE.x0 - 0.9, HOUSE.z0 + 1.2, HOUSE.x0, HOUSE.z1], [HOUSE.x1, HOUSE.z0 + 1.2, HOUSE.x1 + 0.9, HOUSE.z1], // rim wedges beside the side walls (rim clamp would shove the head into the wall)
+  [GARDEN.x - GARDEN.w / 2, GARDEN.z - GARDEN.d / 2, GARDEN.x + GARDEN.w / 2, GARDEN.z + GARDEN.d / 2]];
 const CIRCLES0 = [[L.cx, L.cz, 0.65], [(GLASS.x0 + GLASS.x1) / 2, (GLASS.z0 + GLASS.z1) / 2, 1.25], [-4.6, -7.2, 0.5], [7.4, 2.6, 0.62], [-2.4, 7.2, 0.5], [6.6, 6.9, 0.62], [10.2, -1.2, 0.5], [-3.9, 7.3, 0.3], [9.6, 3.2, 0.3], [-10.2, 7.3, 0.4], [10.1, 7.1, 0.5]];
 const BOXES = [...BOXES0, ...HOME_BOXES], CIRCLES = [...CIRCLES0, ...HOME_CIRCLES];
 // ---- two-level collision: ground (office + lawn), stairs (ramp, side-clamped), rooftop ----
@@ -125,7 +126,11 @@ body.cardon #actb,body.cardon #imenu{display:none!important}`;
       controls.target.lerp(tmp, k); camera.position.lerp(new THREE.Vector3(tmp.x + Math.sin(a) * d * 0.78, tmp.y + d * 0.55, tmp.z + Math.cos(a) * d * 0.78), k); return; }
     if (api.look) { const L = api.look; const k = 1 - Math.exp(-dt * 2); controls.target.lerp(L.tgt, k); camera.position.lerp(L.pos, k); return; }
     if (follow) { tmp.set(c.position.x, 1.2, c.position.z); const k = 1 - Math.exp(-dt * 3.2); const delta = tmp.sub(controls.target).multiplyScalar(k); controls.target.add(delta); camera.position.add(delta);
-      const off = camera.position.clone().sub(controls.target); const want = near || (innerWidth < innerHeight ? 17 : 13); off.setLength(off.length() + (want - off.length()) * Math.min(1, dt * 1.5)); camera.position.copy(controls.target).add(off); controls.minDistance = 8; }
+      const off = camera.position.clone().sub(controls.target); const want = near || (innerWidth < innerHeight ? 17 : 13); off.setLength(off.length() + (want - off.length()) * Math.min(1, dt * 1.5));
+      if (onHome(c.position.x, c.position.z) && c.position.z > HOUSE.z0 - 2.5) { // near the longhouse: swing round to its open (-z) front so the rooms aren't hidden behind the back wall
+        const az = Math.atan2(off.x, off.z), lim = 0.55; let tgt = Math.PI - Math.sign(off.x || 1) * Math.min(lim, Math.abs(Math.atan2(Math.sin(az - Math.PI), Math.cos(az - Math.PI))));
+        let d = Math.atan2(Math.sin(tgt - az), Math.cos(tgt - az)); const na = az + d * Math.min(1, dt * 1.8), h = Math.hypot(off.x, off.z); off.x = Math.sin(na) * h; off.z = Math.cos(na) * h; }
+      camera.position.copy(controls.target).add(off); controls.minDistance = 8; }
     else if (home.active) { const k = 1 - Math.exp(-dt * 3); controls.target.lerp(home.target, k); camera.position.lerp(home.pos, k); if (camera.position.distanceTo(home.pos) < 0.05) home.active = false; controls.minDistance = 12; }
   }
   // seats: { pos:[x,z], rot, y, pose, camDist, onStand }

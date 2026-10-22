@@ -24,7 +24,7 @@ export const TREES = [[-15.6, -4.2, 1.5], [-15.1, 4.6, 1.3], [-11.4, -12.2, 1.4]
 // ---- home island (+z), joined by a rope-and-plank bridge ----
 export const HOME = { cx: 2, cz: 33, r: 10.5 }; HOME.walk = HOME.r - 1.3;
 export const BRIDGE = { x: 2, half: 1.0, z0: 15.6, z1: 24.4, s0: 16.4, s1: 23.4 }; // corridor z0..z1, rope span s0..s1
-BRIDGE.walkHalf = BRIDGE.half - 0.45; // body radius inside the rails
+BRIDGE.walkHalf = BRIDGE.half - 0.53; // body radius inside the rails
 export const HOUSE = { x0: HOME.cx - 7.6, x1: HOME.cx + 7.6, z0: HOME.cz + 2.6, z1: HOME.cz + 6.4, h: 3.55, y: 0.12, porch: 1.0 };
 HOUSE.rooms = [['Pixel', -5.7], ['Jun', -1.9], ['Sage', 1.9], ['Mika', 5.7]].map(([who, dx]) => ({ who, cx: HOME.cx + dx, x0: HOME.cx + dx - 1.9, x1: HOME.cx + dx + 1.9 }));
 HOUSE.walls = [HOUSE.x0, ...HOUSE.rooms.slice(1).map(r => r.x0), HOUSE.x1]; // side walls + partitions (x)

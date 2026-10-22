@@ -284,7 +284,7 @@ window.__headClear = () => { scene.updateMatrixWorld(true); const hb = new THREE
   const rc = new THREE.Raycaster(); rc.far = 3; rc.camera = camera; let gap = Infinity; const skip = o => { for (let n = o; n; n = n.parent) if (n.userData.chibi || n.userData.pet || n.userData.name || n.isSprite) return true; return !o.visible; };
   const sides = new Map(); scene.traverse(o => { const m = o.material; if (o.isMesh && m && !Array.isArray(m) && m.side === THREE.FrontSide) { sides.set(m, 1); m.side = THREE.DoubleSide; } }); // undersides of open cones etc.
   for (const [ox, oz] of [[0, 0], [rx, 0], [-rx, 0], [0, rz], [0, -rz]]) { rc.set(new THREE.Vector3(cx + ox, top - 0.6, cz + oz), new THREE.Vector3(0, 1, 0));
-    const h = rc.intersectObjects(scene.children, true).find(i => i.object.isMesh && !skip(i.object) && !(i.object.material?.side === THREE.BackSide)); if (h) gap = Math.min(gap, h.point.y - top); }
+    const h = rc.intersectObjects(scene.children, true).find(i => i.object.isMesh && !skip(i.object) && !(i.object.material?.side === THREE.BackSide)); if (h && h.point.y - top < gap) { gap = h.point.y - top; window.__hcHit = [h.object.geometry?.type, h.object.position.toArray().map(v=>+v.toFixed(2)), +h.point.y.toFixed(2), +h.point.x.toFixed(2), +h.point.z.toFixed(2)]; } }
   sides.forEach((_, m) => { m.side = THREE.FrontSide; });
   return { top: +top.toFixed(2), gap: gap === Infinity ? null : +gap.toFixed(2), pos: [+calvin.position.x.toFixed(2), +calvin.position.y.toFixed(2), +calvin.position.z.toFixed(2)], seat: player.seat?.kind || null }; };
 window.__near = () => target?.label || null; window.__target = () => target; window.__mode = () => mode; window.__objs = OBJS; window.__choose = i => imenu.children[i]?.click();
@@ -318,7 +318,8 @@ function loop() { const t = clock.getElapsedTime(); toonUniforms.uTime.value = t
   const sp = speechAt(wt, talkers);
   talkersAll.forEach((c, i) => { const nm = c.userData.name, bs = c.userData.brain?.state; const loc = localSay[nm]; let text = loc && loc.until > wt ? loc.text : (sp && sp.name === nm ? sp.text : '');
     drawBubble(bubbles[i], bs ? (bs.walking ? '🚶' : actEmoji(bs.act)) : '', text); const bb = bubbles[i]; bb.sp.visible = bb.big || !!bs;
-    const dcam = camera.position.distanceTo(c.position), sc = (bb.big ? THREE.MathUtils.clamp(dcam * 0.16, 3.0, 7.5) : THREE.MathUtils.clamp(dcam * 0.05, 0.8, 2.6)); bb.sp.scale.set(sc, sc * 0.344, 1); bb.sp.position.set(c.position.x, c.position.y + (c.userData.pet ? 1.0 : 3.7 * BOT_S / 1.5) + sc * 0.17, c.position.z); });
+    const dcam = camera.position.distanceTo(c.position), sc = (bb.big ? THREE.MathUtils.clamp(dcam * 0.16, 3.0, 7.5) : THREE.MathUtils.clamp(dcam * 0.05, 0.8, 2.6)); bb.sp.scale.set(sc, sc * 0.344, 1); if (bs?.asleep && !bb.big) { const k = 2.2; bb.sp.scale.set(k, k * 0.344, 1); bb.sp.position.set(c.position.x - 1.2, c.position.y + 2.15 + Math.sin(t * 1.6 + i) * 0.06, c.position.z - 0.2); } // Zzz floats over the pillow, under the roof
+    else bb.sp.position.set(c.position.x, c.position.y + (c.userData.pet ? 1.0 : 3.7 * BOT_S / 1.5) + sc * 0.17, c.position.z); });
   blobs.forEach(([c, m]) => m.position.set(c.position.x + 0.2, heightAt(c.position.x, c.position.z) + 0.02, c.position.z - 0.15));
   if (selected) { const bs = selected.userData.brain.state; card.querySelector('.t').textContent = bs.label + (bs.override ? ' (live)' : ''); card.querySelector('.wt').textContent = selected.userData.task || '—'; ring.position.set(selected.position.x, 0.04, selected.position.z); }
   sky.clouds.children.forEach(c => { c.position.y += Math.sin(t * 0.3 + c.userData.drift * 6) * 0.004; });

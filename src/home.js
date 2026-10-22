@@ -96,7 +96,7 @@ export function makeHome(scene) {
   const lanMat = glowMat(0xffc46e); const lanGeo = []; const halos = [];
   LAN.forEach(([x, z]) => { add(toonMesh(new THREE.CylinderGeometry(0.06, 0.08, 2.1, 6), 0x5a4030), x, 1.05, z); add(toonMesh(B3(0.36, 0.06, 0.36), 0x5a4030), x, 2.37, z);
     const lg = B3(0.26, 0.3, 0.26); lg.translate(x, 2.18, z); lanGeo.push(lg); halos.push([x, 2.18, z, 1.2]); });
-  H.rooms.forEach(r => { const lg = B3(0.22, 0.26, 0.22); lg.translate(r.cx + 1.3, H.h - 0.4, H.z0 - 0.35); lanGeo.push(lg); halos.push([r.cx + 1.3, H.h - 0.4, H.z0 - 0.35, 1.0]); add(toonMesh(B3(0.02, 0.25, 0.02), 0x333333, { outline: false }), r.cx + 1.3, H.h - 0.15, H.z0 - 0.35); });
+  H.rooms.forEach(r => { const lg = B3(0.3, 0.08, 0.3); lg.translate(r.cx + 1.3, H.h - 0.1, H.z0 - 0.35); lanGeo.push(lg); halos.push([r.cx + 1.3, H.h - 0.2, H.z0 - 0.35, 1.0]); }); // ceiling-flush eave lamps: clear the tallest crown (cleartest)
   const lanterns = new THREE.Mesh(mergeAll(lanGeo), lanMat); lanterns.userData.dynamic = true; scene.add(lanterns);
   halos.push([FIRE.x, 0.7, FIRE.z, 2.6]);
   const halo = glowPoints(scene, halos, { size: 70, color: 0xffb860 });
