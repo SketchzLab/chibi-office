@@ -1,0 +1,1 @@
+{"name":"chibi-office","private":true,"type":"module","scripts":{"dev":"vite --host","build":"vite build","preview":"vite preview --host"},"dependencies":{"three":"^0.170.0"},"devDependencies":{"vite":"^5.4.0","puppeteer-core":"^23.0.0"}}
