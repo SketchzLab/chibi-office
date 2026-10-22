@@ -48,9 +48,9 @@ export function makeAtmosphere(scene, tier) {
     sys.push(particles({ n: 60, box: [-18, 18, 0.5, 9, -18, 18], size: 11, color: 0xffb3cf, petals: true, seed: 3 })); // drifting sakura petals
     sys.forEach(s => scene.add(s));
   }
-  // sun rays: CSS overlay (zero GPU geometry), slow breathing
+  // sun rays: static CSS overlay (no blend mode / animation -> no per-frame full-screen recomposite)
   const rays = document.createElement('div'); rays.id = 'rays';
-  rays.style.cssText = 'position:fixed;inset:-20%;pointer-events:none;z-index:1;mix-blend-mode:screen;opacity:.5;background:repeating-conic-gradient(from 200deg at 12% -6%, rgba(255,240,200,.0) 0deg, rgba(255,240,200,.24) 3deg, rgba(255,240,200,0) 7deg, rgba(255,240,200,0) 13deg);-webkit-mask-image:radial-gradient(ellipse at 12% 0%, #000 0%, transparent 70%);mask-image:radial-gradient(ellipse at 12% 0%, #000 0%, transparent 70%);animation:rays 9s ease-in-out infinite alternate';
+  rays.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.42;contain:strict;background:repeating-conic-gradient(from 200deg at 12% -6%, rgba(255,240,200,.0) 0deg, rgba(255,240,200,.24) 3deg, rgba(255,240,200,0) 7deg, rgba(255,240,200,0) 13deg);-webkit-mask-image:radial-gradient(ellipse at 12% 0%, #000 0%, transparent 70%);mask-image:radial-gradient(ellipse at 12% 0%, #000 0%, transparent 70%)';
   const st = document.createElement('style'); st.textContent = '@keyframes rays{from{opacity:.35;transform:rotate(-1deg)}to{opacity:.6;transform:rotate(1.2deg)}}'; document.head.appendChild(st);
   if (tier !== 'low') document.body.appendChild(rays);
   return { update(t) { sys.forEach(s => s.material.uniforms.uTime.value = t); }, systems: sys, rays,

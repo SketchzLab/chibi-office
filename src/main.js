@@ -19,7 +19,7 @@ import { speechAt, GREET, HI_BACK, ZONE } from './dialogue.js';
 import { buildRoot, buildGroup, pickLine, mem } from './talk.js';
 
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 1.75));
+const DPR_CAP = 1.5; renderer.setPixelRatio(Math.min(devicePixelRatio, DPR_CAP));
 renderer.setSize(innerWidth, innerHeight);
 document.body.appendChild(renderer.domElement);
 const atmo = document.createElement('div'); atmo.style.cssText = 'position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at 18% 8%, rgba(255,246,214,.38), rgba(255,246,214,0) 45%), radial-gradient(ellipse at 50% 55%, rgba(0,0,0,0) 60%, rgba(30,60,110,.18) 100%)';
@@ -49,7 +49,7 @@ export { chibis }; window.__scene = scene;
 const player = makePlayer({ scene, camera, controls, bots: chibis }); const calvin = player.chibi; window.__player = player;
 player.setHome(camera.position, controls.target);
 // ---- cozy FX + quality tier ----
-let tier = pickTier(); if (tier === 'low') { toonUniforms.uDetail.value = 0; renderer.setPixelRatio(1); }
+let tier = pickTier(); if (tier === 'low') { toonUniforms.uDetail.value = 0; renderer.setPixelRatio(Math.min(devicePixelRatio, 1)); }
 const atmos = makeAtmosphere(scene, tier);
 const steamFx = tier === 'low' ? null : steam(scene, [...DESKS, BOSS_DESK].map(([x, z]) => z > 0 ? [x + 0.8, 1.1, z - 0.2] : [x - 0.8, 1.1, z + 0.2])); window.__tier = () => tier;
 lightPools(scene, [[-3.9, 7.3, 2.6, 0xffc070, 0.55], [9.6, 3.2, 2.6, 0xffc070, 0.55], [-7.8, 4.6, 3.4, 0xffb060, 0.28], [8.2, -5.2, 3.0, 0xffd090, 0.3], [5.2, 2.0, 2.2, 0xffc890, 0.3], [-7.9, -5.1, 3.0, 0xfff0c0, 0.22]]);
@@ -124,8 +124,9 @@ renderer.domElement.addEventListener('pointerup', e => { if (!down || Math.hypot
 window.__chibiPos = n => { const c = chibis.find(c => c.userData.name === n); return [+c.position.x.toFixed(2), +c.position.z.toFixed(2)]; };
 window.__screenPos = n => { const c = chibis.find(c => c.userData.name === n); const v = c.position.clone(); v.y += 1.8; v.project(camera); return [(v.x + 1) / 2 * innerWidth, (1 - v.y) / 2 * innerHeight]; };
 // FPS meter (?fps)
-const fpsEl = document.createElement('div'); fpsEl.style.cssText='position:fixed;top:6px;left:6px;color:#fff;font:12px monospace;background:#0006;padding:2px 6px;border-radius:4px';
-if (location.search.includes('fps')) document.body.appendChild(fpsEl);
+// subtle always-on FPS counter (top-left, clear of the joystick/buttons; never takes input)
+const fpsEl = document.createElement('div'); fpsEl.id = 'fps'; fpsEl.style.cssText = 'position:fixed;top:max(6px,env(safe-area-inset-top));left:max(6px,env(safe-area-inset-left));z-index:5;pointer-events:none;color:#fff;font:600 10px/1.2 ui-monospace,monospace;background:rgba(20,16,30,.32);padding:2px 5px;border-radius:5px;opacity:.7';
+document.body.appendChild(fpsEl);
 let frames = 0, last = performance.now(); window.__fps = 0;
 const clock = new THREE.Clock();
 // Shared wall clock: routines are driven by UTC epoch seconds (modulo loop length inside each walker),
@@ -146,7 +147,7 @@ const imenu = document.createElement('div'); imenu.id = 'imenu'; document.body.a
 const fcss = document.createElement('style'); fcss.textContent = `#actb{right:auto!important;bottom:auto!important;left:0;top:0;min-height:48px!important;min-width:48px;border-radius:24px!important;font-size:15px;white-space:nowrap;transition:opacity .15s}
 #imenu{right:auto!important;bottom:auto!important;left:0;top:0;max-width:min(300px,78vw)} #imenu button{text-align:left;white-space:normal;min-height:46px;font-size:14px;line-height:1.2;padding:8px 12px}`; document.head.appendChild(fcss);
 const strip = t => t.replace(/^[^\p{L}\p{N}"'(]+/u, '');
-function showMenu(choices) { imenu.replaceChildren(...choices.map((ch, i) => { const b = document.createElement('button'); b.className = 'hudb'; b.type = 'button'; b.textContent = ch.t; b.onclick = e => { e.stopPropagation(); choose(ch); }; return b; })); imenu.classList.add('on'); }
+function showMenu(choices) { imenu._w = imenu._h = 0; imenu.replaceChildren(...choices.map((ch, i) => { const b = document.createElement('button'); b.className = 'hudb'; b.type = 'button'; b.textContent = ch.t; b.onclick = e => { e.stopPropagation(); choose(ch); }; return b; })); imenu.classList.add('on'); }
 function closeTalk() { mode = null; imenu.classList.remove('on'); }
 function openTalk(c) { const n = c.userData.name, wt = wallTime(); const node = buildRoot(n, tctx); mode = { type: 'talk', bot: c, node }; face[n] = wt + 30; say(n, node.say, wt, 6); emoteBot(n, node.emote); showMenu(node.choices); }
 function openGroup(names, wt) { const g = buildGroup(names); mode = { type: 'group', names, node: g }; names.forEach(n => face[n] = wt + 30); say(g.speaker, g.say, wt, 6); emoteBot(g.speaker, g.emote); showMenu(g.choices); }
@@ -205,12 +206,14 @@ actb.addEventListener('click', e => { e.stopPropagation(); if (mode && imenu.cla
     else { mode = { type: 'pet' }; showMenu([{ t: '🐾 Pet Biscuit', run: () => { emoteCalvin('pet', 2.6); petsys.pet(p, clock.getElapsedTime()); say('Biscuit', pick(['Arf! 💛', '*happy wiggles* 🐶', 'Woof woof! 💛']), wallTime() + 0.4, 3); } },
       { t: '🎾 Play fetch', run: () => { emoteCalvin('highfive', 0.9); petsys.throwBall(calvin, clock.getElapsedTime()); say('Calvin', pick(['Fetch, Biscuit!', 'Go get it! 🎾', 'Who\'s a good pup?']), wallTime(), 2.2); setTimeout(() => say('Biscuit', 'Woof! 🎾', wallTime(), 2.5), 3500); } },
       { t: '🐕 Come along, Biscuit!', run: () => { p.mode = 'follow'; p.followUntil = wallTime() + 60; p.slot = Math.floor(wallTime() / 11 + p.seed) + 2; say('Biscuit', '*trots after you* 🐾', wallTime(), 2.5); } }]); } } });
-const v3 = new THREE.Vector3();
+const v3 = new THREE.Vector3(); let _joyR = null, _joyT = 0; function joyRect() { const n = performance.now(); if (n - _joyT > 500) { _joyT = n; const j = document.getElementById('joy'); _joyR = j && j.offsetParent !== null ? j.getBoundingClientRect() : null; } return _joyR; } addEventListener('resize', () => { _joyT = 0; });
+let _pickT = -1, _tgCache = null;
 function interact(wt, t, dt) {
   // pick the best target: seated -> Stand; group of 2+ bots; nearest bot; nearest object
   let tg = null; const cp = calvin.position;
-  const near = chibis.map(c => [c, Math.hypot(c.position.x - cp.x, c.position.z - cp.z)]).filter(([, d]) => d < 3.2).sort((a, b) => a[1] - b[1]);
   const sameLv = o => Math.abs((o.y || 0) - cp.y) < 1.2;
+  if (t - _pickT >= 0.08 || !!player.seat !== (_tgCache?.kind === 'stand')) { _pickT = t;
+  const near = chibis.map(c => [c, Math.hypot(c.position.x - cp.x, c.position.z - cp.z)]).filter(([, d]) => d < 3.2).sort((a, b) => a[1] - b[1]);
   let closeObj = null; { let bd = 0.95; OBJS.forEach(o => { const d = Math.hypot(o.x - cp.x, o.z - cp.z); if (d < bd && sameLv(o)) { bd = d; closeObj = o; } }); }
   const social = near.filter(([c]) => zoneOf(c) !== 'desk');
   if (player.seat) tg = { kind: 'stand', label: player.seat.kind === 'desk' ? '⬆️ Stand up' : '⬆️ Stand', id: 'stand' };
@@ -227,31 +230,49 @@ function interact(wt, t, dt) {
   }
   if (tg) {}
   else { let bd = 1e9; OBJS.forEach(o => { const d = Math.hypot(o.x - cp.x, o.z - cp.z); if (d < o.r && d < bd && sameLv(o)) { bd = d; tg = { kind: 'obj', o, label: typeof o.label === 'function' ? o.label() : o.label, id: 'o' + o.x + o.z }; } }); }
+  _tgCache = tg; } else tg = _tgCache;
   if ((tg?.id) !== (target?.id)) { if (mode && !(tg && (tg.id === mode.bot?.userData.name || tg.kind === 'group' || tg.kind === 'stand'))) closeTalk(); }
   if (tg?.kind === 'pet' && tg.p.mode === 'wander') { tg.p.holdUntil = wt + 4; if (Math.hypot(tg.p.tx - tg.p.x, tg.p.tz - tg.p.z) > 0.2 && !tg.p.waitSet) { tg.p.tx = tg.p.x; tg.p.tz = tg.p.z; } }
-  if (player.look) tg = null; target = tg; actb.style.display = tg ? 'block' : 'none'; if (tg) actb.textContent = mode && imenu.classList.contains('on') ? '✖ Close' : tg.label;
+  if (player.look) tg = null; target = tg; { const dsp = tg ? 'block' : 'none'; if (actb._d !== dsp) { actb._d = dsp; actb.style.display = dsp; } } if (tg) { const lb = mode && imenu.classList.contains('on') ? '✖ Close' : tg.label; if (actb.textContent !== lb) actb.textContent = lb; }
   // greet on approach (once per 25 s), group invite when walking up to 2+ bots
   if (tg?.kind === 'bot') { const n = tg.c.userData.name; if (!greeted[n] || wt - greeted[n] > 25) { greeted[n] = wt; face[n] = wt + 5; emoteBot(n, pick(['wave', 'shywave', 'jump']), 2.0); const m = mem.get(n); say(n, m && Math.random() < 0.5 ? REMEMBER_HI(n, m.topic) : pick(GREET[n]), wt); } }
   if (tg?.kind === 'group' && (!greeted[tg.id] || wt - greeted[tg.id] > 40)) { greeted[tg.id] = wt; const a = tg.names[0]; say(a, pick(['Calvin! Come join us!', 'Boss! Pull up a chair!', 'Ooh, Calvin\'s here! 🎉']), wt); tg.names.forEach(n => { face[n] = wt + 6; emoteBot(n, 'wave', 1.8); }); }
   // floating button + menu beside Calvin's head (screen space, clamped, clear of the joystick)
   if (tg) { v3.set(cp.x, cp.y + 3.0 * CALVIN_S / 1.16, cp.z).project(camera); let x = (v3.x + 1) / 2 * innerWidth + 40, y = (1 - v3.y) / 2 * innerHeight + 24;
-    const bw = actb.offsetWidth, bh = actb.offsetHeight; x = Math.min(Math.max(8, x), innerWidth - bw - 8); y = Math.min(Math.max(60, y), innerHeight - bh - 10);
-    const joy = document.getElementById('joy'); if (joy) { const r = joy.getBoundingClientRect(); if (x < r.right + 8 && y + bh > r.top - 8) y = r.top - bh - 12; }
-    actb.style.transform = `translate(${x | 0}px, ${y | 0}px)`;
-    if (imenu.classList.contains('on')) { const mw = imenu.offsetWidth, mh = imenu.offsetHeight; let mx = Math.min(Math.max(8, x), innerWidth - mw - 8), my = y + bh + 8; if (my + mh > innerHeight - 10) my = y - mh - 8; my = Math.max(60, my);
-      if (joy) { const r = joy.getBoundingClientRect(); if (mx < r.right + 8 && my + mh > r.top - 8) mx = Math.min(r.right + 10, innerWidth - mw - 8); } imenu.style.transform = `translate(${mx | 0}px, ${my | 0}px)`; } }
+    if (actb._lbl !== actb.textContent) { actb._lbl = actb.textContent; actb._w = actb.offsetWidth; actb._h = actb.offsetHeight; } const bw = actb._w, bh = actb._h; x = Math.min(Math.max(8, x), innerWidth - bw - 8); y = Math.min(Math.max(60, y), innerHeight - bh - 10);
+    const joy = joyRect(); if (joy) { const r = joy; if (x < r.right + 8 && y + bh > r.top - 8) y = r.top - bh - 12; }
+    { const tr = `translate(${x | 0}px, ${y | 0}px)`; if (actb._tr !== tr) { actb._tr = tr; actb.style.transform = tr; } }
+    if (imenu.classList.contains('on')) { const mw = imenu._w || (imenu._w = imenu.offsetWidth), mh = imenu._h || (imenu._h = imenu.offsetHeight); let mx = Math.min(Math.max(8, x), innerWidth - mw - 8), my = y + bh + 8; if (my + mh > innerHeight - 10) my = y - mh - 8; my = Math.max(60, my);
+      if (joy) { const r = joy; if (mx < r.right + 8 && my + mh > r.top - 8) mx = Math.min(r.right + 10, innerWidth - mw - 8); } { const tr = `translate(${mx | 0}px, ${my | 0}px)`; if (imenu._tr !== tr) { imenu._tr = tr; imenu.style.transform = tr; } } } }
   else if (imenu.classList.contains('on')) closeTalk();
   // bots face Calvin; emotes layered on top of the routine pose
   chibis.forEach(c => { const n = c.userData.name, P = c.userData.parts, bs = c.userData.brain.state;
-    if (face[n] > wt) { let a = Math.atan2(cp.x - c.position.x, cp.z - c.position.z) - c.rotation.y; a = Math.atan2(Math.sin(a), Math.cos(a));
-      if (bs.seated || bs.walking) P.head.rotation.y = THREE.MathUtils.clamp(a, -0.9, 0.9); else c.rotation.y += a * Math.min(1, dt * 6); }
+    // look-at: one smoothed target yaw, shortest-angle wrap, clamp, dead-zone, distance hysteresis
+    const lk = c.userData.lk || (c.userData.lk = { on: false, yaw: 0 }); const dist = Math.hypot(cp.x - c.position.x, cp.z - c.position.z);
+    lk.on = face[n] > wt && (lk.on ? dist < 4.2 : dist < 3.4);
+    let want = 0;
+    if (lk.on) { let a = Math.atan2(cp.x - c.position.x, cp.z - c.position.z) - c.rotation.y; a = Math.atan2(Math.sin(a), Math.cos(a));
+      // standing still & target far behind the shoulder: turn the body at a capped rate (routine leaves facing alone while idle)
+      if (!bs.seated && !bs.walking && Math.abs(a) > 0.85) { const turn = Math.sign(a) * Math.min(Math.abs(a) - 0.6, dt * 2.6); c.rotation.y += turn; a -= turn; }
+      want = THREE.MathUtils.clamp(a, -0.85, 0.85); }
+    const dy = want - lk.yaw; if (Math.abs(dy) > 0.04 || !lk.on) lk.yaw += dy * Math.min(1, dt * 5);
+    c.userData.lookYaw = Math.abs(lk.yaw) < 0.005 ? 0 : lk.yaw;
     const e = botEmote[n]; if (e && e.until > t) applyPose(c, e.name, t, dt, bs.seated, c.userData.persona); });
 }
 const REMEMBER_HI = (n, topic) => ({ Pixel: `Boss! Still thinking about ${topic}!`, Jun: `Hi Calvin! I sketched something about ${topic}.`, Sage: `Calvin. I've been pondering ${topic}.`, Mika: `Heyy! Our ${topic} chat inspired a new cut!` })[n];
 const pick = a => a[Math.floor(Math.random() * a.length)];
 window.__near = () => target?.label || null; window.__target = () => target; window.__mode = () => mode; window.__objs = OBJS; window.__choose = i => imenu.children[i]?.click();
-let slow = 0; function autoTier(fps, t) { if (tier === 'low' || new URLSearchParams(location.search).get('q') || t < 4) return; slow = fps < 24 ? slow + 1 : 0;
-  if (slow >= 4) { tier = 'low'; toonUniforms.uDetail.value = 0; renderer.setPixelRatio(1); atmos.demote(); if (steamFx) steamFx.visible = false; console.log('quality tier -> low'); } }
+// eager auto quality (desktop + mobile): dynamic resolution steps first, then FX tiers. Recovers resolution if fps is high again.
+const PR_STEPS = [DPR_CAP, 1.25, 1.0, 0.85, 0.7]; let prI = 0, slow = 0, fast = 0, mid = false;
+function setPR() { renderer.setPixelRatio(Math.min(devicePixelRatio, PR_STEPS[prI])); }
+function autoTier(fps, t) { if (new URLSearchParams(location.search).get('q') || t < 3) return; slow = fps < 50 ? slow + 1 : 0; fast = fps > 58 ? fast + 1 : 0;
+  if (slow >= 2) { slow = 0;
+    if (!mid) { mid = true; atmos.demote(); console.log('quality -> mid (no particles/rays)'); }
+    else if (prI < 2) { prI++; setPR(); console.log('res ->', PR_STEPS[prI]); }
+    else if (tier !== 'low') { tier = 'low'; toonUniforms.uDetail.value = 0; if (steamFx) steamFx.visible = false; console.log('quality tier -> low'); }
+    else if (prI < PR_STEPS.length - 1) { prI++; setPR(); console.log('res ->', PR_STEPS[prI]); } }
+  else if (fast >= 6 && prI > 0 && tier !== 'low') { fast = 0; prI--; setPR(); } }
+window.__quality = () => ({ tier, mid, pr: renderer.getPixelRatio() });
 function loop() { const t = clock.getElapsedTime(); toonUniforms.uTime.value = t; atmos.update(t); if (steamFx) steamFx.material.uniforms.uTime.value = t; const dt = Math.min(0.1, t - prevT); prevT = t; const wt = wallTime(); brains.forEach(b => b.update(wt, dt, t));
   island.children.forEach(c => { if (c.userData.float !== undefined) c.position.y += Math.sin(t + c.userData.float) * 0.003; });
   glows.forEach((h,i)=>h.material.opacity=0.5+0.06*Math.sin(t*2+i));

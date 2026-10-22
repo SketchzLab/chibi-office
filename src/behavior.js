@@ -133,6 +133,8 @@ export function applyPose(c, pose, t, dt, seated, b) {
     case 'talk': { const a = Math.sin(t * 3.2), c2 = Math.sin(t * 2.3 + 1); tgt.armL = [-0.9 + a * 0.3, 0.3]; tgt.armR = [-0.7 + c2 * 0.35, -0.3]; tgt.headZ = Math.sin(t * 1.6) * 0.08; tgt.headY = Math.sin(t * 0.9) * 0.2; break; }
     default: { tgt.armL = [0, -0.1 - s * 0.04]; tgt.armR = [0, 0.1 + s * 0.04]; tgt.bodyY = s * 0.025; }
   }
+  // look-at offset from main (smoothed/clamped there); added to the pose's head yaw so they never fight
+  if (c.userData.lookYaw) tgt.headY = THREE.MathUtils.clamp(tgt.headY * 0.3 + c.userData.lookYaw, -0.95, 0.95);
   ['legL', 'legR', 'armL', 'armR'].forEach(n => { P[n].rotation.x += (tgt[n][0] - P[n].rotation.x) * k; P[n].rotation.z += (tgt[n][1] - P[n].rotation.z) * k; });
   P.body.position.y += (tgt.bodyY - P.body.position.y) * k; P.head.rotation.x += (tgt.headX - P.head.rotation.x) * k; P.head.rotation.z += (tgt.headZ - P.head.rotation.z) * k; P.head.rotation.y += (tgt.headY - P.head.rotation.y) * k;
 }
