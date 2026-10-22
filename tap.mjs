@@ -1,0 +1,11 @@
+import puppeteer from 'puppeteer-core';
+const [url, out, who, wh, delay] = process.argv.slice(2); const [w, h] = (wh||'904x1078').split('x').map(Number);
+const b = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', args: ['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader'] });
+const p = await b.newPage(); await p.setViewport({ width: w, height: h, isMobile: true, hasTouch: true });
+p.on('pageerror', e => console.log('ERR', e.message));
+await p.goto(url, { waitUntil: 'networkidle0' }); await new Promise(r => setTimeout(r, +(delay||2500)));
+const [x, y] = await p.evaluate(n => window.__screenPos(n), who); await p.touchscreen.tap(x, y);
+await new Promise(r => setTimeout(r, 600)); await p.screenshot({ path: out });
+console.log('card:', await p.evaluate(() => document.getElementById('card').className + ' | ' + document.getElementById('card').innerText.replace(/\n/g,' / ')));
+await p.touchscreen.tap(30, h - 300); await new Promise(r => setTimeout(r, 400));
+console.log('after tap elsewhere:', await p.evaluate(() => document.getElementById('card').className || '(closed)')); await b.close();
