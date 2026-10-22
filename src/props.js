@@ -64,10 +64,10 @@ export function makeOffice(scene) {
   // open desks: 2 rows x 2, facing camera-ish, plus a spare
   const spots = [[-4.2, -1.8], [-1.6, -1.8], [1.0, -1.8], [-4.2, 1.8], [-1.6, 1.8]];
   spots.forEach(([x, z], i) => { const d = desk(); d.position.set(x, 0, z); if (z > 0) d.rotation.y = Math.PI; g.add(d); });
-  const p = pantry(); p.position.set(3.6, 0, 3.6); p.rotation.y = -Math.PI / 4 - Math.PI / 2 + Math.PI; g.add(p);
-  p.rotation.y = -Math.PI * 0.75; // face island centre
-  [[-6.8, -3.2], [4.4, -4.5], [-6.5, 3.6], [6.8, 0.8]].forEach(([x, z], i) => { const pl = plant(1 + (i % 2) * 0.4); pl.position.set(x, 0, z); g.add(pl); });
-  [[-6.4, 0], [3.0, -1.2], [5.8, 3.8]].forEach(([x, z]) => { const l = lamp(); l.position.set(x, 0, z); g.add(l); });
+  const p = pantry(); p.position.set(4.8, 0, -3.4); p.rotation.y = -Math.PI / 4 - Math.PI / 2 + Math.PI; g.add(p);
+  p.rotation.y = -0.53; // face island centre
+  [[-6.8, -3.2], [1.6, -5.6], [-6.5, 3.6], [5.6, 4.6]].forEach(([x, z], i) => { const pl = plant(1 + (i % 2) * 0.4); pl.position.set(x, 0, z); g.add(pl); });
+  [[-6.4, 0], [-2.8, 4.6], [5.8, 3.8]].forEach(([x, z]) => { const l = lamp(); l.position.set(x, 0, z); g.add(l); });
   scene.add(g);
   return g;
 }
