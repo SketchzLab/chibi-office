@@ -34,12 +34,17 @@ export function makePets(scene, getCalvin) {
   const ball = toonMesh(new THREE.SphereGeometry(0.11, 10, 8), 0xd8f25a); ball.visible = false; scene.add(ball);
   const fetch = { state: null, t0: 0, from: new THREE.Vector3(), to: new THREE.Vector3() };
   const pets = [cat, dog];
-  function plan(p, wt, C) { const slot = Math.floor(wt / 11 + p.seed); if (slot === p.slot) return; p.slot = slot; const h = hash(slot * 7 + p.seed);
+  function plan(p, wt, C) { const slot = Math.floor(wt / 11 + p.seed); if (slot === p.slot) return; if (wt < (p.holdUntil || 0) && p.mode !== 'follow') { p.tx = p.x; p.tz = p.z; return; } p.slot = slot; const h = hash(slot * 7 + p.seed);
     const near = C && C.position.y < 0.5 && Math.hypot(C.position.x - p.x, C.position.z - p.z) < 8;
-    if (p.mode === 'fetch') return;
+    if (p.mode === 'fetch') return; if (wt < (p.followUntil || 0) && near) { p.mode = 'follow'; return; }
     if (near && h < (p === dog ? 0.55 : 0.3)) p.mode = 'follow'; else { p.mode = 'wander'; const s = p.spots[Math.floor(hash(slot + p.seed * 3) * p.spots.length)]; p.tx = s[0]; p.tz = s[1]; } }
   function step(p, dt, t, tx, tz, speed, stopAt = 0.15) { const dx = tx - p.x, dz = tz - p.z, d = Math.hypot(dx, dz); p.moving = d > stopAt;
-    if (p.moving) { const s = Math.min(d, speed * dt); const q = collide({ x: p.x + dx / d * s, z: p.z + dz / d * s }, [], { x: p.x, z: p.z }); p.x = q.x; p.z = q.z; let dr = Math.atan2(dx, dz) - p.rot; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); p.rot += dr * Math.min(1, dt * 8); }
+    if (p.moving) { const s = Math.min(d, speed * dt);
+      // obstacle avoidance: if blocked, slide around it (perpendicular detour) for a moment
+      let ux = dx / d, uz = dz / d; if (t < (p.detourUntil || 0)) { const k = p.detourSide; ux = ux * 0.35 + -dz / d * k; uz = uz * 0.35 + dx / d * k; const m = Math.hypot(ux, uz); ux /= m; uz /= m; }
+      const q = collide({ x: p.x + ux * s, z: p.z + uz * s }, [], { x: p.x, z: p.z }); const moved = Math.hypot(q.x - p.x, q.z - p.z);
+      if (moved < s * 0.3) { p.stuckT = (p.stuckT || 0) + dt; if (p.stuckT > 0.35) { p.detourSide = -(p.detourSide || -1); p.detourUntil = t + 0.9; p.stuckT = 0; } } else p.stuckT = 0;
+      p.x = q.x; p.z = q.z; let dr = Math.atan2(dx, dz) - p.rot; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); p.rot += dr * Math.min(1, dt * 8); }
     return d; }
   return { pets, cat, dog, ball,
     pet(p, t) { p.happyUntil = t + 3; },
@@ -50,9 +55,9 @@ export function makePets(scene, getCalvin) {
       for (const p of pets) { plan(p, wt, C); let sp = p.speed;
         if (p.mode === 'follow') { const bx = C.position.x - Math.sin(C.rotation.y) * 1.3 + (p === cat ? 0.7 : -0.7), bz = C.position.z - Math.cos(C.rotation.y) * 1.3; const d = Math.hypot(bx - p.x, bz - p.z); sp = d > 3 ? p.speed * 2.2 : p.speed * 1.2; step(p, dt, t, bx, bz, sp, 0.4); if (C.position.y > 0.5) p.mode = 'wander'; }
         else if (p.mode === 'fetch') { if (fetch.state === 'fly') { const k = Math.min(1, (t - fetch.t0) / 0.9); ball.position.lerpVectors(fetch.from, fetch.to, k); ball.position.y = 0.11 + (1 - k) * 1.1 + Math.sin(k * Math.PI) * 1.6; if (k >= 1) fetch.state = 'chase'; step(p, dt, t, fetch.to.x, fetch.to.z, p.speed * 2.6); }
-          else if (fetch.state === 'chase') { if (step(p, dt, t, fetch.to.x, fetch.to.z, p.speed * 2.6, 0.3) <= 0.3) fetch.state = 'return'; }
+          else if (fetch.state === 'chase') { if (step(p, dt, t, fetch.to.x, fetch.to.z, p.speed * 2.6, 0.3) <= 0.3 || t - fetch.t0 > 9) fetch.state = 'return'; }
           else if (fetch.state === 'return') { ball.position.set(p.x + Math.sin(p.rot) * 0.5, 0.5, p.z + Math.cos(p.rot) * 0.5); if (step(p, dt, t, C.position.x + Math.sin(C.rotation.y) * 0.9, C.position.z + Math.cos(C.rotation.y) * 0.9, p.speed * 2.4, 0.5) <= 0.5) { fetch.state = 'drop'; fetch.t0 = t; p.happyUntil = t + 2.5; } }
-          else if (fetch.state === 'drop') { ball.position.set(p.x + Math.sin(p.rot) * 0.55, 0.11, p.z + Math.cos(p.rot) * 0.55); if (t - fetch.t0 > 2.5) { fetch.state = null; ball.visible = false; p.mode = 'follow'; } } }
+          else if (fetch.state === 'drop') { ball.position.set(p.x + Math.sin(p.rot) * 0.55, 0.11, p.z + Math.cos(p.rot) * 0.55); if (t - fetch.t0 > 2.5) { fetch.state = null; ball.visible = false; p.mode = 'follow'; p.followUntil = wt + 20; } } }
         else step(p, dt, t, p.tx, p.tz, sp);
         const happy = p.happyUntil > t; const run = p.moving && sp > p.speed * 1.5;
         p.g.position.set(p.x, heightAt(p.x, p.z), p.z); p.g.rotation.y = p.rot;

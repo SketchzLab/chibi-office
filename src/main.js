@@ -179,7 +179,6 @@ const OBJS = [
   seat('meeting', [(GLASS.x0 + GLASS.x1) / 2 - 2.1, (GLASS.z0 + GLASS.z1) / 2], Math.PI / 2, -0.05 + HIPC, 'stand', '🪑 Sit at meeting table', { camDist: 10, camYaw: -0.6 }),
   { label: () => player.carry ? '🍵 Sip coffee' : '☕ Make coffee', x: PANTRY.x - 0.3, z: PANTRY.z + 1.4, r: 1.6, run: () => { const t = clock.getElapsedTime(); if (player.carry) { emoteCalvin('sip', 2.4); say('Calvin', pick(['Ahh, perfect.', 'Mmm. Founder fuel.', 'Best brew on the island.']), wallTime(), 2.5); return; }
     emoteCalvin('water', 2.0); say('Calvin', 'Brewing… ☕', wallTime(), 2); setTimeout(() => { player.carry = true; say('Calvin', 'Fresh brew! ☕', wallTime(), 2.5); }, 2000); } },
-  { label: '🐱 Pet the cat', x: LX - 2.15, z: LZ + 0.85, r: 1.5, run: () => { emoteCalvin('pet', 2.8); const wt = wallTime(); say('Mochi', '💕 purrr… 💕', wt + 0.6, 4); calvinFlag = 'cat'; flagUntil = wt + 90; } },
   { label: '🔭 Look through telescope', x: 2.6, z: -10.35, y: ROOF.y, r: 1.3, run: () => { emoteCalvin('look', 5); player.look = { pos: new THREE.Vector3(2.6, ROOF.y + 2.2, -9.6), tgt: new THREE.Vector3(-8, 6, -70) }; say('Calvin', pick(['Is that… another island? 🏝️', 'I can see the Imagine.ooo blimp!', 'Clouds shaped like a roadmap.', 'A whale-shaped cloud! 🐋']), wallTime() + 1, 3.5); setTimeout(() => { player.look = null; }, 5000); } },
   seat('roof', [-2.5, -10.75], 0, -0.05 + HIPC, 'stand', '🌿 Sit under the pergola', { camDist: 10, camYaw: 0.5, y0: ROOF.y }),
   seat('roof', [1.2, -10.0], -Math.PI / 2, -0.05 + HIPC, 'stand', '☂️ Sit at the parasol table', { camDist: 10, camYaw: 0.6, y0: ROOF.y }),
@@ -205,7 +204,7 @@ actb.addEventListener('click', e => { e.stopPropagation(); if (mode && imenu.cla
     if (p === petsys.cat) { emoteCalvin('pet', 2.8); petsys.pet(p, t); say('Mochi', pick(['💕 purrr… 💕', '😽 mrrp!', '💕 *slow blink* 💕']), wt + 0.5, 3.5); calvinFlag = 'cat'; flagUntil = wt + 90; }
     else { mode = { type: 'pet' }; showMenu([{ t: '🐾 Pet Biscuit', run: () => { emoteCalvin('pet', 2.6); petsys.pet(p, clock.getElapsedTime()); say('Biscuit', pick(['Arf! 💛', '*happy wiggles* 🐶', 'Woof woof! 💛']), wallTime() + 0.4, 3); } },
       { t: '🎾 Play fetch', run: () => { emoteCalvin('highfive', 0.9); petsys.throwBall(calvin, clock.getElapsedTime()); say('Calvin', pick(['Fetch, Biscuit!', 'Go get it! 🎾', 'Who\'s a good pup?']), wallTime(), 2.2); setTimeout(() => say('Biscuit', 'Woof! 🎾', wallTime(), 2.5), 3500); } },
-      { t: '🐕 Come along, Biscuit!', run: () => { p.mode = 'follow'; p.slot = Math.floor(wallTime() / 11 + p.seed) + 2; say('Biscuit', '*trots after you* 🐾', wallTime(), 2.5); } }]); } } });
+      { t: '🐕 Come along, Biscuit!', run: () => { p.mode = 'follow'; p.followUntil = wallTime() + 60; p.slot = Math.floor(wallTime() / 11 + p.seed) + 2; say('Biscuit', '*trots after you* 🐾', wallTime(), 2.5); } }]); } } });
 const v3 = new THREE.Vector3();
 function interact(wt, t, dt) {
   // pick the best target: seated -> Stand; group of 2+ bots; nearest bot; nearest object
@@ -215,12 +214,21 @@ function interact(wt, t, dt) {
   let closeObj = null; { let bd = 0.95; OBJS.forEach(o => { const d = Math.hypot(o.x - cp.x, o.z - cp.z); if (d < bd && sameLv(o)) { bd = d; closeObj = o; } }); }
   const social = near.filter(([c]) => zoneOf(c) !== 'desk');
   if (player.seat) tg = { kind: 'stand', label: player.seat.kind === 'desk' ? '⬆️ Stand up' : '⬆️ Stand', id: 'stand' };
-  else if (closeObj) tg = { kind: 'obj', o: closeObj, label: typeof closeObj.label === 'function' ? closeObj.label() : closeObj.label, id: 'o' + closeObj.x + closeObj.z };
-  else if (social.length >= 2 && social[1][1] < 3.2) tg = { kind: 'group', names: social.map(([c]) => c.userData.name), label: '🎉 Join the chat', id: 'g' + social.map(([c]) => c.userData.name).join() };
-  else if ((() => { const pp = petsys.pets.map(p => [p, Math.hypot(p.x - cp.x, p.z - cp.z)]).filter(([p, d]) => d < 1.7 && Math.abs(p.g.position.y - cp.y) < 1).sort((a, b) => a[1] - b[1])[0]; if (pp && !(near.length && near[0][1] < pp[1])) { tg = { kind: 'pet', p: pp[0], label: pp[0] === petsys.cat ? '🐱 Pet Mochi' : '🐶 Play with Biscuit', id: pp[0].name }; return true; } return false; })()) {}
-  else if (near.length && near[0][1] < 2.5) tg = { kind: 'bot', c: near[0][0], label: '💬 Talk to ' + near[0][0].userData.name, id: near[0][0].userData.name };
+  else {
+    const pp = petsys.pets.map(p => [p, Math.hypot(p.x - cp.x, p.z - cp.z)]).filter(([p, d]) => d < 1.7 && Math.abs(p.g.position.y - cp.y) < 1).sort((a, b) => a[1] - b[1])[0];
+    const petT = pp && !(near.length && near[0][1] < pp[1]) ? { kind: 'pet', p: pp[0], label: pp[0] === petsys.cat ? '🐱 Pet Mochi' : '🐶 Play with Biscuit', id: pp[0].name } : null;
+    const botT = near.length && near[0][1] < 2.5 ? { kind: 'bot', c: near[0][0], label: '💬 Talk to ' + near[0][0].userData.name, id: near[0][0].userData.name } : null;
+    // living things win over seats/objects: pets, then a close bot, then the object
+    if (petT) tg = petT;
+    else if (botT && near[0][1] < 1.6) tg = botT;
+    else if (closeObj) tg = { kind: 'obj', o: closeObj, label: typeof closeObj.label === 'function' ? closeObj.label() : closeObj.label, id: 'o' + closeObj.x + closeObj.z };
+    else if (social.length >= 2 && social[1][1] < 3.2) tg = { kind: 'group', names: social.map(([c]) => c.userData.name), label: '🎉 Join the chat', id: 'g' + social.map(([c]) => c.userData.name).join() };
+    else if (botT) tg = botT;
+  }
+  if (tg) {}
   else { let bd = 1e9; OBJS.forEach(o => { const d = Math.hypot(o.x - cp.x, o.z - cp.z); if (d < o.r && d < bd && sameLv(o)) { bd = d; tg = { kind: 'obj', o, label: typeof o.label === 'function' ? o.label() : o.label, id: 'o' + o.x + o.z }; } }); }
   if ((tg?.id) !== (target?.id)) { if (mode && !(tg && (tg.id === mode.bot?.userData.name || tg.kind === 'group' || tg.kind === 'stand'))) closeTalk(); }
+  if (tg?.kind === 'pet' && tg.p.mode === 'wander') { tg.p.holdUntil = wt + 4; if (Math.hypot(tg.p.tx - tg.p.x, tg.p.tz - tg.p.z) > 0.2 && !tg.p.waitSet) { tg.p.tx = tg.p.x; tg.p.tz = tg.p.z; } }
   if (player.look) tg = null; target = tg; actb.style.display = tg ? 'block' : 'none'; if (tg) actb.textContent = mode && imenu.classList.contains('on') ? '✖ Close' : tg.label;
   // greet on approach (once per 25 s), group invite when walking up to 2+ bots
   if (tg?.kind === 'bot') { const n = tg.c.userData.name; if (!greeted[n] || wt - greeted[n] > 25) { greeted[n] = wt; face[n] = wt + 5; emoteBot(n, pick(['wave', 'shywave', 'jump']), 2.0); const m = mem.get(n); say(n, m && Math.random() < 0.5 ? REMEMBER_HI(n, m.topic) : pick(GREET[n]), wt); } }
