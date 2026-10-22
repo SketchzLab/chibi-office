@@ -2,17 +2,18 @@ import * as THREE from 'three';
 import { toonMesh, toonMat } from './toon.js';
 import { bake } from './bake.js';
 import { cast } from './shadows.js';
-import { ISLAND_R as R, FLOOR, POOL as PL, BACK_Z, TREES, ROOF, STAIRS, BALCONY, PARK, inR } from './layout.js';
+import { ISLAND_R as R, FLOOR, POOL as PL, BACK_Z, TREES, ROOF, STAIRS, BALCONY, PARK, inR, TREE_LIFT, TREE_SPHERES, treeRot } from './layout.js';
 let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 const POOL = new THREE.Vector3(PL.x, 0, PL.z);
 function onGrassRing(x, z) { const r = Math.hypot(x, z); return r < R - 0.7 && (x < FLOOR.x0 - 0.3 || x > FLOOR.x1 + 0.3 || z < FLOOR.z0 - 0.3 || z > FLOOR.z1 + 0.3) && !inR(ROOF, x, z, 0.2) && !inR(STAIRS, x, z, 0.2) && !inR(BALCONY, x, z, 0.1) && Math.abs(Math.hypot(x - PARK.cx, z - PARK.cz) - PARK.r) > 0.5 && Math.hypot(x - PARK.cx, z - PARK.cz) > 1.3; }
-export function tree(s = 1) {
+// canopy spheres [x, y, z, r] (scaled by s); lifted 0.35 so the lowest foliage sits higher. Shared with collision (canopyRadius).
+export function tree(s = 1, rot = null) {
   const g = new THREE.Group();
-  const trunk = toonMesh(new THREE.CylinderGeometry(0.16, 0.24, 1.6, 6), 0x9a6a44); trunk.position.y = 0.8; g.add(trunk);
+  const trunk = toonMesh(new THREE.CylinderGeometry(0.16, 0.24, 1.6 + TREE_LIFT, 6), 0x9a6a44); trunk.position.y = (1.6 + TREE_LIFT) / 2; g.add(trunk);
   const greens = [0x5fb550, 0x6cc45a, 0x4fa548];
-  [[0, 2.1, 0, 1.0], [0.6, 1.8, 0.2, 0.7], [-0.55, 1.85, -0.1, 0.72], [0.1, 2.7, -0.1, 0.7]].forEach(([x, y, z, r], i) => {
+  TREE_SPHERES.forEach(([x, y, z, r], i) => {
     const m = toonMesh(new THREE.SphereGeometry(r, 8, 6), greens[i % 3]); m.position.set(x, y, z); g.add(m); });
-  g.scale.setScalar(s); g.rotation.y = rnd() * 6.28; return g;
+  g.scale.setScalar(s); const rr = rnd() * 6.28; g.rotation.y = rot ?? rr; return g;
 }
 export function makeNature(scene) {
   const g = new THREE.Group(); const updates = [];
@@ -75,7 +76,7 @@ export function makeNature(scene) {
   const bk = toonMesh(new THREE.BoxGeometry(1.8, 0.45, 0.08), 0xc98d55); bk.position.set(0, 0.8, -0.26); bench.add(bk);
   [-0.75, 0.75].forEach(x => { const l = toonMesh(new THREE.BoxGeometry(0.1, 0.48, 0.5), 0x3f6f6a, { outline: false }); l.position.set(x, 0.24, 0); bench.add(l); }); g.add(bench);
   // ---- trees ----
-  TREES.forEach(([x, z, s]) => { const t = tree(s); t.position.set(x, 0, z); cast(x, z, 3.4 * s, 3.0 * s, 0, -0.03, 1.6); g.add(t); });
+  TREES.forEach(([x, z, s], i) => { const t = tree(s, treeRot(i)); t.position.set(x, 0, z); cast(x, z, 3.4 * s, 3.0 * s, 0, -0.03, 1.6); g.add(t); });
   // ---- grass detail (instanced, no outlines: cheap) ----
   const tuftGeo = new THREE.ConeGeometry(0.08, 0.38, 3, 1, true); tuftGeo.translate(0, 0.17, 0);
   const NT = 950; const tufts = new THREE.InstancedMesh(tuftGeo, toonMat(0x63b852), NT); tufts.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(NT * 3).map((_, i) => 0.85 + ((i * 7919) % 100) / 100 * 0.3), 3);

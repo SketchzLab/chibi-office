@@ -21,9 +21,9 @@ const loungeSeats = [
 ];
 function loungePlace(i) { const s = loungeSeats[i]; return { pos: s.pos, rot: s.rot, seat: SEAT_SOFA, approach: [[-4.6, 0.25], ...s.via, s.pos] }; }
 const doorX = (GLASS.door0 + GLASS.x1) / 2, tcx = (GLASS.x0 + GLASS.x1) / 2, tcz = (GLASS.z0 + GLASS.z1) / 2;
-const stools = [[tcx + 0.8, tcz + 1.3], [tcx + 2.1, tcz], [tcx - 0.8, tcz + 1.3], [tcx + 0.8, tcz - 1.3]].map(([x, z]) => [x, z, Math.atan2(tcx - x, tcz - z)]); // face the table centre
+const stools = [[tcx + 0.8, tcz + 1.3], [tcx + 1.7, tcz] /* head clears the glass side pane */, [tcx - 0.8, tcz + 1.3], [tcx + 0.8, tcz - 1.3]].map(([x, z]) => [x, z, Math.atan2(tcx - x, tcz - z)]); // face the table centre
 function meetingPlace(i) { const [x, z, r] = stools[i]; const via = [[-4.6, -0.25], [doorX, GLASS.z1 + 1.0], [doorX, GLASS.z1 - 0.5]];
-  if (i === 3) via.push([tcx + 2.6, tcz - 1.3]); if (i === 2) via.push([tcx - 0.8, GLASS.z1 - 0.5]);
+  if (i === 3) via.push([tcx + 1.65, tcz - 1.3]); if (i === 2) via.push([doorX, GLASS.z1 - 1.05], [tcx - 0.8, GLASS.z1 - 1.05]); // keep heads ≥ head radius off the panes
   return { pos: [x, z], rot: r, seat: SEAT_STOOL, approach: [...via, [x, z]] }; }
 function pacePlace() { return { pos: [-3.4, -6.5], rot: Math.PI, seat: null, pace: [[-3.4, -6.5], [-0.6, -6.5]], approach: [[-4.0, -0.25], [-4.0, -5.0], [-3.4, -6.5]] }; }
 // ---- expansion places (routes leave the office on the open right side / front) ----
@@ -34,7 +34,7 @@ const roofSpots = [ // [x, z, rot, seat?, pose]
 function roofPlace(i) { const [x, z, r, seated, pose] = roofSpots[i % 4]; return { pos: [x, z], rot: r, seat: seated ? SEAT_STOOL + 0.0 : null, pose, approach: [...TO_ROOF, [x, -9.3], [x, z]] }; }
 const parkSpots = () => [[...PARK.benches[0], true], [...PARK.benches[1], true], [PARK.blanket[0] - 0.3, PARK.blanket[1], -2.4, 'blanket'], [PARK.blanket[0] + 0.4, PARK.blanket[1] + 0.3, -2.4, 'blanket']];
 function parkPlace(i) { const [x, z, r, kind] = parkSpots()[i % 4]; const fx = x - Math.sin(r) * 0.0; return { pos: [fx, z], rot: r, seat: kind === 'blanket' ? -0.32 : SEAT_STOOL, approach: [[1.0, 0.25], [2.2, 7.0], [4.6, 8.4], [x + Math.sin(r) * 1.0, z + Math.cos(r) * 1.0], [fx, z]] }; }
-function viewPlace(i) { const z = [-0.9, 1.1][i % 2]; return { pos: [BALCONY.x1 - 0.65, z], rot: Math.PI / 2, seat: null, pose: 'lean', approach: [[9.2, 0.25], [12.2, 0.25], [BALCONY.x0 + 0.4, z], [BALCONY.x1 - 0.65, z]] }; }
+function viewPlace(i) { const z = [-0.9, 1.1][i % 2]; return { pos: [BALCONY.x1 - 0.5, z], rot: Math.PI / 2, seat: null, pose: 'lean', approach: [[9.2, 0.25], [12.2, 0.25], [BALCONY.x0 + 0.4, z], [BALCONY.x1 - 0.5, z]] }; }
 // every seated spot a bot can use (for the facing audit)
 export function seatPlaces() { const out = [];
   DESKS.forEach((_, i) => out.push({ name: 'desk ' + i, ...deskPlace(i) })); loungeSeats.forEach((_, i) => out.push({ name: 'lounge ' + i, ...loungePlace(i) }));
@@ -107,7 +107,7 @@ export function makeBrain(chibi, persona) {
 // ---------- Poses ----------
 export function applyPose(c, pose, t, dt, seated, b) {
   const P = c.userData.parts, pr = c.userData.props, k = Math.min(1, dt * 9);
-  const tgt = { legL: [0, 0], legR: [0, 0], armL: [0, -0.1], armR: [0, 0.1], bodyY: 0, headX: 0, headZ: Math.sin(t * 1.1) * 0.05, headY: 0 };
+  const tgt = { legL: [0, 0], legR: [0, 0], armL: [0, -0.1], armR: [0, 0.1], bodyY: 0, bodyX: 0, bodyZ: 0, headX: 0, headZ: Math.sin(t * 1.1) * 0.05, headY: 0 };
   const s = Math.sin(t * 2.2);
   if (seated) { tgt.legL = [-1.25, -0.06]; tgt.legR = [-1.25, 0.06]; }
   pr.cup.visible = pose === 'sip'; pr.spinner.visible = pose === 'fidget'; pr.pencil.visible = pose === 'sketch'; pr.pad.visible = pose === 'sketch'; pr.book.visible = pose === 'read'; pr.ctrl.visible = pose === 'game';
@@ -133,8 +133,8 @@ export function applyPose(c, pose, t, dt, seated, b) {
     case 'pet': { tgt.armR = [-1.2 + Math.sin(t * 6) * 0.15, -0.2]; tgt.headX = 0.35; tgt.headZ = 0.1; break; }
     case 'look': { tgt.armR = [-2.4, -0.7]; tgt.armL = [-1.6, 0.4]; tgt.headX = -0.35; break; }
     case 'water': { tgt.armR = [-1.4, -0.2]; tgt.headX = 0.3; tgt.bodyY = Math.sin(t * 3) * 0.02; break; }
-    case 'lean': { tgt.armL = [-1.35, 0.35]; tgt.armR = [-1.35, -0.35]; tgt.headX = -0.05 + Math.sin(t * 0.6) * 0.05; tgt.headY = Math.sin(t * 0.3) * 0.3; tgt.bodyY = -0.02; break; }
-    case 'leanBob': { tgt.armL = [-1.35, 0.35]; tgt.armR = [-1.35, -0.35]; tgt.headX = Math.max(0, Math.sin(t * 7.6)) * 0.18; tgt.headZ = Math.sin(t * 3.8) * 0.1; break; }
+    case 'lean': { tgt.armL = [-1.15, 0.42]; tgt.armR = [-1.15, -0.42]; tgt.bodyX = 0.16 + Math.sin(t * 0.7) * 0.02; tgt.bodyZ = Math.sin(t * 0.45) * 0.03; tgt.headX = -0.12 + Math.sin(t * 0.6) * 0.04; tgt.headZ = Math.sin(t * 0.35) * 0.12; tgt.headY = Math.sin(t * 0.23) * 0.25; break; }
+    case 'leanBob': { tgt.armL = [-1.15, 0.42]; tgt.armR = [-1.15, -0.42]; tgt.bodyX = 0.16; tgt.headX = -0.05 + Math.max(0, Math.sin(t * 7.6)) * 0.16; tgt.headZ = Math.sin(t * 3.8) * 0.1; break; }
     case 'wave': { tgt.armR = [-2.9, -0.4 + Math.sin(t * 12) * 0.35]; tgt.headX = -0.1; break; }
     case 'talk': { const a = Math.sin(t * 3.2), c2 = Math.sin(t * 2.3 + 1); tgt.armL = [-0.9 + a * 0.3, 0.3]; tgt.armR = [-0.7 + c2 * 0.35, -0.3]; tgt.headZ = Math.sin(t * 1.6) * 0.08; tgt.headY = Math.sin(t * 0.9) * 0.2; break; }
     default: { tgt.armL = [0, -0.1 - s * 0.04]; tgt.armR = [0, 0.1 + s * 0.04]; tgt.bodyY = s * 0.025; }
@@ -142,5 +142,5 @@ export function applyPose(c, pose, t, dt, seated, b) {
   // look-at offset from main (smoothed/clamped there); added to the pose's head yaw so they never fight
   if (c.userData.lookYaw) tgt.headY = THREE.MathUtils.clamp(tgt.headY * 0.3 + c.userData.lookYaw, -0.95, 0.95);
   ['legL', 'legR', 'armL', 'armR'].forEach(n => { P[n].rotation.x += (tgt[n][0] - P[n].rotation.x) * k; P[n].rotation.z += (tgt[n][1] - P[n].rotation.z) * k; });
-  P.body.position.y += (tgt.bodyY - P.body.position.y) * k; P.head.rotation.x += (tgt.headX - P.head.rotation.x) * k; P.head.rotation.z += (tgt.headZ - P.head.rotation.z) * k; P.head.rotation.y += (tgt.headY - P.head.rotation.y) * k;
+  P.body.position.y += (tgt.bodyY - P.body.position.y) * k; P.body.rotation.x += (tgt.bodyX - P.body.rotation.x) * k; P.body.rotation.z += (tgt.bodyZ - P.body.rotation.z) * k; P.head.rotation.x += (tgt.headX - P.head.rotation.x) * k; P.head.rotation.z += (tgt.headZ - P.head.rotation.z) * k; P.head.rotation.y += (tgt.headY - P.head.rotation.y) * k;
 }

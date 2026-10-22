@@ -4,7 +4,7 @@ import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeom
 import { toonMesh } from './toon.js';
 import { bake } from './bake.js';
 import { cast } from './shadows.js';
-import { FLOOR, BACK_Z, LEFT_X, GLASS, LOUNGE, DESKS, PANTRY, WALKWAY, BOSS_DESK, GLASS_H } from './layout.js';
+import { FLOOR, BACK_Z, LEFT_X, GLASS, LOUNGE, DESKS, PANTRY, WALKWAY, BOSS_DESK, GLASS_H , PLANT_SPHERES, PLANTS } from './layout.js';
 // Phone-friendly glow: emissive screen + additive soft halo quad (no post-process bloom).
 const haloTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
   const r = g.createRadialGradient(32, 32, 0, 32, 32, 32); r.addColorStop(0, 'rgba(255,255,255,1)'); r.addColorStop(1, 'rgba(255,255,255,0)');
@@ -46,7 +46,7 @@ function desk() {
 function plant(scale = 1) {
   const g = new THREE.Group();
   const pot = toonMesh(new THREE.CylinderGeometry(0.3, 0.22, 0.45, 10), 0xe8d6c0); pot.position.y = 0.22; g.add(pot);
-  [[0, 0.75, 0, 0.42], [0.2, 0.95, 0.1, 0.3], [-0.18, 1.05, -0.05, 0.28]].forEach(([x, y, z, r]) => { const f = toonMesh(new THREE.IcosahedronGeometry(r, 1), 0x5fae5a); f.position.set(x, y, z); g.add(f); });
+  PLANT_SPHERES.forEach(([x, y, z, r]) => { const f = toonMesh(new THREE.IcosahedronGeometry(r, 1), 0x5fae5a); f.position.set(x, y, z); g.add(f); });
   g.scale.setScalar(scale); return g;
 }
 function lamp() {
@@ -200,7 +200,7 @@ export function makeOffice(scene) {
     const cupT = toonMesh(new THREE.CylinderGeometry(0.1, 0.05, 0.16, 8), 0xffc94a); cupT.position.set(-0.95, 1.12, -0.2); d.add(cupT);
     const rug = toonMesh(new THREE.CylinderGeometry(1.9, 1.9, 0.02, 24), 0xc94f4f, { outline: false }); rug.scale.set(1, 1, 0.75); rug.position.set(x, 0.012, z - 0.3); g.add(rug); }
   cast(PANTRY.x + 0.4, PANTRY.z, 6.2, 2.4, PANTRY.ry); const p = pantry(); p.position.set(PANTRY.x, 0, PANTRY.z); p.rotation.y = PANTRY.ry; g.add(p);
-  [[-4.6, -7.2], [7.4, 2.6], [-2.4, 7.2], [6.6, 6.9], [10.2, -1.2]].forEach(([x, z], i) => { const pl = plant(1.1 + (i % 2) * 0.4); pl.position.set(x, 0, z); cast(x, z, 1.4, 1.4); g.add(pl); });
+  PLANTS.forEach(([x, z, sc]) => { const pl = plant(sc); pl.position.set(x, 0, z); cast(x, z, 1.4, 1.4); g.add(pl); });
   [[-3.9, 7.3], [9.6, 3.2]].forEach(([x, z]) => { const l = lamp(); l.position.set(x, 0, z); cast(x, z, 1.0, 1.0); g.add(l); });
   cozy(g);
   scene.add(g); bake(g);

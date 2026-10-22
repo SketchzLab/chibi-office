@@ -172,23 +172,24 @@ function runAct(a, bot, wt) { const n = bot?.userData.name;
 // interactable objects: { label, x, z, r, run }
 const { cx: LX, cz: LZ } = LOUNGE; const HIPC = 0.37 * (1.5 - CALVIN_S);
 const bossGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: radial, color: 0x9ff0ff, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending })); bossGlow.scale.set(2.4, 1.4, 1); bossGlow.position.set(BOSS_DESK[0], 1.45, BOSS_DESK[1] + 0.22); bossGlow.visible = false; scene.add(bossGlow);
+const RAIL_LEAN = 0.5; // stand this far from the balcony top rail so forearms rest on it
 const seat = (kind, pos, rot, y, pose, label, extra = {}) => ({ label, seatDef: { kind, pos, rot }, x: pos[0], z: pos[1], y: extra.y0 || 0, r: 1.4, run: () => { player.sitAt({ kind, pos, rot, y, pose, ...extra }); closeTalk(); onSit(kind); } });
 const OBJS = [
   seat('desk', [BOSS_DESK[0], BOSS_DESK[1] - 1.0], 0, 0.07 + HIPC, 'type', '💼 Sit & work', { camDist: 8.5, camYaw: Math.PI - 0.7, onStand: () => { bossGlow.visible = false; } }),
   seat('sofa', [LX - 1.95, LZ + 0.5], Math.PI / 2, -0.06 + HIPC, 'stand', '🛋️ Sit on sofa', { camDist: 11, camYaw: 0.55 }),
   seat('sofa', [LX + 2.1, LZ - 0.9], -1.1, /* armchair group ry (back at local -z) -> sit facing its front */ -0.04 + HIPC, 'stand', '🪑 Sit in armchair', { camDist: 11, camYaw: 0.5 }),
-  seat('meeting', [(GLASS.x0 + GLASS.x1) / 2 - 2.1, (GLASS.z0 + GLASS.z1) / 2], Math.PI / 2, -0.05 + HIPC, 'stand', '🪑 Sit at meeting table', { camDist: 10, camYaw: -0.6 }),
+  seat('meeting', [(GLASS.x0 + GLASS.x1) / 2 - 1.95 /* head clears the left wall */, (GLASS.z0 + GLASS.z1) / 2], Math.PI / 2, -0.05 + HIPC, 'stand', '🪑 Sit at meeting table', { camDist: 10, camYaw: -0.6 }),
   { label: () => player.carry ? '🍵 Sip coffee' : '☕ Make coffee', x: PANTRY.x - 0.3, z: PANTRY.z + 1.4, r: 1.6, run: () => { const t = clock.getElapsedTime(); if (player.carry) { emoteCalvin('sip', 2.4); say('Calvin', pick(['Ahh, perfect.', 'Mmm. Founder fuel.', 'Best brew on the island.']), wallTime(), 2.5); return; }
     emoteCalvin('water', 2.0); say('Calvin', 'Brewing… ☕', wallTime(), 2); setTimeout(() => { player.carry = true; say('Calvin', 'Fresh brew! ☕', wallTime(), 2.5); }, 2000); } },
-  { label: '🔭 Look through telescope', x: 2.6, z: -10.35, y: ROOF.y, r: 1.3, run: () => { emoteCalvin('look', 5); player.look = { pos: new THREE.Vector3(2.6, ROOF.y + 2.2, -9.6), tgt: new THREE.Vector3(-8, 6, -70) }; say('Calvin', pick(['Is that… another island? 🏝️', 'I can see the Imagine.ooo blimp!', 'Clouds shaped like a roadmap.', 'A whale-shaped cloud! 🐋']), wallTime() + 1, 3.5); setTimeout(() => { player.look = null; }, 5000); } },
+  { label: '🔭 Look through telescope', x: 2.6, z: -10.35, fx: 2.6, fz: -14, y: ROOF.y, r: 1.3, run: () => { emoteCalvin('look', 5); player.look = { pos: new THREE.Vector3(2.6, ROOF.y + 2.2, -9.6), tgt: new THREE.Vector3(-8, 6, -70) }; say('Calvin', pick(['Is that… another island? 🏝️', 'I can see the Imagine.ooo blimp!', 'Clouds shaped like a roadmap.', 'A whale-shaped cloud! 🐋']), wallTime() + 1, 3.5); setTimeout(() => { player.look = null; }, 5000); } },
   seat('roof', [-2.5, -10.75], 0, -0.05 + HIPC, 'stand', '🌿 Sit under the pergola', { camDist: 10, camYaw: 0.5, y0: ROOF.y }),
   seat('roof', [1.2, -10.0], -Math.PI / 2, -0.05 + HIPC, 'stand', '☂️ Sit at the parasol table', { camDist: 10, camYaw: 0.6, y0: ROOF.y }),
-  { label: '🌅 Lean on railing · Enjoy the view', x: BALCONY.x1 - 0.65, z: 0.1, r: 1.3, run: () => { player.sitAt({ kind: 'view', pos: [BALCONY.x1 - 0.65, 0.1], rot: Math.PI / 2, y: 0, pose: 'lean', look: { pos: new THREE.Vector3(BALCONY.x1 - 4.2, 2.4, -1.2), tgt: new THREE.Vector3(70, -4, 14) } }); closeTalk(); say('Calvin', pick(['What a view… ☁️', 'This is why we built on a floating island.', 'Breathe in. Breathe out. 🌤️']), wallTime() + 0.8, 4); } },
+  { label: '🌅 Lean on railing · Enjoy the view', x: BALCONY.x1 - 0.65, z: 0.1, r: 1.3, run: () => { player.sitAt({ kind: 'view', standing: true, pos: [BALCONY.x1 - RAIL_LEAN, 0.1], rot: Math.PI / 2 /* +x: out over the cliff, back to the office */, y: 0, pose: 'lean', look: { pos: new THREE.Vector3(BALCONY.x1 - 4.2, 2.4, -1.2), tgt: new THREE.Vector3(70, -4, 14) } }); closeTalk(); say('Calvin', pick(['What a view… ☁️', 'This is why we built on a floating island.', 'Breathe in. Breathe out. 🌤️']), wallTime() + 0.8, 4); } },
   ...PARK.benches.map(([x, z, ry]) => seat('park', [x + Math.sin(ry) * 0.05, z + Math.cos(ry) * 0.05], ry, -0.05 + HIPC, 'stand', '🪑 Sit on park bench', { camDist: 10, camYaw: 0.5 })),
   seat('park', [PARK.blanket[0], PARK.blanket[1] - 0.2], -2.4, -0.32 + HIPC, 'stand', '🧺 Picnic on the blanket', { camDist: 9, camYaw: 0.6 }),
-  { label: '⛲ Toss a coin in the fountain', x: PARK.cx - 1.4, z: PARK.cz - 0.6, r: 0.9, run: () => { emoteCalvin('water', 1.6); say('Calvin', pick(['🪙 *plink* I wish for… more cozy days.', '🪙 Wish: the build stays green.', '🪙 Wish granted? We\'ll see ✨']), wallTime(), 3.5); } },
-  { label: '📚 Browse books', x: -2.75, z: -6.7, r: 1.6, run: () => { emoteCalvin('read', 2.5); say('Calvin', pick(['"Zero to One"… classic.', '"The Cozy Startup". Must read.', '"Shaders for Cats". Hmm.']), wallTime(), 3); } },
-  { label: '🖍️ Doodle on whiteboard', x: 2.9, z: -6.8, r: 1.4, run: () => { emoteCalvin('sketch', 2.5); say('Calvin', pick(['Drew a tiny cat. 🐱', 'Q4 plan: ☕ → 🚀', 'Added a smiley. Morale +10.']), wallTime(), 3); } },
+  { label: '⛲ Toss a coin in the fountain', x: PARK.cx - 1.4, z: PARK.cz - 0.6, fx: PARK.cx, fz: PARK.cz, r: 0.9, run: () => { emoteCalvin('water', 1.6); say('Calvin', pick(['🪙 *plink* I wish for… more cozy days.', '🪙 Wish: the build stays green.', '🪙 Wish granted? We\'ll see ✨']), wallTime(), 3.5); } },
+  { label: '📚 Browse books', x: -2.75, z: -6.7, fx: -2.75, fz: -9, r: 1.6, run: () => { emoteCalvin('read', 2.5); say('Calvin', pick(['"Zero to One"… classic.', '"The Cozy Startup". Must read.', '"Shaders for Cats". Hmm.']), wallTime(), 3); } },
+  { label: '🖍️ Doodle on whiteboard', x: 2.9, z: -6.8, fx: 2.9, fz: -9, r: 1.4, run: () => { emoteCalvin('sketch', 2.5); say('Calvin', pick(['Drew a tiny cat. 🐱', 'Q4 plan: ☕ → 🚀', 'Added a smiley. Morale +10.']), wallTime(), 3); } },
   ...[[-4.6, -7.2], [7.4, 2.6], [-2.4, 7.2], [6.6, 6.9], [10.2, -1.2], [-10.2, 7.3], [10.1, 7.1]].map(([x, z]) => ({ label: '💧 Water plant', x, z, r: 1.3, run: () => { emoteCalvin('water', 2.4); say('Calvin', pick(['There you go, buddy 🌱', 'Grow big and leafy!', 'Hydration is self-care 💧']), wallTime(), 3); } })),
 ];
 function onSit(kind) { const wt = wallTime();
@@ -200,7 +201,7 @@ actb.addEventListener('click', e => { e.stopPropagation(); if (mode && imenu.cla
   if (target.kind === 'stand') { player.stand(); closeTalk(); return; }
   if (target.kind === 'group') return openGroup(target.names, wt);
   if (target.kind === 'bot') return openTalk(target.c);
-  if (target.kind === 'obj') target.o.run();
+  if (target.kind === 'obj') { const o = target.o; if (!o.seatDef && o.face !== false) { const fx = o.fx ?? o.x, fz = o.fz ?? o.z; if (Math.hypot(fx - calvin.position.x, fz - calvin.position.z) > 0.05) calvin.rotation.y = Math.atan2(fx - calvin.position.x, fz - calvin.position.z); } o.run(); } // standing interactions face their object
   if (target.kind === 'pet') { const p = target.p, t = clock.getElapsedTime();
     if (p === petsys.cat) { emoteCalvin('pet', 2.8); petsys.pet(p, t); say('Mochi', pick(['💕 purrr… 💕', '😽 mrrp!', '💕 *slow blink* 💕']), wt + 0.5, 3.5); calvinFlag = 'cat'; flagUntil = wt + 90; }
     else { mode = { type: 'pet' }; showMenu([{ t: '🐾 Pet Biscuit', run: () => { emoteCalvin('pet', 2.6); petsys.pet(p, clock.getElapsedTime()); say('Biscuit', pick(['Arf! 💛', '*happy wiggles* 🐶', 'Woof woof! 💛']), wallTime() + 0.4, 3); } },
@@ -262,6 +263,16 @@ function interact(wt, t, dt) {
 const REMEMBER_HI = (n, topic) => ({ Pixel: `Boss! Still thinking about ${topic}!`, Jun: `Hi Calvin! I sketched something about ${topic}.`, Sage: `Calvin. I've been pondering ${topic}.`, Mika: `Heyy! Our ${topic} chat inspired a new cut!` })[n];
 const pick = a => a[Math.floor(Math.random() * a.length)];
 window.__seatAudit = () => [...OBJS.filter(o => o.seatDef).map(o => ({ who: 'Calvin', label: o.label, pos: o.seatDef.pos, rot: o.seatDef.rot })), ...seatPlaces().map(s => ({ who: 'bot', label: s.name, pos: s.pos, rot: s.rot }))];
+// test hook: vertical clearance above Calvin's head (crown + extra for the tallest chibi) against any static mesh overhead
+window.__Box3 = THREE.Box3;
+window.__headClear = () => { scene.updateMatrixWorld(true); const hb = new THREE.Box3().setFromObject(calvin.userData.parts.head), extra = Math.max(0, ...chibis.map(c => new THREE.Box3().setFromObject(c.userData.parts.head).max.y - c.position.y)) - (hb.max.y - calvin.position.y);
+  const top = hb.max.y + Math.max(0, extra), cx = (hb.min.x + hb.max.x) / 2, cz = (hb.min.z + hb.max.z) / 2, rx = (hb.max.x - hb.min.x) / 2 * 0.8, rz = (hb.max.z - hb.min.z) / 2 * 0.8;
+  const rc = new THREE.Raycaster(); rc.far = 3; rc.camera = camera; let gap = Infinity; const skip = o => { for (let n = o; n; n = n.parent) if (n.userData.chibi || n.userData.pet || n.userData.name || n.isSprite) return true; return !o.visible; };
+  const sides = new Map(); scene.traverse(o => { const m = o.material; if (o.isMesh && m && !Array.isArray(m) && m.side === THREE.FrontSide) { sides.set(m, 1); m.side = THREE.DoubleSide; } }); // undersides of open cones etc.
+  for (const [ox, oz] of [[0, 0], [rx, 0], [-rx, 0], [0, rz], [0, -rz]]) { rc.set(new THREE.Vector3(cx + ox, top - 0.6, cz + oz), new THREE.Vector3(0, 1, 0));
+    const h = rc.intersectObjects(scene.children, true).find(i => i.object.isMesh && !skip(i.object) && !(i.object.material?.side === THREE.BackSide)); if (h) gap = Math.min(gap, h.point.y - top); }
+  sides.forEach((_, m) => { m.side = THREE.FrontSide; });
+  return { top: +top.toFixed(2), gap: gap === Infinity ? null : +gap.toFixed(2), pos: [+calvin.position.x.toFixed(2), +calvin.position.y.toFixed(2), +calvin.position.z.toFixed(2)], seat: player.seat?.kind || null }; };
 window.__near = () => target?.label || null; window.__target = () => target; window.__mode = () => mode; window.__objs = OBJS; window.__choose = i => imenu.children[i]?.click();
 // eager auto quality (desktop + mobile): dynamic resolution steps first, then FX tiers. Recovers resolution if fps is high again.
 const PR_STEPS = [DPR_CAP, 1.25, 1.0, 0.85, 0.7]; let prI = 0, slow = 0, fast = 0, mid = false;

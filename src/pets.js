@@ -42,14 +42,14 @@ export function makePets(scene, getCalvin) {
     if (p.moving) { const s = Math.min(d, speed * dt);
       // obstacle avoidance: if blocked, slide around it (perpendicular detour) for a moment
       let ux = dx / d, uz = dz / d; if (t < (p.detourUntil || 0)) { const k = p.detourSide; ux = ux * 0.35 + -dz / d * k; uz = uz * 0.35 + dx / d * k; const m = Math.hypot(ux, uz); ux /= m; uz /= m; }
-      const q = collide({ x: p.x + ux * s, z: p.z + uz * s }, [], { x: p.x, z: p.z }); const moved = Math.hypot(q.x - p.x, q.z - p.z);
+      const q = collide({ x: p.x + ux * s, z: p.z + uz * s }, [], { x: p.x, z: p.z }, true); const moved = Math.hypot(q.x - p.x, q.z - p.z);
       if (moved < s * 0.3) { p.stuckT = (p.stuckT || 0) + dt; if (p.stuckT > 0.35) { p.detourSide = -(p.detourSide || -1); p.detourUntil = t + 0.9; p.stuckT = 0; } } else p.stuckT = 0;
       p.x = q.x; p.z = q.z; let dr = Math.atan2(dx, dz) - p.rot; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); p.rot += dr * Math.min(1, dt * 8); }
     return d; }
   return { pets, cat, dog, ball,
     pet(p, t) { p.happyUntil = t + 3; },
     throwBall(C, t) { const dir = new THREE.Vector3(Math.sin(C.rotation.y), 0, Math.cos(C.rotation.y)); fetch.from.set(C.position.x, 1.2, C.position.z);
-      const q = collide({ x: C.position.x + dir.x * 5.5, z: C.position.z + dir.z * 5.5 }, [], { x: C.position.x, z: C.position.z }); fetch.to.set(q.x, 0.11, q.z); fetch.state = 'fly'; fetch.t0 = t; ball.visible = true; dog.mode = 'fetch'; },
+      const q = collide({ x: C.position.x + dir.x * 5.5, z: C.position.z + dir.z * 5.5 }, [], { x: C.position.x, z: C.position.z }, true); fetch.to.set(q.x, 0.11, q.z); fetch.state = 'fly'; fetch.t0 = t; ball.visible = true; dog.mode = 'fetch'; },
     get fetching() { return fetch.state; },
     update(dt, t, wt) { const C = getCalvin();
       for (const p of pets) { plan(p, wt, C); let sp = p.speed;
