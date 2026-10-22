@@ -26,7 +26,7 @@ export function makeNature(scene) {
         vec3 deep = vec3(0.16,0.58,0.78), shallow = vec3(0.45,0.88,0.92);
         vec3 c = mix(deep, shallow, smoothstep(0.2,0.95,edge)); c = mix(c, c*1.15, smoothstep(-0.2,0.7,r));
         vec3 V = normalize(cameraPosition - vW); float fr = pow(1.0-abs(V.y),3.0); c = mix(c, vec3(0.85,0.95,1.0), fr*0.5);
-        c = mix(c, vec3(1.0), step(1.05, r)*0.6); c = mix(c, vec3(1.0), smoothstep(0.88,0.97,edge)*0.8);
+        c = mix(c, vec3(1.0), step(1.05, r)*0.6); { vec2 g = floor(vW.xz*6.0); float hh = fract(sin(dot(g, vec2(12.9898,78.233)))*43758.5453); float tw = pow(max(0.0, sin(uT*2.5 + hh*40.0)), 24.0)*step(0.86, hh); c += vec3(1.0,0.98,0.9)*tw*0.8; float ca = sin(vW.x*5.0+sin(vW.z*4.0+uT)*1.5+uT*0.8)*sin(vW.z*5.5-uT*0.6); c += vec3(0.08,0.12,0.12)*smoothstep(0.6,0.95,ca); } c = mix(c, vec3(1.0), smoothstep(0.88,0.97,edge)*0.8);
         gl_FragColor = vec4(c, 0.94);
         #include <colorspace_fragment>
       }` });
