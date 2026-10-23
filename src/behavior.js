@@ -35,7 +35,7 @@ const roofSpots = [ // [x, z, rot, seat?, pose]
 function roofPlace(i) { const [x, z, r, seated, pose] = roofSpots[i % 4]; return { pos: [x, z], rot: r, seat: seated ? SEAT_STOOL + 0.0 : null, pose, approach: [...TO_ROOF, [x, -9.3], [x, z]] }; }
 const parkSpots = () => [[...PARK.benches[0], true], [...PARK.benches[1], true], [PARK.blanket[0] - 0.3, PARK.blanket[1], -2.4, 'blanket'], [PARK.blanket[0] + 0.4, PARK.blanket[1] + 0.3, -2.4, 'blanket']];
 function parkPlace(i) { const [x, z, r, kind] = parkSpots()[i % 4]; const fx = x - Math.sin(r) * 0.0; return { pos: [fx, z], rot: r, seat: kind === 'blanket' ? -0.32 : SEAT_STOOL, approach: [[1.0, 0.25], [2.2, 7.0], [4.6, 8.4], [x + Math.sin(r) * 1.0, z + Math.cos(r) * 1.0], [fx, z]] }; }
-function viewPlace(i) { const z = [-0.9, 1.1][i % 2]; return { pos: [BALCONY.x1 - 0.5, z], rot: Math.PI / 2, seat: null, pose: 'lean', approach: [[9.2, 0.25], [12.2, 0.25], [BALCONY.x0 + 0.4, z], [BALCONY.x1 - 0.5, z]] }; }
+function viewPlace(i) { const x = [BALCONY.x1 - 0.6, BALCONY.x1 - 2.3][i % 2], z = BALCONY.z0 + 0.5; return { pos: [x, z], rot: Math.PI, seat: null, pose: 'lean', approach: [[9.2, 0.25], [12.2, 0.25], [BALCONY.x0 + 0.4, 0.2], [x, 0.2], [x, z]] }; } // v18: lean on the north rail (open sea), not the east one (shop street)
 // every seated spot a bot can use (for the facing audit)
 export function seatPlaces() { const out = [];
   DESKS.forEach((_, i) => out.push({ name: 'desk ' + i, ...deskPlace(i) })); loungeSeats.forEach((_, i) => out.push({ name: 'lounge ' + i, ...loungePlace(i) }));

@@ -194,7 +194,9 @@ export function makeChibi({ name, role, skin = 0xf0c4a6, hair, shirt, pants, day
   /* anatomy (soft, tapered head) + today's outfit */
   const girl = GIRLS.has(style); box('head', girl ? 0.76 : 0.8, 0.62, 0.66, 0, -0.04, 0, 'skin', { bt: girl ? -0.12 : -0.04 }); box('body', 0.3, 0.14, 0.3, 0, 1.38, 0, 'skin', { r: 0.4 });
   ['armL', 'armR'].forEach(a => box(a, 0.22, 0.18, 0.24, 0, -0.5, 0.02, 'skin', { r: 0.48 }));
-  TOPS[fit.top[1]](box, t, fit.top[2]); BOTTOMS[fit.bottom[1]](box, t, fit.bottom[2]); shoes(box, t, { kind: fit.shoes[1], ...fit.shoes[2] });
+  TOPS[fit.top[1]](box, t, fit.top[2]); BOTTOMS[fit.bottom[1]](box, t, fit.bottom[2]); { const bo = fit.bottom[2] || {}, sk = fit.bottom[1] === 'skirt'; /* v18 pelvis: hip block bridging torso hem and leg tops so legs always overlap into it (idle/walk/run/sit) */
+    box('body', 0.7, 0.3, 0.5, 0, 0.47, 0, sk ? t('cel', bo.t ?? 0x3a3d5c, { specks: 0 }) : t('seam', bo.c ?? L.pants), { r: 0.4 });
+    ['legL', 'legR'].forEach(l => box(l, sk ? 0.24 : 0.3, 0.2, sk ? 0.26 : 0.32, 0, 0.1, 0, sk ? t('cel', bo.t ?? 0x3a3d5c, { specks: 0 }) : t('seam', bo.c ?? L.pants), { r: 0.4 })); } shoes(box, t, { kind: fit.shoes[1], ...fit.shoes[2] });
   const hat = fit.head[1], cov = fit.top[2].up ? 'hood' : hat ? 'hat' : null; if (hat) HATS[hat](box, t, fit.head[2]);
   const HC = style === 'Sage' && name === 'Sage' ? 0xa8a6cc : L.hair, hk = t('cel', HC, { lo: -0.36, hi: 0.2, specks: 3 }), hkd = t('flat', tone(HC, -0.4)); (HAIR[style] || HAIR.Calvin)(box, hk, hkd, cov, t('cel', L.shirt, { hi: 0.25 })); /* fringe peeking under the hood */
   [].concat(fit.acc[1] || []).forEach(a => ACC[a](box, t, fit.acc[2], !!hat));

@@ -44,7 +44,7 @@ export function makeShops(scene) {
   SHOP_X.forEach(x => { for (let k = 0; k < 10; k++) add(T(BX(1.7, 0.066, 0.46), 0xfbf6ec, { outline: false }), x, 0.036, STREET.z - STREET.half + 0.55 + k * (STREET.half * 2 - 1.1) / 9); }); // zebra crossings shop-to-shop
   add(T(CYL(2.9, 2.9, 0.06, 18), 0xe2d5bd, { outline: false }), 53.6, 0.04, STREET.z); // east plaza
   // bridge (unchanged): planks along x following the sag, posts + rope rails
-  const N = 28; for (let i = 0; i < N; i++) { const x = BRIDGE2.x0 + 0.35 + i * (BRIDGE2.x1 - BRIDGE2.x0 - 0.7) / (N - 1), yy = bridge2Y(x) - 0.06;
+  const N = 28; for (let i = 0; i < N; i++) { const x = BRIDGE2.x0 + 0.35 + i * (BRIDGE2.deck1 - BRIDGE2.x0 - 0.7) / (N - 1), yy = bridge2Y(x) - 0.06;
     const pl = add(T(BX(0.3, 0.075, BRIDGE2.half * 2 + 0.1 - rnd() * 0.12), i % 2 ? 0xc48f5c : 0xb98250), x, yy, BRIDGE2.z + (rnd() - 0.5) * 0.06); pl.rotation.z = Math.atan2(bridge2Y(x + 0.2) - bridge2Y(x - 0.2), 0.4); }
   [-1, 1].forEach(sd => { const z = BRIDGE2.z + sd * BRIDGE2.half, pts = [];
     for (let i = 0; i <= 6; i++) { const x = BRIDGE2.s0 - 0.6 + i * (BRIDGE2.s1 - BRIDGE2.s0 + 1.2) / 6, yy = bridge2Y(x); add(T(BX(0.12, 1.05, 0.12), 0x8a5a36), x, yy + 0.47, z); pts.push(new THREE.Vector3(x, yy + 0.98, z)); }

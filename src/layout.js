@@ -33,7 +33,10 @@ FIRE.logs = [Math.PI * 0.5 + 0.0, Math.PI * 1.15, Math.PI * 1.85].map(a => ({ a,
 export const GARDEN = { x: HOME.cx - 6.0, z: HOME.cz - 1.6, w: 2.6, d: 1.6 };
 // ---- shopping island (+x, south-east), joined by a second plank bridge along z = 11 from the park ----
 export const SHOP = { cx: 38, cz: 11, r: 18 }; SHOP.walk = SHOP.r - 1.3; // v17: island r 18 (v16 r 13 at x 32) for the 2x-wide street + bigger shops
-export const BRIDGE2 = { z: 11, half: 1.0, x0: 11.6, x1: 21.0, s0: 13.6, s1: 19.8 }; BRIDGE2.walkHalf = BRIDGE2.half - 0.53;
+// v18: corridor runs on to x1 22.6, well inside the shop island's walk circle (edge x 21.3) — v17 left a 0.3 gap between the corridor end
+// (21.0) and the island walk area that the walk clamp snapped you around; deck 2.8 wide (walk lane 1.74, was 0.94). Planks stop at deck1.
+export const BRIDGE2 = { z: 11, half: 1.4, x0: 11.6, x1: 22.6, deck1: 21.0, s0: 13.6, s1: 19.8 }; BRIDGE2.walkHalf = BRIDGE2.half - 0.53;
+BRIDGE2.mouths = [[11.5, 11, 1.9], [21.7, 11, 1.9]]; // v18: walkable funnel circles at both bridge ends so a player steering in at an angle is guided onto the deck
 // v17 high street: a broad paved street along z = 11 (carriageway 10.4 wide, facades 14 apart = 2x v16), three big two-storey
 // shops each side with 3.5-unit gaps (north fronts face +z, south fronts face -z). Shop meshes are built in local units and
 // scaled by SHOP_S; the ground-floor details (door, shop window, counter, awning height) stay chibi-sized because the local
@@ -66,7 +69,7 @@ export const onHome = (x, z, m = 0) => Math.hypot(x - HOME.cx, z - HOME.cz) < HO
 // walkable regions: main lawn circle OR bridge corridor OR home lawn circle; anything else snaps to the nearest one
 export function walkClamp(p, W) { const B = BRIDGE, hx = p.x - HOME.cx, hz = p.z - HOME.cz, r = Math.hypot(p.x, p.z), rh = Math.hypot(hx, hz);
   const B2 = BRIDGE2, sx = p.x - SHOP.cx, sz = p.z - SHOP.cz, rs = Math.hypot(sx, sz);
-  if (r <= W || rh <= HOME.walk || rs <= SHOP.walk || (Math.abs(p.x - B.x) <= B.walkHalf && p.z >= B.z0 && p.z <= B.z1) || (Math.abs(p.z - B2.z) <= B2.walkHalf && p.x >= B2.x0 && p.x <= B2.x1)) return p;
+  if (r <= W || rh <= HOME.walk || rs <= SHOP.walk || (Math.abs(p.x - B.x) <= B.walkHalf && p.z >= B.z0 && p.z <= B.z1) || (Math.abs(p.z - B2.z) <= B2.walkHalf && p.x >= B2.x0 && p.x <= B2.x1) || B2.mouths.some(([mx, mz, mr]) => Math.hypot(p.x - mx, p.z - mz) <= mr)) return p;
   const c = [[SHOP.cx + sx * SHOP.walk / rs, SHOP.cz + sz * SHOP.walk / rs], [Math.max(B2.x0, Math.min(B2.x1, p.x)), Math.max(B2.z - B2.walkHalf, Math.min(B2.z + B2.walkHalf, p.z))], [p.x * W / r, p.z * W / r], [HOME.cx + hx * HOME.walk / rh, HOME.cz + hz * HOME.walk / rh], [Math.max(B.x - B.walkHalf, Math.min(B.x + B.walkHalf, p.x)), Math.max(B.z0, Math.min(B.z1, p.z))]];
   let best = c[0], bd = Infinity; for (const q of c) { const d = Math.hypot(q[0] - p.x, q[1] - p.z); if (d < bd) { bd = d; best = q; } } p.x = best[0]; p.z = best[1]; return p; }
 // bridge deck height: sags in the middle of the rope span
