@@ -5,10 +5,10 @@
 // canvas atlas on one merged mesh, and the lamp/string-light glows are one points draw — ~5 draw calls for the whole island.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { toonMesh } from './toon.js';
+import { toonMesh, occPatch } from './toon.js';
 import { bake } from './bake.js';
 import { cast } from './shadows.js';
-import { SHOP, BRIDGE2, SHOP_BLDG, SHOP_S, SHOP_SIDE, STREET, STREET_PROPS, STREET_TREE, LAMP_H, bridge2Y } from './layout.js';
+import { SHOP, BRIDGE2, SHOP_BLDG, SHOP_S, SHOP_L, SHOP_X, SHOP_SIDE, STREET, STREET_PROPS, STREET_TREE, LAMP_H, bridge2Y } from './layout.js';
 import { SHOP_STOCK } from './chibi.js';
 import { glowPoints } from './daycycle.js';
 const B3 = (w, h, d) => new THREE.BoxGeometry(w, h, d), BX = (w, h, d) => { const g = new THREE.BoxGeometry(w, h, d); g.userData.soft = true; return g; }, // BX: crisp box, skips soften() (tri budget)
@@ -40,8 +40,9 @@ export function makeShops(scene) {
   add(T(BX(SL, 0.05, STREET.front * 2), 0xeadfca, { outline: false }), SX, 0.025, STREET.z); // pavements up to the shop fronts
   add(T(BX(SL, 0.06, STREET.half * 2), 0xd9cbb2, { outline: false }), SX, 0.03, STREET.z); // street
   [-1, 1].forEach(s => add(T(BX(SL - 1.2, 0.08, 0.18), 0xbfae94, { outline: false }), SX + 0.3, 0.045, STREET.z + s * (STREET.half - 0.09)));
-  for (let k = 0; k < 9; k++) add(T(BX(1.2, 0.065, 0.5), 0xf2e8d6, { outline: false }), STREET.x0 + 2.2 + k * 2.55, 0.035, STREET.z + (k % 2 ? 0.7 : -0.7)); // crossing stones
-  add(T(CYL(2.6, 2.6, 0.06, 18), 0xe2d5bd, { outline: false }), 42.4, 0.04, STREET.z); // east plaza
+  for (let k = 0; k < 13; k++) add(T(BX(1.0, 0.065, 0.42), 0xe6dac4, { outline: false }), STREET.x0 + 1.6 + k * 2.55, 0.035, STREET.z + (k % 2 ? 0.55 : -0.55)); // centre-line stones
+  SHOP_X.forEach(x => { for (let k = 0; k < 10; k++) add(T(BX(1.7, 0.066, 0.46), 0xfbf6ec, { outline: false }), x, 0.036, STREET.z - STREET.half + 0.55 + k * (STREET.half * 2 - 1.1) / 9); }); // zebra crossings shop-to-shop
+  add(T(CYL(2.9, 2.9, 0.06, 18), 0xe2d5bd, { outline: false }), 53.6, 0.04, STREET.z); // east plaza
   // bridge (unchanged): planks along x following the sag, posts + rope rails
   const N = 28; for (let i = 0; i < N; i++) { const x = BRIDGE2.x0 + 0.35 + i * (BRIDGE2.x1 - BRIDGE2.x0 - 0.7) / (N - 1), yy = bridge2Y(x) - 0.06;
     const pl = add(T(BX(0.3, 0.075, BRIDGE2.half * 2 + 0.1 - rnd() * 0.12), i % 2 ? 0xc48f5c : 0xb98250), x, yy, BRIDGE2.z + (rnd() - 0.5) * 0.06); pl.rotation.z = Math.atan2(bridge2Y(x + 0.2) - bridge2Y(x - 0.2), 0.4); }
@@ -50,19 +51,20 @@ export function makeShops(scene) {
     g.add(T(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 20, 0.04, 4), 0xe0c48a, { outline: false })); });
   // ---- shops ----
   const glass = (w, h) => new THREE.Mesh(B3(w, h, 0.04), new THREE.MeshBasicMaterial({ color: 0xd6f1fb }));
-  SHOP_BLDG.forEach((b, si) => { const [wall, trim, acc] = LOOK[b.kind], W = 3.0, D = 2.4, H = b.lh, F = D / 2, AY = 2.75, sg = new THREE.Group(); add(sg, b.x, 0, b.z, b.ry); sg.scale.setScalar(SHOP_S); // built in local units, scaled up
+  SHOP_BLDG.forEach((b, si) => { const [wall, trim, acc] = LOOK[b.kind], W = SHOP_L.W, D = SHOP_L.D, H = b.lh, F = D / 2, AY = 2.75, sg = new THREE.Group(); add(sg, b.x, 0, b.z, b.ry); sg.scale.setScalar(SHOP_S); // built in local units, scaled up
     const L = (m, x, y, z, ry = 0) => add(m, x, y, z, ry, sg);
     L(T(B3(W, H, D), wall), 0, H / 2, 0); L(T(BX(W + 0.12, 0.3, D + 0.12), trim), 0, 0.15, 0); // body + base course
-    L(T(BX(0.8, 1.9, 0.06), trim), -0.9, 1.05, F + 0.02); L(glass(0.5, 0.6), -0.9, 1.45, F + 0.06); L(T(BX(0.1, 0.1, 0.05), 0xe8c45a), -0.64, 1.0, F + 0.07); // door (glazed) + knob
-    L(glass(1.5, 1.3), 0.55, 1.3, F + 0.02); L(T(BX(1.66, 0.1, 0.16), trim), 0.55, 0.6, F + 0.06); L(T(BX(1.66, 0.08, 0.08), trim), 0.55, 1.99, F + 0.04); L(T(BX(0.06, 1.3, 0.06), trim), 0.55, 1.3, F + 0.05); // window + sill + head + mullion
-    [-0.75, 0.75].forEach(x => { L(glass(0.7, 0.42), x, 2.3, F + 0.02); L(T(BX(0.8, 0.07, 0.1), trim), x, 2.06, F + 0.05); }); // upper-floor windows (under the awning line)
-    const sY = AY + 0.55; signs.push([sg, 0, sY, F + 0.05, si]); L(T(BX(2.5, 0.62, 0.06), trim), 0, sY, F + 0.01);
+    // ground floor stays chibi-sized (door 1.9 local = 2.5 world vs ~3 for a chibi incl. hair); the frontage + a second storey make the shop big
+    L(T(BX(0.8, 1.9, 0.06), trim), -1.5, 1.05, F + 0.02); L(glass(0.5, 0.6), -1.5, 1.45, F + 0.06); L(T(BX(0.1, 0.1, 0.05), 0xe8c45a), -1.24, 1.0, F + 0.07); // door (glazed) + knob
+    L(glass(2.3, 1.3), 0.75, 1.3, F + 0.02); L(T(BX(2.46, 0.1, 0.16), trim), 0.75, 0.6, F + 0.06); L(T(BX(2.46, 0.08, 0.08), trim), 0.75, 1.99, F + 0.04); [0.2, 1.3].forEach(x => L(T(BX(0.06, 1.3, 0.06), trim), x, 1.3, F + 0.05)); // shop window + sill + head + mullions
+    const up = z => { L(T(BX(W + 0.06, 0.12, 0.12), trim), 0, 3.95, z * (F + 0.04)); [-1.5, 0, 1.5].forEach(x => { L(glass(0.82, 0.95), x, 4.75, z * (F + 0.02)); L(T(BX(0.98, 0.09, 0.14), trim), x, 4.22, z * (F + 0.05)); L(T(BX(0.98, 0.09, 0.08), trim), x, 5.27, z * (F + 0.03)); }); }; up(1); // first floor: string course + three sash windows
+    const sY = AY + 0.62; signs.push([sg, 0, sY, F + 0.05, si]); L(T(BX(3.4, 0.86, 0.06), trim), 0, sY, F + 0.01);
     const aw = []; const A = m => (aw.push(m), m); // awning parts: measured for the clearance test (window.__awnings)
     const keeper = { x: -0.9, z: F + 0.3, ry: 0 }; // shopkeeper spot (local), moved behind the counter where there is one
     const counter = (c) => { L(T(BX(1.4, 0.72, 0.3), trim), 0.55, 0.36, F + 0.62); L(T(BX(1.5, 0.06, 0.38), c), 0.55, 0.75, F + 0.62); keeper.x = 0.55; keeper.z = F + 0.24; }; // sign backer
     const win = (m, x, yy, z = F + 0.11) => { m.children.slice().forEach(c => m.remove(c)); return L(m, x, yy, z); }; // display props: no outline hull (tris)
     if (b.kind === 'clothes') { // gable roof, striped awning, mannequins + folded stack in the window, side rack of stock tops
-      const roof = L(T(CYL(1.0, 1.0, D + 0.3, 3), trim), 0, H + 0.42, 0); roof.rotation.set(Math.PI / 2, 0, Math.PI / 2); roof.scale.set(1, 1, 0.55 * 1.0); roof.rotation.order = 'YXZ';
+      const gr = (W + 0.3) / Math.sqrt(3), roof = L(T(CYL(gr, gr, D + 0.3, 3), trim), 0, H + 0.5 * gr * 0.36, 0); roof.rotation.set(-Math.PI / 2, 0, 0); roof.scale.set(1, 1, 0.36); // gable: apex up, ridge front-to-back
       for (let k = 0; k < 7; k++) { const a = A(L(T(BX(W / 7 + 0.01, 0.07, 0.75), k % 2 ? 0xfff4ee : acc), -W / 2 + W / 14 + k * W / 7, AY, F + 0.33)); a.rotation.x = 0.38; }
       const st = SHOP_STOCK.slice(0, 9); [0.12, 0.84].forEach((x, k) => { win(T(BX(0.34, 0.42, 0.18), st[k * 4][2].c), x, 1.2); win(T(BX(0.2, 0.2, 0.2), 0xe8e2d8, { outline: false }), x, 1.53); win(T(BX(0.04, 0.4, 0.04), 0x5a4a40, { outline: false }), x, 0.85); });
       [0, 1, 2].forEach(k => win(T(BX(0.26, 0.06, 0.16), st[k * 3 + 2][2].c, { outline: false }), 0.48, 0.76 + k * 0.065));
@@ -96,36 +98,36 @@ export function makeShops(scene) {
       [0x6f86c9, 0xf28a7a, 0x8fc79a, 0xf7c64a].forEach((c, k) => win(T(BX(0.28, 0.07, 0.2), c, { outline: false }), 0.18, 0.76 + k * 0.07)); win(T(BX(0.22, 0.4, 0.04), 0x6f86c9), 0.6, 0.92); win(T(BX(0.22, 0.4, 0.04), 0xf28a7a), 0.86, 0.92);
       win(T(CYL(0.08, 0.08, 0.16, 8), 0x3a3d5c), 0.4, 0.8); [-0.03, 0.03].forEach((o, k) => win(T(BX(0.025, 0.22, 0.025), k ? 0xf28a7a : 0x6f86c9, { outline: false }), 0.4 + o, 0.95)); }
     if (b.kind === 'bistro') { // hipped green roof, green awning, string lights, chalkboard, bottles in the window
-      const rf = L(T(CYL(0.9, 2.15, 0.8, 4), trim), 0, H + 0.4, 0); rf.rotation.y = Math.PI / 4; rf.scale.set(1, 1, 0.86);
+      const rk0 = W / 3, rf = L(T(CYL(0.9 * rk0, 2.15 * rk0, 0.8 * rk0, 4), trim), 0, H + 0.4 * rk0, 0); rf.rotation.y = Math.PI / 4; rf.scale.set(1, 1, 0.82);
       const ba = A(L(T(BX(W - 0.1, 0.08, 0.8), acc), 0, AY, F + 0.33)); ba.rotation.x = 0.3; A(L(T(BX(W - 0.1, 0.16, 0.04), 0xf6eccc, { outline: false }), 0, AY - 0.14, F + 0.7)); counter(0x5f9a68);
       [0.1, 0.32, 0.54, 0.76].forEach((x, k) => { win(T(CYL(0.05, 0.05, 0.3, 6), [0x3f6b4c, 0x7a2a3a, 0x3f6b4c, 0xc89a40][k]), x, 0.88); });
       for (let k = 0; k < 7; k++) glows.push(new THREE.Vector3(-W / 2 + 0.2 + k * (W - 0.4) / 6, AY + 0.3 - Math.sin(k / 6 * Math.PI) * 0.12, F + 0.75).multiplyScalar(SHOP_S).applyMatrix4(new THREE.Matrix4().makeRotationY(b.ry)).add(new THREE.Vector3(b.x, 0, b.z)));
       const [c0, c1, c2, c3] = SHOP_SIDE[1], cb = new THREE.Group(); add(cb, (c0 + c2) / 2, 0, (c1 + c3) / 2, Math.PI + 0.25); cb.scale.setScalar(1.2); add(T(BX(0.5, 0.7, 0.05), 0x2f3a30), 0, 0.55, 0, 0, cb); add(T(BX(0.56, 0.06, 0.08), 0x8a5a36), 0, 0.92, 0, 0, cb); add(T(BX(0.06, 0.3, 0.3), 0x8a5a36), 0, 0.15, -0.05, 0, cb); }
     if (b.ry) { // south row: its back faces the main camera — dress the rear like a second frontage (sign, windows, flower boxes)
-      signs.push([sg, 0, sY, -F - 0.05, si, true]); L(T(BX(2.5, 0.62, 0.06), trim), 0, sY, -F - 0.01);
-      [-0.75, 0.75].forEach(x => { L(glass(0.8, 0.7), x, 1.25, -F - 0.02); L(T(BX(0.95, 0.1, 0.12), trim), x, 0.86, -F - 0.06); L(T(BX(0.9, 0.18, 0.22), 0xc98a5a), x, 0.74, -F - 0.14);
+      signs.push([sg, 0, sY, -F - 0.05, si, true]); L(T(BX(3.4, 0.86, 0.06), trim), 0, sY, -F - 0.01); up(-1);
+      [-1.2, 1.2].forEach(x => { L(glass(0.8, 0.7), x, 1.25, -F - 0.02); L(T(BX(0.95, 0.1, 0.12), trim), x, 0.86, -F - 0.06); L(T(BX(0.9, 0.18, 0.22), 0xc98a5a), x, 0.74, -F - 0.14);
         [-0.28, 0, 0.28].forEach((o, k) => L(T(new THREE.DodecahedronGeometry(0.11, 0), [0xf28a7a, 0x7cbd62, 0xf7d774][k], { outline: false }), x + o, 0.88, -F - 0.16)); }); }
     sg.updateMatrixWorld(true); aw.forEach(m => awnings.push(new THREE.Box3().setFromObject(m)));
     const kp = new THREE.Vector3(keeper.x, 0, keeper.z).multiplyScalar(SHOP_S).applyAxisAngle(new THREE.Vector3(0, 1, 0), b.ry); keepers.push({ kind: b.kind, x: b.x + kp.x, z: b.z + kp.z, rot: b.ry });
     cast(b.x, b.z, b.w + 0.6, b.d + 0.6, b.ry); });
   // ---- street furniture ----
   STREET_PROPS.forEach(([x, z, , kind], k) => {
-    if (kind === 'table') { const cafe = x < 27; add(T(CYL(0.38, 0.38, 0.06, 10), cafe ? 0xfff8ee : 0xf6eccc), x, 0.72, z); add(T(BX(0.07, 0.7, 0.07), 0x3a3d5c), x, 0.36, z); add(T(CYL(0.22, 0.26, 0.04, 10), 0x3a3d5c, { outline: false }), x, 0.02, z);
+    if (kind === 'table') { const cafe = x < SHOP_X[1]; add(T(CYL(0.38, 0.38, 0.06, 10), cafe ? 0xfff8ee : 0xf6eccc), x, 0.72, z); add(T(BX(0.07, 0.7, 0.07), 0x3a3d5c), x, 0.36, z); add(T(CYL(0.22, 0.26, 0.04, 10), 0x3a3d5c, { outline: false }), x, 0.02, z);
       [-0.58, 0.58].forEach(o => { add(T(CYL(0.17, 0.17, 0.06, 8), cafe ? 0xc98a5a : 0x5f9a68, { outline: false }), x + o, 0.44, z); add(T(BX(0.05, 0.42, 0.05), 0x3a3d5c, { outline: false }), x + o, 0.21, z); });
       add(T(BX(0.04, 2.7, 0.04), 0xf6f0e4, { outline: false }), x, 2.05, z); add(T(CYL(0.02, 1.0, 0.34, 8), cafe ? (k % 2 ? 0xf29aa6 : 0xf6e2a8) : (k % 2 ? 0x5f9a68 : 0xf6eccc)), x, 3.5, z); // umbrella well above head height
       if (!cafe) { add(T(CYL(0.06, 0.06, 0.18, 6), 0x7a2a3a, { outline: false }), x + 0.1, 0.84, z); }
       add(T(CYL(0.07, 0.06, 0.08, 8), 0xfff8ee, { outline: false }), x - 0.12, 0.79, z + 0.06); cast(x, z, 1.5, 0.8); }
     if (kind === 'lamp') { add(T(BX(0.13, LAMP_H, 0.13), 0x3a3d5c), x, LAMP_H / 2, z); add(T(BX(0.34, 0.36, 0.34), 0xffe2a8), x, LAMP_H + 0.1, z); add(T(BX(0.42, 0.07, 0.42), 0x3a3d5c), x, LAMP_H + 0.31, z); add(T(BX(0.5, 0.05, 0.1), 0x3a3d5c), x, LAMP_H - 0.3, z); glows.push(new THREE.Vector3(x, LAMP_H + 0.1, z)); cast(x, z, 0.4, 0.4); }
     if (kind === 'planter') { add(T(BX(0.8, 0.42, 0.8), 0xc98a5a), x, 0.21, z); add(T(new THREE.DodecahedronGeometry(0.4, 0), [0x6fae5a, 0x7cbd62][k % 2]), x, 0.68, z); add(T(BX(0.1, 0.1, 0.1), [0xf28a7a, 0xf7d774][k % 2], { outline: false }), x + 0.2, 0.9, z + 0.18); cast(x, z, 0.9, 0.9); }
-    if (kind === 'bench') { const ry = x > 42 ? -Math.PI / 2 : z < STREET.z ? 0 : Math.PI, bg = new THREE.Group(); add(bg, x, 0, z, ry); add(T(BX(1.3, 0.1, 0.42), 0xc48f5c), 0, 0.44, 0, 0, bg); add(T(BX(1.3, 0.34, 0.08), 0xc48f5c), 0, 0.72, -0.2, 0, bg);
+    if (kind === 'bench') { const ry = x > 52 ? -Math.PI / 2 : z < STREET.z ? 0 : Math.PI, bg = new THREE.Group(); add(bg, x, 0, z, ry); add(T(BX(1.3, 0.1, 0.42), 0xc48f5c), 0, 0.44, 0, 0, bg); add(T(BX(1.3, 0.34, 0.08), 0xc48f5c), 0, 0.72, -0.2, 0, bg);
       [-0.55, 0.55].forEach(s => add(T(BX(0.08, 0.42, 0.36), 0x3a3d5c), s, 0.2, 0, 0, bg)); cast(x, z, 1.4, 0.6); }
     if (kind === 'tree') { const Y = STREET_TREE.canopyY; add(T(BX(0.3, Y, 0.3), 0x8a5a36), x, Y / 2, z); add(T(new THREE.DodecahedronGeometry(STREET_TREE.canopyR, 0), 0x6fae5a), x, Y, z); add(T(new THREE.DodecahedronGeometry(0.62, 0), 0x86c466), x + 0.3, Y + 0.65, z - 0.2); cast(x, z, 1.8, 1.8); }
   });
   scene.add(g); bake(g);
   // signs: six boards from one atlas, merged into one mesh
-  g.updateMatrixWorld(true); const atlas = signAtlas(), geos = signs.map(([sg, x, yy, z, i, back]) => { const p = new THREE.PlaneGeometry(2.36, 0.59), uv = p.attributes.uv, u0 = (i % 2) * 0.5, v0 = 1 - ((i >> 1) + 1) * 0.25;
+  g.updateMatrixWorld(true); const atlas = signAtlas(), geos = signs.map(([sg, x, yy, z, i, back]) => { const p = new THREE.PlaneGeometry(3.24, 0.81), uv = p.attributes.uv, u0 = (i % 2) * 0.5, v0 = 1 - ((i >> 1) + 1) * 0.25;
     for (let k = 0; k < uv.count; k++) uv.setXY(k, u0 + uv.getX(k) * 0.5, v0 + uv.getY(k) * 0.25); if (back) p.rotateY(Math.PI); p.translate(x, yy, z); p.applyMatrix4(sg.matrixWorld); return p; });
-  const sm = new THREE.Mesh(mergeGeometries(geos), new THREE.MeshBasicMaterial({ map: atlas })); sm.name = 'shopSigns'; scene.add(sm);
+  const sm = new THREE.Mesh(mergeGeometries(geos), occPatch(new THREE.MeshBasicMaterial({ map: atlas }))); sm.name = 'shopSigns'; scene.add(sm);
   glowPoints(scene, glows.map(v => [v.x, v.y, v.z]), { size: 50 });
   window.__awnings = awnings.map(b => ({ min: b.min.toArray(), max: b.max.toArray() })); g.userData.keepers = keepers;
   return g;

@@ -32,25 +32,29 @@ export const FIRE = { x: HOME.cx, z: HOME.cz - 2.2 };
 FIRE.logs = [Math.PI * 0.5 + 0.0, Math.PI * 1.15, Math.PI * 1.85].map(a => ({ a, x: FIRE.x + Math.cos(a + Math.PI / 2) * 2.0, z: FIRE.z + Math.sin(a + Math.PI / 2) * 2.0 }));
 export const GARDEN = { x: HOME.cx - 6.0, z: HOME.cz - 1.6, w: 2.6, d: 1.6 };
 // ---- shopping island (+x, south-east), joined by a second plank bridge along z = 11 from the park ----
-export const SHOP = { cx: 32, cz: 11, r: 13 }; SHOP.walk = SHOP.r - 1.3; // v16: bigger island (was r 8 at x 27)
+export const SHOP = { cx: 38, cz: 11, r: 18 }; SHOP.walk = SHOP.r - 1.3; // v17: island r 18 (v16 r 13 at x 32) for the 2x-wide street + bigger shops
 export const BRIDGE2 = { z: 11, half: 1.0, x0: 11.6, x1: 21.0, s0: 13.6, s1: 19.8 }; BRIDGE2.walkHalf = BRIDGE2.half - 0.53;
-// v16 high street: a wide paved street along z = 11 from the bridge, three bigger shops each side with ~2.9-unit gaps
-// (north fronts face +z, south fronts face -z). Shop meshes are built at local scale SHOP_S; w/d/h below are WORLD units.
-export const SHOP_S = 1.3, STREET = { x0: 19.6, x1: 43.6, z: 11, half: 2.6, front: 3.9 }; // front = street centre -> shop facade
+// v17 high street: a broad paved street along z = 11 (carriageway 10.4 wide, facades 14 apart = 2x v16), three big two-storey
+// shops each side with 3.5-unit gaps (north fronts face +z, south fronts face -z). Shop meshes are built in local units and
+// scaled by SHOP_S; the ground-floor details (door, shop window, counter, awning height) stay chibi-sized because the local
+// frontage/height grew instead (local W 4.8 x D 3.6, + a second storey), so w/d/h below are WORLD units.
+export const SHOP_S = 1.3, SHOP_L = { W: 4.8, D: 3.6 }, STREET = { x0: 20.2, x1: 53.0, z: 11, half: 5.2, front: 7.0 }; // front = street centre -> shop facade
 export const AWN = { y: 2.75 * SHOP_S - 0.2, out: 0.78 * SHOP_S }; // lowest awning edge (world) and how far awnings/counters project from the facade
-export const SHOP_BLDG = [['clothes', 'Thread & Co.', 24.2, 0, 4.2], ['gadgets', 'Gizmo Hub', 31.0, 0, 3.8], ['computers', 'Byte Works', 37.8, 0, 4.0],
-  ['cafe', 'Bean There', 24.2, 1, 3.8], ['stationery', 'Paper Plane', 31.0, 1, 4.6], ['bistro', 'Little Bistro', 37.8, 1, 3.9]]
-  .map(([kind, name, x, south, h], i) => { const d = 2.4 * SHOP_S; return { i, kind, name, x, z: STREET.z + (south ? 1 : -1) * (STREET.front + d / 2), w: 3.0 * SHOP_S, d, h: h * SHOP_S, lh: h, ry: south ? Math.PI : 0 }; });
+export const SHOP_X = [28.2, 38.0, 47.8], GAPS = [33.1, 42.9];
+export const SHOP_BLDG = [['clothes', 'Thread & Co.', 0, 0, 6.2], ['gadgets', 'Gizmo Hub', 1, 0, 5.8], ['computers', 'Byte Works', 2, 0, 6.0],
+  ['cafe', 'Bean There', 0, 1, 5.8], ['stationery', 'Paper Plane', 1, 1, 6.6], ['bistro', 'Little Bistro', 2, 1, 5.9]]
+  .map(([kind, name, xi, south, h], i) => { const d = SHOP_L.D * SHOP_S; return { i, kind, name, x: SHOP_X[xi], z: STREET.z + (south ? 1 : -1) * (STREET.front + d / 2), w: SHOP_L.W * SHOP_S, d, h: h * SHOP_S, lh: h, ry: south ? Math.PI : 0 }; });
 // collider: the block plus everything that projects from the facade (awning, counter, keeper) — nobody walks under an awning
 export const shopBox = (b, out = AWN.out + 0.05) => { const f = b.ry ? -1 : 1; return [b.x - b.w / 2, Math.min(b.z - b.d / 2, b.z + f * (b.d / 2 + out)), b.x + b.w / 2, Math.max(b.z + b.d / 2, b.z + f * (b.d / 2 + out))]; };
-// side props beside a shop (clothes rack, bistro chalkboard): boxes [x0,z0,x1,z1]
-export const SHOP_SIDE = [[24.2 + 1.95 + 0.05, 5.6, 24.2 + 1.95 + 0.6, 7.0], [37.8 - 1.95 - 0.75, 14.75, 37.8 - 1.95 - 0.05, 15.35]];
+// side props beside a shop (clothes rack east of Thread & Co., bistro chalkboard west of Little Bistro): boxes [x0,z0,x1,z1]
+const NF = STREET.z - STREET.front, SF = STREET.z + STREET.front, HW = SHOP_L.W * SHOP_S / 2;
+export const SHOP_SIDE = [[SHOP_X[0] + HW + 0.05, NF - 1.5, SHOP_X[0] + HW + 0.6, NF - 0.1], [SHOP_X[2] - HW - 0.75, SF + 0.1, SHOP_X[2] - HW - 0.05, SF + 0.7]];
 // street furniture shared by the builder (shops.js) and the colliders (player.js): [x, z, collider r, kind]
-const GAPS = [27.6, 34.4];
-export const STREET_PROPS = [[22.6, 13.05, 0.8, 'table'], [25.8, 13.05, 0.8, 'table'], [36.2, 13.05, 0.8, 'table'], [39.4, 13.05, 0.8, 'table'],
-  ...[20.6, ...GAPS, 41.4].flatMap(x => [[x, 8.55, 0.2, 'lamp'], [x, 13.45, 0.2, 'lamp']]),
-  ...GAPS.flatMap(x => [[x, 6.6, 0.75, 'bench'], [x, 15.4, 0.75, 'bench'], [x, 4.6, 0.6, 'tree'], [x, 17.4, 0.6, 'tree']]),
-  [21.2, 6.2, 0.4, 'planter'], [21.2, 15.8, 0.4, 'planter'], [41.6, 6.4, 0.4, 'planter'], [41.6, 15.6, 0.4, 'planter'], [43.4, 11, 0.75, 'tree'], [42.2, 8.0, 0.75, 'bench'], [42.2, 14.0, 0.75, 'bench']];
+export const TERRACE_Z = SF - AWN.out - 1.9; // café / bistro terrace tables in front of the south row
+export const STREET_PROPS = [...[SHOP_X[0], SHOP_X[2]].flatMap(x => [[x - 1.6, TERRACE_Z, 0.8, 'table'], [x + 1.6, TERRACE_Z, 0.8, 'table']]),
+  ...[21.4, ...GAPS, 51.8].flatMap(x => [[x, STREET.z - STREET.half - 0.4, 0.2, 'lamp'], [x, STREET.z + STREET.half + 0.4, 0.2, 'lamp']]),
+  ...GAPS.flatMap(x => [[x, NF - 0.4, 0.75, 'bench'], [x, SF + 0.4, 0.75, 'bench'], [x, NF - 3.4, 0.6, 'tree'], [x, SF + 3.4, 0.6, 'tree'], [x, STREET.z, 0.55, 'planter']]),
+  [21.6, NF + 0.6, 0.4, 'planter'], [21.6, SF - 0.6, 0.4, 'planter'], [51.6, NF + 0.6, 0.4, 'planter'], [51.6, SF - 0.6, 0.4, 'planter'], [54.4, 11, 0.75, 'tree'], [53.4, 7.4, 0.75, 'bench'], [53.4, 14.6, 0.75, 'bench']];
 export const STREET_TREE = { canopyY: 3.55, canopyR: 1.0 }; // street trees: canopy centre/radius (world) — head collider in player.js
 export const LAMP_H = 3.7; // lamp globe height (above any head)
 export const shopFront = (b, f, s = 0) => [b.x + Math.sin(b.ry) * f + Math.cos(b.ry) * s, b.z + Math.cos(b.ry) * f - Math.sin(b.ry) * s];

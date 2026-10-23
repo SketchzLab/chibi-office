@@ -5,8 +5,24 @@ const SOFTC = new WeakMap();
 export function soften(geo) { if (!geo || geo.type !== 'BoxGeometry' || geo.userData.soft) return geo; if (SOFTC.has(geo)) return SOFTC.get(geo);
   geo.computeBoundingBox(); const bb = geo.boundingBox, sz = bb.getSize(new THREE.Vector3()), ce = bb.getCenter(new THREE.Vector3()), p = geo.attributes.position; let out = geo;
   let axisAligned = true; for (let i = 0; i < p.count && axisAligned; i++) for (const [ax, lo, hi] of [['getX', bb.min.x, bb.max.x], ['getY', bb.min.y, bb.max.y], ['getZ', bb.min.z, bb.max.z]]) { const v = p[ax](i); if (Math.abs(v - lo) > 1e-4 && Math.abs(v - hi) > 1e-4) { axisAligned = false; break; } }
-  const mn = Math.min(sz.x, sz.y, sz.z); if (axisAligned && mn >= 0.08 && sz.x * sz.y * sz.z >= 0.012) { out = new RoundedBoxGeometry(sz.x, sz.y, sz.z, 1, mn * 0.2); out.translate(ce.x, ce.y, ce.z); out.userData.soft = true; }
+  const mn = Math.min(sz.x, sz.y, sz.z); if (axisAligned && mn >= 0.12 && sz.x * sz.y * sz.z >= 0.05) { out = new RoundedBoxGeometry(sz.x, sz.y, sz.z, 1, mn * 0.2); out.translate(ce.x, ce.y, ce.z); out.userData.soft = true; }
   SOFTC.set(geo, out); return out; }
+// v17 camera-occlusion see-through: any world fragment that sits between the camera and the player (inside a soft cone around
+// the camera->player ray, in front of the player, above the ground) is ordered-dithered down to ~25% coverage. Shared by the
+// toon fill, the outline hulls and the merged basic (glass/sign) materials, so a baked building fades as one piece and its
+// outline goes with it. uOccK (0..1) is eased in main.js (on in follow mode, off in the overview).
+export const OCC_U = { uOccP: { value: new THREE.Vector3(0, -999, 0) }, uOccK: { value: 0 }, uOccR: { value: 2.3 } };
+export const OCC_GLSL = `uniform vec3 uOccP; uniform float uOccK; uniform float uOccR;
+float occB2(vec2 a){ a = floor(a); return fract(a.x / 2.0 + a.y * a.y * 0.75); }
+float occBayer(vec2 p){ return occB2(0.5 * p) * 0.25 + occB2(p); }
+float occFade(vec3 w){ if (uOccK < 0.002 || w.y < 0.35) return 0.0; vec3 a = uOccP - cameraPosition; float L = length(a); vec3 u = a / max(L, 1e-4);
+  float s = dot(w - cameraPosition, u); if (s <= 0.0) return 0.0; float d = length(w - cameraPosition - u * s), r = uOccR * (0.45 + 0.55 * clamp(s / L, 0.0, 1.0));
+  return uOccK * (1.0 - smoothstep(0.55 * r, r, d)) * (1.0 - smoothstep(L - 1.4, L - 0.6, s)); }
+#define OCC_CLIP(w) if (occBayer(gl_FragCoord.xy) < occFade(w) * 0.75) discard;
+`;
+export function occPatch(mat) { mat.onBeforeCompile = sh => { Object.assign(sh.uniforms, OCC_U);
+  sh.vertexShader = 'varying vec3 vOccW;\n' + sh.vertexShader.replace('#include <project_vertex>', '#include <project_vertex>\n vOccW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+  sh.fragmentShader = 'varying vec3 vOccW;\n' + OCC_GLSL + sh.fragmentShader.replace('void main() {', 'void main() {\n OCC_CLIP(vOccW)'); }; return mat; }
 // Custom 3-band toon shader: warm key light vs cool shade.
 const keyDir = new THREE.Vector3(-0.6, 1.0, 0.5).normalize();
 export const toonUniforms = {
@@ -21,6 +37,7 @@ export const toonUniforms = {
   uDetail: { value: 1 },      // quality tier: 1 = painterly noise + wood grain + hatching, 0 = off (low-end)
   uRimColor: { value: new THREE.Color(1.0, 0.82, 0.58) }, // warm rim light
   uGrade: { value: new THREE.Vector3(0.9, 0.97, 0.03) }, // saturation, tone-curve gamma, warm lift (in-shader colour grade, no post pass)
+  ...OCC_U,
 };
 const vs = `uniform float uTime; varying vec3 vN; varying vec3 vW; varying vec3 vC;
 void main(){ vC = vec3(1.0);
@@ -42,9 +59,10 @@ void main(){ vC = vec3(1.0);
 const fs = `uniform vec3 uColor; uniform vec3 uKeyDir; uniform vec3 uKeyColor; uniform vec3 uShadeColor; uniform vec3 uEmissive; uniform vec3 uFogColor; uniform vec2 uFogRange; uniform vec3 uSkyAmb; uniform vec3 uGroundAmb;
 uniform float uDetail; uniform vec3 uRimColor; uniform vec3 uGrade;
 varying vec3 vN; varying vec3 vW; varying vec3 vC;
+${OCC_GLSL}
 float h21(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float vnoise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.0-2.0*f); return mix(mix(h21(i), h21(i+vec2(1,0)), f.x), mix(h21(i+vec2(0,1)), h21(i+vec2(1,1)), f.x), f.y); }
-void main(){ vec3 n=normalize(vN); float d=dot(n,uKeyDir); vec3 alb = uColor*vC;
+void main(){ OCC_CLIP(vW) vec3 n=normalize(vN); float d=dot(n,uKeyDir); vec3 alb = uColor*vC;
  // painterly: world-space noise wobbles the band edges + brightness a touch
  // v11 'hand-painted pixel' surface (matches the chibi atlases): triplanar 2x2-cluster texels (8/unit), 3-tone hue-shifted values, plank / brick / tuft details. Flat bands, no dither.
  vec3 an = abs(n); bool top = an.y > max(an.x, an.z); vec2 uvp = top ? vW.xz : (an.x > an.z ? vW.zy : vW.xy);
@@ -89,10 +107,10 @@ export function toonMat(color, emissive = 0x000000) {
 
 // Inverted-hull outline
 const outlineMat = new THREE.ShaderMaterial({
-  uniforms: { uW: { value: 0.022 } }, side: THREE.BackSide,
+  uniforms: { uW: { value: 0.022 }, ...OCC_U }, side: THREE.BackSide,
   // depth-aware: hull grows with view distance so lines keep a steady screen width (thin up close, not vanishing far away)
-  vertexShader: `uniform float uW; void main(){ vec4 mv0 = modelViewMatrix*vec4(position,1.0); float k = clamp(-mv0.z/22.0, 0.55, 1.7); vec3 p = position + normal*uW*k; gl_Position = projectionMatrix*modelViewMatrix*vec4(p,1.0);}`,
-  fragmentShader: `void main(){ gl_FragColor=vec4(0.11,0.12,0.29,1.0);}`,
+  vertexShader: `uniform float uW; varying vec3 vOW; void main(){ vec4 mv0 = modelViewMatrix*vec4(position,1.0); float k = clamp(-mv0.z/22.0, 0.55, 1.7); vec3 p = position + normal*uW*k; vOW = (modelMatrix*vec4(p,1.0)).xyz; gl_Position = projectionMatrix*modelViewMatrix*vec4(p,1.0);}`,
+  fragmentShader: `varying vec3 vOW; ${OCC_GLSL} void main(){ OCC_CLIP(vOW) gl_FragColor=vec4(0.11,0.12,0.29,1.0);}`,
 });
 export function toonMesh(geo, color, { outline = true, emissive } = {}) {
   geo = soften(geo); const m = new THREE.Mesh(geo, toonMat(color, emissive));

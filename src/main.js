@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { makeSky } from './sky.js';
-import { toonUniforms } from './toon.js';
+import { toonUniforms } from './toon.js'; window.__toonU = toonUniforms;
+const OCC_MODE = new URLSearchParams(location.search).get('occ'); // ?occ=0 off, ?occ=1 forced on (shots)
 import { chatLink } from './agents.js';
 import { PERSONAS } from './personas.js';
 import { makeBrain, actEmoji, applyPose, seatPlaces, setDayClock, breath } from './behavior.js';
@@ -55,7 +56,7 @@ for (const [name, per] of Object.entries(PERSONAS)) {
 }
 export { chibis }; window.__scene = scene; window.__camera = camera;
 const player = makePlayer({ scene, camera, controls, bots: chibis }); const calvin = player.chibi; window.__player = player;
-player.setHome(camera.position, controls.target); window.__cam = camera;
+player.setHome(camera.position, controls.target); window.__cam = camera; window.__controls = controls;
 // ---- cozy FX + quality tier ----
 let tier = QMODE === 'auto' ? pickTier() : QMODE; if (tier === 'low') { toonUniforms.uDetail.value = 0; renderer.setPixelRatio(Math.min(devicePixelRatio, 1)); }
 const atmos = makeAtmosphere(scene, tier);
@@ -283,7 +284,7 @@ const REMEMBER_HI = (n, topic) => ({ Pixel: `Boss! Still thinking about ${topic}
 const pick = a => a[Math.floor(Math.random() * a.length)];
 window.__seatAudit = () => [...OBJS.filter(o => o.seatDef).map(o => ({ who: 'Calvin', label: o.label, pos: o.seatDef.pos, rot: o.seatDef.rot })), ...seatPlaces().map(s => ({ who: 'bot', label: s.name, pos: s.pos, rot: s.rot }))];
 // test hook: vertical clearance above Calvin's head (crown + extra for the tallest chibi) against any static mesh overhead
-window.__Box3 = THREE.Box3;
+window.__Box3 = THREE.Box3; window.__Frustum = THREE.Frustum; window.__Mat4 = THREE.Matrix4;
 window.__headClear = () => { scene.updateMatrixWorld(true); const hb = new THREE.Box3().setFromObject(calvin.userData.parts.head), extra = Math.max(0, ...chibis.map(c => new THREE.Box3().setFromObject(c.userData.parts.head).max.y - c.position.y)) - (hb.max.y - calvin.position.y);
   const top = hb.max.y + Math.max(0, extra), cx = (hb.min.x + hb.max.x) / 2, cz = (hb.min.z + hb.max.z) / 2, rx = (hb.max.x - hb.min.x) / 2 * 0.8, rz = (hb.max.z - hb.min.z) / 2 * 0.8;
   const rc = new THREE.Raycaster(); rc.far = 3; rc.camera = camera; let gap = Infinity; const skip = o => { for (let n = o; n; n = n.parent) if (n.userData.chibi || n.userData.pet || n.userData.name || n.isSprite) return true; return !o.visible; };
@@ -330,6 +331,8 @@ function loop() { const t = clock.getElapsedTime(); toonUniforms.uTime.value = t
   sky.clouds.children.forEach(c => { c.position.y += Math.sin(t * 0.3 + c.userData.drift * 6) * 0.004; });
   nature.update(t);
   { const d = camera.position.distanceTo(controls.target); toonUniforms.uFogRange.value.set(d + 15, d + 170); }
+  { const want = OCC_MODE === '0' ? 0 : (OCC_MODE === '1' || (player.follow && !player.look)) ? 1 : 0; // v17 see-through: buildings/props between camera and Calvin dither to ~25%
+    toonUniforms.uOccK.value += (want - toonUniforms.uOccK.value) * Math.min(1, dt * 3); toonUniforms.uOccP.value.set(calvin.position.x, calvin.position.y + 1.3, calvin.position.z); }
   controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop); }
 loop();
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); if (!camP) { const off = camera.position.clone().sub(controls.target).setLength(fitDistance()); camera.position.copy(controls.target).add(off); } renderer.setSize(innerWidth, innerHeight); });

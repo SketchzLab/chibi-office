@@ -29,7 +29,7 @@ async function walk(sx, sz, dx, dz, ms = 2600) { await p.evaluate((x, z) => { co
   await p.evaluate((dx, dz) => { window.__player.debugDir = [dx, dz, 1.0]; }, dx, dz); let w = 1e9; const t0 = Date.now(); while (Date.now() - t0 < ms) { await W(120); w = Math.min(w, gap(await head())); } await p.evaluate(() => { window.__player.debugDir = null; }); return w; }
 const runs = [];
 for (const s of SHOP_BLDG) { const f = s.ry ? -1 : 1, fz = s.z + f * s.d / 2; runs.push([`${s.name} front (straight)`, s.x, fz + f * 3.2, 0, -f], [`${s.name} awning corner (diagonal)`, s.x + s.w / 2 + 1.4, fz + f * 2.6, -0.6, -f], [`${s.name} awning (other diagonal)`, s.x - s.w / 2 - 1.2, fz + f * 2.4, 0.55, -f]); }
-for (const [x, z, , k] of STREET_PROPS) if (k === 'tree' || k === 'lamp' || k === 'table') { const a = Math.atan2(11 - z, 31.6 - x); runs.push([`${k} (${x},${z})`, x + Math.cos(a) * 2.6, z + Math.sin(a) * 2.6, -Math.cos(a), -Math.sin(a)]); }
+for (const [x, z, , k] of STREET_PROPS) if (k === 'tree' || k === 'lamp' || k === 'table') { const a = Math.atan2(11 - z, SHOP.cx - x); runs.push([`${k} (${x},${z})`, x + Math.cos(a) * 2.6, z + Math.sin(a) * 2.6, -Math.cos(a), -Math.sin(a)]); }
 for (const [lab, sx, sz, dx, dz] of runs.filter(r => !process.env.ONLY || r[0].includes(process.env.ONLY))) { const g = await walk(sx, sz, dx, dz); rep(g > -TOL, `${lab.padEnd(44)} closest head gap ${g.toFixed(2)}`); }
 // ---- 3. paths ----
 const boxes = [...SHOP_BLDG.map(s => shopBox(s)), ...SHOP_SIDE], circles = STREET_PROPS.map(([x, z, r]) => [x, z, r]);

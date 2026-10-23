@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { DESKS, PANTRY, LOUNGE, GLASS, ROOF, STAIRS, BALCONY, PARK, HOUSE, FIRE, GARDEN, heightAt } from './layout.js';
 // ---------- Places ----------
 // Each place: pos [x,z], rot (facing), seat (root y when seated, null = standing), approach: waypoints from the main aisle (z≈0).
-import { BOT_S, SHOP_BLDG, STREET, STREET_PROPS, AWN, shopFront } from './layout.js';
+import { BOT_S, SHOP_BLDG, SHOP_X, STREET, STREET_PROPS, TERRACE_Z, AWN, shopFront } from './layout.js';
 import { shopsOn, ootdDay } from './chibi.js';
 // seat root heights scale with chibi size (hip ~0.37 local units)
 const HIP = 0.37 * (1.5 - BOT_S); export const SEAT_CHAIR = 0.07 + HIP, SEAT_SOFA = -0.06 + HIP, SEAT_STOOL = -0.05 + HIP;
@@ -62,7 +62,7 @@ const VENUE_LABEL = { clothes: 'Shopping for a new top at Thread & Co.', cafe: '
 const actLabel = (b, a) => a === 'shop' ? VENUE_LABEL[shopVenue(b)] : (b.labels[a] || a);
 export function shopVenue(b, day = ootdDay()) { return shopsOn(b.name, day) ? 'clothes' : ['cafe', 'gadgets', 'bistro', 'stationery', 'computers'][(day + b.slot * 2) % 5]; }
 function shopPlace(b) { const v = shopVenue(b), sb = SHOP_BLDG.find(s => s.kind === v);
-  if (v === 'cafe' || v === 'bistro') { const T = STREET_PROPS.filter(p => p[3] === 'table' && (v === 'cafe' ? p[0] < 31 : p[0] > 31))[b.slot % 2], x = T[0] + (b.slot >= 2 ? 0.3 : -0.3), z = STREET.z + 0.95; // stands by a terrace table (NPC townsfolk sit at them)
+  if (v === 'cafe' || v === 'bistro') { const T = STREET_PROPS.filter(p => p[3] === 'table' && (v === 'cafe' ? p[0] < SHOP_X[1] : p[0] > SHOP_X[1]))[b.slot % 2], x = T[0] + (b.slot >= 2 ? 0.3 : -0.3), z = TERRACE_Z - 1.1; // stands by a terrace table (NPC townsfolk sit at them)
     return { pos: [x, z], rot: 0, seat: null, pose: 'sip', approach: [...TO_SHOP, [x, STREET.z - 0.2], [x, z]] }; }
   const o = [-0.3, 0.6, -0.75, 0.3][b.slot % 4], [x, z] = shopFront(sb, sb.d / 2 + AWN.out + 0.55, o), sx = x; // clear of the awning/counter collider
   return { pos: [x, z], rot: sb.ry + Math.PI, seat: null, approach: [...TO_SHOP, [sx, STREET.z], [x, z]] }; }

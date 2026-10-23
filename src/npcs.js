@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { makeChibi } from './chibi.js';
 import { applyPose, SEAT_CHAIR } from './behavior.js';
-import { STREET, STREET_PROPS, SHOP_BLDG, AWN, shopFront } from './layout.js';
+import { STREET, STREET_PROPS, SHOP_BLDG, SHOP, AWN, shopFront } from './layout.js';
 
 function skinify(root) { // root must be un-parented at identity
   root.updateMatrixWorld(true); const P = root.userData.parts, bones = [P.body, P.head, P.armL, P.armR, P.legL, P.legR], cats = { fill: [], out: [], face: [] }, mats = {};
@@ -30,9 +30,9 @@ const STYLES = ['Calvin', 'Pixel', 'Jun', 'Sage', 'Mika'];
 const KEEPER_POSE = { clothes: 'wave', gadgets: 'type', computers: 'think', cafe: 'type', stationery: 'nod', bistro: 'nod' };
 const ROW = AWN.out + 0.55, NZ = STREET.z - STREET.front + ROW + 0.0, SZ = STREET.z + STREET.front - ROW; // window-shopping line (clear of the shop colliders)
 // stroller loops: [x, z, pause s, facing while paused]
-export const NPC_LOOPS = [
-  [[21.8, 9.8], [29.8, 9.8], [29.8, NZ, 4, Math.PI], [29.8, 9.8], [40.6, 9.8], [40.6, 11.6], [29.4, 11.6], [29.4, SZ, 3.5, 0], [29.4, 11.6], [21.8, 11.6]],
-  [[40.6, 11.6], [36.6, 11.6], [36.6, NZ, 3, Math.PI], [36.6, 9.8], [22.9, 9.8], [22.9, NZ, 4, Math.PI], [22.9, 9.8], [21.8, 9.8], [21.8, 11.6], [40.6, 11.6]]];
+export const NPC_LOOPS = [ // lanes z 9 / 13 either side of the centre planters; stops in front of shop windows
+  [[22.3, 9], [48.7, 9], [48.7, NZ, 4, Math.PI], [48.7, 9], [51, 9], [51, 13], [39.9, 13], [39.9, SZ, 3.5, 0], [39.9, 13], [22.3, 13]],
+  [[51, 13], [36.4, 13], [36.4, NZ, 3, Math.PI], [36.4, 9], [29.1, 9], [29.1, NZ, 4, Math.PI], [29.1, 9], [22.3, 9], [22.3, 13], [51, 13]]];
 export function makeNPCs(scene, keepers) {
   const grp = new THREE.Group(); grp.name = 'townsfolk'; scene.add(grp); const npcs = []; let n = 0;
   const mk = (spec) => { const k = n++, c = makeChibi({ name: 'Townie' + k, role: 'Townsfolk', style: STYLES[(k * 3 + 1) % 5], lo: true, hair: HAIRS[k % HAIRS.length], shirt: SHIRTS[(k * 7 + 2) % SHIRTS.length], pants: PANTS[(k * 5) % PANTS.length], skin: SKINS[(k * 3) % SKINS.length] });
@@ -43,11 +43,11 @@ export function makeNPCs(scene, keepers) {
   const tables = STREET_PROPS.filter(p => p[3] === 'table');
   [[0, -1], [1, 1], [2, 1]].forEach(([ti, s], i) => { const [x, z] = tables[ti]; mk({ role: 'diner', pos: [x + s * 0.6, z], rot: s < 0 ? Math.PI / 2 : -Math.PI / 2, seat: SEAT_CHAIR + 0.04, pose: i === 2 ? 'nod' : 'sip' }); });
   const sb = k => SHOP_BLDG.find(s => s.kind === k);
-  [['gadgets', 1.25, 'look'], ['stationery', -1.3, 'think']].forEach(([kind, off, pose]) => { const b = sb(kind), [x, z] = shopFront(b, b.d / 2 + ROW, off); mk({ role: 'browser', pos: [x, z], rot: b.ry + Math.PI, pose }); });
+  [['gadgets', 1.25, 'look'], ['stationery', 0.9, 'think']].forEach(([kind, off, pose]) => { const b = sb(kind), [x, z] = shopFront(b, b.d / 2 + ROW, off); mk({ role: 'browser', pos: [x, z], rot: b.ry + Math.PI, pose }); });
   mk({ role: 'stroller', loop: NPC_LOOPS[0], start: 0, speed: 1.15 }); mk({ role: 'stroller', loop: NPC_LOOPS[1], start: 0, speed: 1.0 });
-  const C = new THREE.Vector3(STREET.x0 + 12, 0, STREET.z);
+  const C = new THREE.Vector3(SHOP.cx, 0, SHOP.cz);
   function update(dt, t, hour, camera) {
-    const on = hour >= 8 && hour < 19.5 && camera.position.distanceTo(C) < 46; grp.visible = on; if (!on) return;
+    const on = hour >= 8 && hour < 19.5 && camera.position.distanceTo(C) < 54; grp.visible = on; if (!on) return;
     for (const o of npcs) { const c = o.c; let pose = o.pose || 'stand', tt = t + o.k * 1.7;
       if (o.loop) { const L = o.loop; if (o.wait > 0) { o.wait -= dt; pose = 'look'; c.rotation.y = L[o.seg][3]; }
         else { const nx = (o.seg + 1) % L.length, [tx, tz] = L[nx], dx = tx - c.position.x, dz = tz - c.position.z, d = Math.hypot(dx, dz), st = o.speed * dt;
