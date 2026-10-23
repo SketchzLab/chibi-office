@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { vcolToonMat, getOutlineMat } from './toon.js';
+import { vcolToonMat, getOutlineMat, soften } from './toon.js';
 // Merge every static toon mesh under `root` into ONE vertex-coloured toon mesh + ONE outline mesh.
 // Skips subtrees flagged userData.dynamic. Returns {before, after} mesh counts.
 const sharedMat = vcolToonMat(); const basicVcol = new THREE.MeshBasicMaterial({ vertexColors: true });
 function prep(geo, mat4, color) {
-  let g = geo.index ? geo.toNonIndexed() : geo.clone();
+  geo = soften(geo); let g = geo.index ? geo.toNonIndexed() : geo.clone();
   for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal' && k !== 'color') g.deleteAttribute(k);
   g.applyMatrix4(mat4);
   if (color) { const n = g.attributes.position.count, a = new Float32Array(n * 3), src = g.attributes.color; // per-vertex tint (e.g. grass/cliff variation) x material colour

@@ -20,7 +20,7 @@ import { makeDayClock, makeDayCycle, fireflies, glowPoints, dayUniforms } from '
 import { speechAt, GREET, HI_BACK, ZONE } from './dialogue.js';
 import { buildRoot, buildGroup, pickLine, mem, setTalkClock } from './talk.js';
 
-const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true, stencil: true });
 // resolution: desktop renders at up to 2x DPR (crisp text/outlines), touch devices cap at 1.5x. Quality: Auto / High / Low (localStorage, ?q= overrides)
 const COARSE = matchMedia('(pointer: coarse)').matches; const DPR_CAP = COARSE ? 1.5 : 2; const PR_TARGET = Math.min(devicePixelRatio, DPR_CAP);
 const QMODE = (() => { const q = new URLSearchParams(location.search).get('q') || localStorage.getItem('chibiQuality') || 'auto'; return ['auto', 'high', 'low'].includes(q) ? q : 'auto'; })();
@@ -114,7 +114,7 @@ const ring = new THREE.Mesh(new THREE.RingGeometry(1.15, 1.4, 32), new THREE.Mes
 ring.rotation.x = -Math.PI / 2; ring.visible = false; scene.add(ring);
 function select(c) { selected = c; document.body.classList.toggle('cardon', !!c); card.classList.toggle('on', !!c); ring.visible = !!c;
   card.querySelector('.note').textContent = '';
-  if (c) { const per = c.userData.persona; card.querySelector('.n').textContent = c.userData.name; card.querySelector('.r').textContent = c.userData.role; card.querySelector('.chat').hidden = !chatLink(c.userData.name);
+  if (c) { const per = c.userData.persona; card.querySelector('.n').textContent = c.userData.name; card.querySelector('.r').textContent = c.userData.role + (c.userData.ootd ? ' · OOTD: ' + c.userData.ootd : ''); card.querySelector('.chat').hidden = !chatLink(c.userData.name);
     const fill = (sel, arr, tag) => { const el = card.querySelector(sel); el.replaceChildren(...arr.map(x => { const e = document.createElement(tag); e.textContent = x; return e; })); };
     fill('.tr', per.traits, 'span'); fill('.hb', per.hobbies, 'li'); fill('.ht', per.habits, 'li'); card.querySelector('.sc').scrollTop = 0; } }
 // 'Open chat' -> Grok Bot deep link; if the page is still visible shortly after, the app probably isn't installed.
@@ -285,7 +285,7 @@ window.__headClear = () => { scene.updateMatrixWorld(true); const hb = new THREE
   const top = hb.max.y + Math.max(0, extra), cx = (hb.min.x + hb.max.x) / 2, cz = (hb.min.z + hb.max.z) / 2, rx = (hb.max.x - hb.min.x) / 2 * 0.8, rz = (hb.max.z - hb.min.z) / 2 * 0.8;
   const rc = new THREE.Raycaster(); rc.far = 3; rc.camera = camera; let gap = Infinity; const skip = o => { for (let n = o; n; n = n.parent) if (n.userData.chibi || n.userData.pet || n.userData.name || n.isSprite) return true; return !o.visible; };
   const sides = new Map(); scene.traverse(o => { const m = o.material; if (o.isMesh && m && !Array.isArray(m) && m.side === THREE.FrontSide) { sides.set(m, 1); m.side = THREE.DoubleSide; } }); // undersides of open cones etc.
-  for (const [ox, oz] of [[0, 0], [rx, 0], [-rx, 0], [0, rz], [0, -rz]]) { rc.set(new THREE.Vector3(cx + ox, top - 0.6, cz + oz), new THREE.Vector3(0, 1, 0));
+  for (const [ox, oz] of [[0, 0], [rx, 0], [-rx, 0], [0, rz], [0, -rz]]) { rc.set(new THREE.Vector3(cx + ox, top - 0.3, cz + oz), new THREE.Vector3(0, 1, 0));
     const h = rc.intersectObjects(scene.children, true).find(i => i.object.isMesh && !skip(i.object) && !(i.object.material?.side === THREE.BackSide)); if (h && h.point.y - top < gap) { gap = h.point.y - top; window.__hcHit = [h.object.geometry?.type, h.object.position.toArray().map(v=>+v.toFixed(2)), +h.point.y.toFixed(2), +h.point.x.toFixed(2), +h.point.z.toFixed(2)]; } }
   sides.forEach((_, m) => { m.side = THREE.FrontSide; });
   return { top: +top.toFixed(2), gap: gap === Infinity ? null : +gap.toFixed(2), pos: [+calvin.position.x.toFixed(2), +calvin.position.y.toFixed(2), +calvin.position.z.toFixed(2)], seat: player.seat?.kind || null }; };
