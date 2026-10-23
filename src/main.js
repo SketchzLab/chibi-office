@@ -13,6 +13,7 @@ import { makeWorld } from './world.js';
 import { makePets } from './pets.js';
 import { makeHome } from './home.js';
 import { makeShops } from './shops.js';
+import { makeNPCs } from './npcs.js';
 import { makeClosets } from './wardrobe.js';
 import { makeChibi } from './chibi.js';
 import { makePlayer } from './player.js';
@@ -41,11 +42,11 @@ camera.position.copy(CAM_DIR).multiplyScalar(fitDistance()).add(new THREE.Vector
 const camP = new URLSearchParams(location.search).get('cam'); if (camP) camera.position.set(...camP.split(',').map(Number));
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.target.set(0, -2.5, 0); const tgtP = new URLSearchParams(location.search).get('tgt'); if (tgtP) { controls.target.set(...tgtP.split(',').map(Number)); controls.minDistance = 3; } controls.enableDamping = true; controls.enablePan = false;
-controls.minDistance = 12; controls.maxDistance = 110; controls.minPolarAngle = 0.3; controls.maxPolarAngle = 1.35;
+controls.minDistance = tgtP ? 3 : 12; controls.maxDistance = 110; controls.minPolarAngle = 0.3; controls.maxPolarAngle = tgtP ? 1.62 : 1.35; // ?tgt= debug shots may come closer
 const sky = makeSky(scene);
 const island = makeIsland(scene);
 const nature = makeNature(scene);
-makeOffice(scene); makeWorld(scene, nature.waterMat); const home = makeHome(scene); window.__home = home; window.__shops = makeShops(scene); window.__closets = makeClosets(scene);
+makeOffice(scene); makeWorld(scene, nature.waterMat); const home = makeHome(scene); window.__home = home; window.__shops = makeShops(scene); const npcs = makeNPCs(scene, window.__shops.userData.keepers); window.__npcs = npcs; window.__closets = makeClosets(scene);
 // ---- Bots: look + persona + clock-driven brain ----
 const chibis = [], brains = [];
 for (const [name, per] of Object.entries(PERSONAS)) {
@@ -54,7 +55,7 @@ for (const [name, per] of Object.entries(PERSONAS)) {
 }
 export { chibis }; window.__scene = scene; window.__camera = camera;
 const player = makePlayer({ scene, camera, controls, bots: chibis }); const calvin = player.chibi; window.__player = player;
-player.setHome(camera.position, controls.target);
+player.setHome(camera.position, controls.target); window.__cam = camera;
 // ---- cozy FX + quality tier ----
 let tier = QMODE === 'auto' ? pickTier() : QMODE; if (tier === 'low') { toonUniforms.uDetail.value = 0; renderer.setPixelRatio(Math.min(devicePixelRatio, 1)); }
 const atmos = makeAtmosphere(scene, tier);
@@ -318,7 +319,7 @@ function loop() { const t = clock.getElapsedTime(); toonUniforms.uTime.value = t
     home.covers[n].visible = !!bs.asleep; if (bs.asleep) home.covers[n].scale.y = 1 + (breath(c, t) * 0.5 + 0.5) * 0.07; });
   flies.forEach(f => { f.visible = ds.fireflies > 0.01; f.material.uniforms.uA.value = ds.fireflies; f.material.uniforms.uTime.value = t; });
   frames++; const now=performance.now(); if(now-last>1000){window.__info=renderer.info.render; window.__fps=frames*1000/(now-last); autoTier(window.__fps, t); fpsEl.textContent=window.__fps.toFixed(0)+' fps'; frames=0; last=now;}
-  player.update(dt, t); petsys.update(dt, t, wt); interact(wt, t, dt);
+  player.update(dt, t); petsys.update(dt, t, wt); npcs.update(dt, t, dayClock() / 3600, camera); interact(wt, t, dt);
   const sp = speechAt(wt, talkers);
   talkersAll.forEach((c, i) => { const nm = c.userData.name, bs = c.userData.brain?.state; const loc = localSay[nm]; let text = loc && loc.until > wt ? loc.text : (sp && sp.name === nm ? sp.text : '');
     drawBubble(bubbles[i], bs ? (bs.walking ? '🚶' : actEmoji(bs.act)) : '', text); const bb = bubbles[i]; bb.sp.visible = bb.big || !!bs;

@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { DESKS, PANTRY, LOUNGE, GLASS, ROOF, STAIRS, BALCONY, PARK, HOUSE, FIRE, GARDEN, heightAt } from './layout.js';
 // ---------- Places ----------
 // Each place: pos [x,z], rot (facing), seat (root y when seated, null = standing), approach: waypoints from the main aisle (z≈0).
-import { BOT_S, SHOP_BLDG, shopFront } from './layout.js';
+import { BOT_S, SHOP_BLDG, STREET, STREET_PROPS, AWN, shopFront } from './layout.js';
+import { shopsOn, ootdDay } from './chibi.js';
 // seat root heights scale with chibi size (hip ~0.37 local units)
 const HIP = 0.37 * (1.5 - BOT_S); export const SEAT_CHAIR = 0.07 + HIP, SEAT_SOFA = -0.06 + HIP, SEAT_STOOL = -0.05 + HIP;
 export function deskPlace(i) { const [x, z] = DESKS[i]; const back = z < 0, sz = back ? z + 1.0 : z - 1.0, side = back ? 0.95 : -0.95, az = back ? -0.25 : 0.25;
@@ -54,11 +55,19 @@ export const SLEEP_Y = 0.86; // flat on the back: torso on the mattress, head on
 function bedPlace(b) { const r = HOUSE.rooms.find(r => r.who === b.name) || HOUSE.rooms[b.slot % 4]; const bz = HOUSE.z1 - 0.85;
   return { pos: [r.cx + 0.95, bz], rot: Math.PI / 2, seat: SLEEP_Y, lie: true, approach: [...TO_HOME, [r.cx + 0.4, HOUSE.z0 - 1.2], [r.cx + 0.4, HOUSE.z0 + 1.4], [r.cx + 0.95, bz - 0.2], [r.cx + 0.95, bz]] }; }
 // ---------- Shopping island (v12): browse in front of a boutique; purchases are the deterministic chibi.js buyOn() rule ----------
-const TO_SHOP = [[2.7, 0.25], [2.7, 8.4], [3.4, 13.9], [6.4, 14.6], [9.2, 13.9], [12.0, 11.0], [21.2, 11.0]];
-function shopPlace(slot) { const b = SHOP_BLDG[slot % 3], [x, z] = shopFront(b, 2.4, slot >= 3 ? 0.3 : -0.4), [ax, az] = shopFront(b, 3.4, slot >= 3 ? 0.3 : -0.4);
-  return { pos: [x, z], rot: b.ry + Math.PI, seat: null, approach: [...TO_SHOP, [ax, az], [x, z]] }; }
+const TO_SHOP = [[2.7, 0.25], [2.7, 8.4], [3.4, 13.9], [6.4, 14.6], [9.2, 13.9], [12.0, 11.0], [21.2, 11.0], [22.6, 11.0]];
+// v15 high street: on a shopping day (chibi.js shopsOn — the same rule that adds the bought top to the wardrobe) a bot goes to
+// Thread & Co.; otherwise it drops by the café, bistro, gadget, computer or stationery shop (rotates by day + slot).
+const VENUE_LABEL = { clothes: 'Shopping for a new top at Thread & Co.', cafe: 'Coffee break at Bean There café', bistro: 'Grabbing a bite at Little Bistro', gadgets: 'Window-shopping gadgets at Gizmo Hub', stationery: 'Picking up pens at Paper Plane', computers: 'Browsing PC parts at Byte Works' };
+const actLabel = (b, a) => a === 'shop' ? VENUE_LABEL[shopVenue(b)] : (b.labels[a] || a);
+export function shopVenue(b, day = ootdDay()) { return shopsOn(b.name, day) ? 'clothes' : ['cafe', 'gadgets', 'bistro', 'stationery', 'computers'][(day + b.slot * 2) % 5]; }
+function shopPlace(b) { const v = shopVenue(b), sb = SHOP_BLDG.find(s => s.kind === v);
+  if (v === 'cafe' || v === 'bistro') { const T = STREET_PROPS.filter(p => p[3] === 'table' && (v === 'cafe' ? p[0] < 31 : p[0] > 31))[b.slot % 2], x = T[0] + (b.slot >= 2 ? 0.3 : -0.3), z = STREET.z + 0.95; // stands by a terrace table (NPC townsfolk sit at them)
+    return { pos: [x, z], rot: 0, seat: null, pose: 'sip', approach: [...TO_SHOP, [x, STREET.z - 0.2], [x, z]] }; }
+  const o = [-0.3, 0.6, -0.75, 0.3][b.slot % 4], [x, z] = shopFront(sb, sb.d / 2 + AWN.out + 0.55, o), sx = x; // clear of the awning/counter collider
+  return { pos: [x, z], rot: sb.ry + Math.PI, seat: null, approach: [...TO_SHOP, [sx, STREET.z], [x, z]] }; }
 const ACTS = {
-  shop: { place: b => shopPlace(b.slot), pose: () => 'stand', emoji: '🛍️' },
+  shop: { place: b => shopPlace(b), pose: b => { const v = shopVenue(b); return v === 'cafe' || v === 'bistro' ? 'sip' : 'stand'; }, emoji: '🛍️' },
   home: { place: b => homePlace(b), pose: b => (homeSpot[b.name] ?? b.slot) < 3 ? 'warm' : 'water', emoji: '🔥' },
   sleep: { place: b => bedPlace(b), pose: () => 'sleep', emoji: '💤' },
   work: { place: b => deskPlace(b.desk), pose: b => b.deskStyle, emoji: '💻' },
@@ -120,7 +129,7 @@ export function makeBrain(chibi, persona) {
       if (r.elapsed < travel) { const d = Math.max(0, (r.elapsed - 0.3) * SPEED); [x, z, rot] = along(pts, d); walking = r.elapsed > 0.3 && d < pathLen(pts); pose = walking ? 'walk' : 'stand'; if (!walking) rot = chibi.rotation.y; }
       else { [x, z] = to.pos; rot = to.rot; pose = A.pose(b);
         if (to.pace) { const L2 = pathLen(to.pace), u = ((r.elapsed - travel) * 1.1) % (2 * L2), d = u < L2 ? u : 2 * L2 - u; const pp = along(u < L2 ? to.pace : [...to.pace].reverse(), u < L2 ? d : u - L2); [x, z] = pp; rot = pp[2]; walking = true; pose = 'walk'; } }
-      st.act = r.act; st.walking = walking; st.label = walking && pose === 'walk' && !to.pace ? (r.act === 'work' ? 'Heading back to the desk' : 'On the way: ' + (b.labels[r.act] || r.act).toLowerCase()) : (b.labels[r.act] || r.act);
+      st.act = r.act; st.walking = walking; st.label = walking && pose === 'walk' && !to.pace ? (r.act === 'work' ? 'Heading back to the desk' : 'On the way: ' + actLabel(b, r.act).toLowerCase()) : actLabel(b, r.act);
       st.seated = !walking && pose !== 'stand' && to.seat !== null; st.asleep = !walking && pose === 'sleep';
       chibi.userData.setSleepFace?.(!!st.asleep);
       if (st.asleep) { const k = Math.min(1, dt * 4); chibi.rotation.x += (-1.57 - chibi.rotation.x) * k; } else chibi.rotation.x += (0 - chibi.rotation.x) * Math.min(1, dt * 6);
@@ -148,6 +157,7 @@ export function applyPose(c, pose, t, dt, seated, b) {
       tgt.armL = [0.05, turn === 1 ? -0.5 : -0.12]; tgt.armR = [turn === 2 ? -0.6 : 0.05, 0.12]; tgt.legL = [0, 0]; tgt.legR = [turn === 2 ? 0.2 : 0, 0]; tgt.bodyY = 0; tgt.headX = -0.12;
       tgt.headY = [0.55, 0.15, 0.8][turn]; tgt.headZ = [0, 0.12, -0.1][turn]; break; } // lying face-up, head turned a little toward the room
     case 'warm': { tgt.armL = [-1.3, 0.3 + Math.sin(t * 0.8) * 0.05]; tgt.armR = [-1.3, -0.3 - Math.sin(t * 0.8) * 0.05]; tgt.headX = 0.08; tgt.headZ = Math.sin(t * 0.5) * 0.08; tgt.bodyY = Math.sin(t * 1.2) * 0.01; break; }
+    case 'run': { const w = Math.sin(t * 9); tgt.legL = [w * 1.05, 0]; tgt.legR = [-w * 1.05, 0]; tgt.armL = [-w * 1.0 - 0.25, -0.16]; tgt.armR = [w * 1.0 - 0.25, 0.16]; tgt.bodyY = Math.abs(Math.cos(t * 9)) * 0.13; tgt.bodyX = 0.2; tgt.headX = -0.1; tgt.headZ = w * 0.04; break; } // v15 run: bigger swing, bent arms, forward lean
     case 'walk': { const w = Math.sin(t * 9); tgt.legL = [w * 0.7, 0]; tgt.legR = [-w * 0.7, 0]; tgt.armL = [-w * 0.6, -0.1]; tgt.armR = [w * 0.6, 0.1]; tgt.bodyY = Math.abs(Math.cos(t * 9)) * 0.08; tgt.headZ = w * 0.05; break; }
     case 'type': case 'bob': { const a = Math.sin(t * 14), c2 = Math.sin(t * 13 + 1.3); tgt.armL = [-1.05 + a * 0.06, 0.25]; tgt.armR = [-1.05 + c2 * 0.06, -0.25]; tgt.headX = 0.12;
       if (pose === 'bob') { tgt.headX = 0.1 + Math.max(0, Math.sin(t * 7.6)) * 0.14; tgt.headZ = Math.sin(t * 3.8) * 0.06; } break; }

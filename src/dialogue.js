@@ -1,7 +1,7 @@
 // Dialogue bank + deterministic scheduler.
 // Every device computes the same conversation for the same UTC slot: slot index -> seeded RNG,
 // and who is where comes from each brain's pure actAt(t). No network needed.
-export const ZONE = { home: 'campfire', sleep: 'bed', pantry: 'pantry', game: 'lounge', read: 'lounge', sketch: 'lounge', meeting: 'meeting', work: 'desk', fidget: 'desk', bob: 'desk', stretch: 'desk', pace: 'desk' };
+export const ZONE = { home: 'campfire', sleep: 'bed', pantry: 'pantry', game: 'lounge', read: 'lounge', sketch: 'lounge', meeting: 'meeting', work: 'desk', fidget: 'desk', bob: 'desk', stretch: 'desk', pace: 'desk', shop: 'street' };
 
 // Solo desk quips (said to nobody in particular).
 export const QUIPS = {

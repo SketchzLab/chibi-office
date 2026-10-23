@@ -143,11 +143,11 @@ const hashD = (name, d, k) => { let x = (Math.imul(d, 2654435761) ^ Math.imul([.
 export const shopsOn = (name, d) => name !== 'Calvin' && hashD(name, d, 1) % 4 === 0; // a shopping day for this bot?
 export const buyOn = (name, d) => shopsOn(name, d) ? SHOP_STOCK[hashD(name, d, 2) % SHOP_STOCK.length] : null;
 export function purchases(name, day = ootdDay()) { const out = []; for (let d = SHOP_START; d < day; d++) { const it = buyOn(name, d); if (it && !out.includes(it)) out.push(it); } return out; }
-export function wardrobeTops(name, L, day = ootdDay()) { return [...(WARDROBE[name] || WARDROBE.Calvin)(L).top, ...purchases(name, day)]; }
+export function wardrobeTops(name, L, day = ootdDay(), style = name) { return [...(WARDROBE[style] || WARDROBE.Calvin)(L).top, ...purchases(name, day)]; }
 /* outfit day: UTC+8 calendar day (stable all day), ?ootd=N overrides */
 export function ootdDay() { const q = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('ootd') : null; return q != null && q !== '' ? +q : Math.floor((Date.now() / 1000 + 8 * 3600) / 86400); }
 const hashN = s => [...s].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7);
-export function pickOOTD(name, L, day = ootdDay()) { const W = { ...(WARDROBE[name] || WARDROBE.Calvin)(L) }, h = hashN(name); W.top = wardrobeTops(name, L, day); const pk = (arr, m, a) => { let x = (day * 2654435761 + h * a + m * 40503) >>> 0; x = Math.imul(x ^ (x >>> 15), 2246822519) >>> 0; x = Math.imul(x ^ (x >>> 13), 3266489917) >>> 0; return arr[((x ^ (x >>> 16)) >>> 0) % arr.length]; };
+export function pickOOTD(name, L, day = ootdDay(), style = name) { const W = { ...(WARDROBE[style] || WARDROBE.Calvin)(L) }, h = hashN(name); W.top = wardrobeTops(name, L, day, style); const pk = (arr, m, a) => { let x = (day * 2654435761 + h * a + m * 40503) >>> 0; x = Math.imul(x ^ (x >>> 15), 2246822519) >>> 0; x = Math.imul(x ^ (x >>> 13), 3266489917) >>> 0; return arr[((x ^ (x >>> 16)) >>> 0) % arr.length]; };
   const arr0 = a => a[(((day + h) % a.length) + a.length) % a.length]; const o = { top: arr0(W.top), bottom: pk(W.bottom, 3, 5), shoes: pk(W.shoes, 5, 3), head: pk(W.head, 7, 11), acc: pk(W.acc, 2, 13) };
   if (o.top[2].up) { o.head = NONE[0]; if (o.acc[1] === 'headphones') o.acc = NONE[0]; }
   o.label = [o.top, o.bottom, o.shoes, o.head, o.acc].map(x => x[0]).filter(Boolean).join(', '); return o; }
@@ -157,9 +157,9 @@ let STENCIL_ID = 0; const OUT = new THREE.MeshBasicMaterial({ color: 0x1d2050, s
 OUT.onBeforeCompile = s => { s.vertexShader = s.vertexShader.replace('#include <begin_vertex>', 'vec3 transformed = position + normal * 0.03;').replace('#include <project_vertex>', '#include <project_vertex>\n gl_Position.z += 0.003 * gl_Position.w;'); };
 const KEY = new THREE.Vector3(-0.45, 0.8, 0.45).normalize(), SH = new THREE.Color(0x98a0d4);
 
-export function makeChibi({ name, role, skin = 0xf0c4a6, hair, shirt, pants, day }) {
+export function makeChibi({ name, role, skin = 0xf0c4a6, hair, shirt, pants, day, style = name, lo = false }) { // style: persona whose hair/wardrobe/build to borrow (NPCs); lo: coarser sculpt (NPC LOD)
   const root = new THREE.Group(); root.userData = { name, role, activity: 'Working at desk' };
-  const L = { hair: mute(hair), shirt: mute(shirt), pants: mute(pants), skin: mute(skin, 0.1) }, dd0 = day ?? ootdDay(), fit = pickOOTD(name, L, dd0);
+  const L = { hair: mute(hair), shirt: mute(shirt), pants: mute(pants), skin: mute(skin, 0.1) }, dd0 = day ?? ootdDay(), fit = pickOOTD(name, L, dd0, style);
   /* atlas: 8x8 tiles painted lazily as outfit parts ask for them */
   const AN = 8, cv = document.createElement('canvas'); cv.width = cv.height = T * AN; const g = cv.getContext('2d'); const tiles = {}; let nt = 0; seed = (name || 'x').length * 977 + 13;
   const t = (fn, base, o = {}) => { const key = fn + new THREE.Color(base).getHexString() + JSON.stringify(o); if (tiles[key] === undefined) { if (nt >= AN * AN) return 'skin'; const i = nt++;
@@ -176,13 +176,13 @@ export function makeChibi({ name, role, skin = 0xf0c4a6, hair, shirt, pants, day
     if (part === 'body') y += LIFT; else if (part === 'legL' || part === 'legR') { if (y < -0.3) y -= LIFT; else { h += LIFT * 0.9; y -= LIFT * 0.45; } }
     const mn = Math.min(w, h, d), blob = o.blob ?? false; let geo;
     if (blob) { /* sculpted mass: subdivided box blended toward an ellipsoid, then tapered / sagged / quilted / bent; faceted */
-      const sy = o.sy ?? (h > 0.5 ? 5 : 3); geo = new THREE.BoxGeometry(w, h, d, 4, Math.max(4, sy), 4); const pa = geo.attributes.position, v = new THREE.Vector3(), rnd0 = o.round ?? 0.9;
+      const sy = o.sy ?? (h > 0.5 ? 5 : 3); geo = lo ? new THREE.BoxGeometry(w, h, d, 2, 3, 2) : new THREE.BoxGeometry(w, h, d, 4, Math.max(4, sy), 4); const pa = geo.attributes.position, v = new THREE.Vector3(), rnd0 = o.round ?? 0.9;
       for (let i = 0; i < pa.count; i++) { v.set(pa.getX(i) / (w / 2), pa.getY(i) / (h / 2), pa.getZ(i) / (d / 2)); const u = v.clone().normalize().multiplyScalar(Math.max(Math.abs(v.x), Math.abs(v.y), Math.abs(v.z))); v.lerp(u, rnd0);
         const yn = v.y; let sc = 1 + (yn > 0 ? (o.tp || 0) * yn : (o.bt || 0) * -yn); if (o.quilt) sc *= 1 + o.quilt * Math.cos(yn * Math.PI * (o.qn ?? 2.5)); { const pf = o.puff ?? (h > 0.4 ? 0.05 : 0); if (pf) sc *= 1 + pf * (1 - yn * yn); }
         let X = v.x * w / 2 * sc, Y = v.y * h / 2, Z = v.z * d / 2 * sc; if (o.sag) Z += o.sag * (1 - yn) * (1 - yn) * 0.25 * d * (v.z > 0 ? 1 : 0.3); if (o.bend) { const k = (1 - yn) / 2; X += o.bend * k * k * h; Z += (o.bendz || 0) * k * k * h; } if (o.lean) Z += o.lean * (yn + 1) / 2 * h; const cv = o.carve; if (cv && Z > cv.z && Math.abs(X) < cv.x && Y > cv.y0 && Y < cv.y1) Z = cv.z;
         pa.setXYZ(i, X, Y, Z); }
       geo = geo.toNonIndexed(); geo.computeVertexNormals(); }
-    else { geo = new RoundedBoxGeometry(w, h, d, 1, mn * 0.2); if (geo.index) geo = geo.toNonIndexed();
+    else { geo = lo ? new THREE.BoxGeometry(w, h, d) : new RoundedBoxGeometry(w, h, d, 1, mn * 0.2); if (geo.index) geo = geo.toNonIndexed();
       const pa = geo.attributes.position, tp = o.tp || 0, bt = o.bt || 0; if (tp || bt) for (let i = 0; i < pa.count; i++) { const yn = pa.getY(i) / (h / 2), s = 1 + (yn > 0 ? tp * yn : bt * -yn); pa.setX(i, pa.getX(i) * s); pa.setZ(i, pa.getZ(i) * s); } }
     const uv = geo.attributes.uv, k = tiles[tk] ?? tiles.skin, u0 = (k % AN) / AN, v0 = 1 - ((k / AN | 0) + 1) / AN, s = 1 / AN, e = 0.5 / (T * AN);
     for (let i = 0; i < uv.count; i++) uv.setXY(i, u0 + e + uv.getX(i) * (s - 2 * e), v0 + e + uv.getY(i) * (s - 2 * e));
@@ -192,11 +192,11 @@ export function makeChibi({ name, role, skin = 0xf0c4a6, hair, shirt, pants, day
     geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
     geo.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(1, 1, 1))); geos[part].push(geo); };
   /* anatomy (soft, tapered head) + today's outfit */
-  const girl = GIRLS.has(name); box('head', girl ? 0.76 : 0.8, 0.62, 0.66, 0, -0.04, 0, 'skin', { bt: girl ? -0.12 : -0.04 }); box('body', 0.3, 0.14, 0.3, 0, 1.38, 0, 'skin', { r: 0.4 });
+  const girl = GIRLS.has(style); box('head', girl ? 0.76 : 0.8, 0.62, 0.66, 0, -0.04, 0, 'skin', { bt: girl ? -0.12 : -0.04 }); box('body', 0.3, 0.14, 0.3, 0, 1.38, 0, 'skin', { r: 0.4 });
   ['armL', 'armR'].forEach(a => box(a, 0.22, 0.18, 0.24, 0, -0.5, 0.02, 'skin', { r: 0.48 }));
   TOPS[fit.top[1]](box, t, fit.top[2]); BOTTOMS[fit.bottom[1]](box, t, fit.bottom[2]); shoes(box, t, { kind: fit.shoes[1], ...fit.shoes[2] });
   const hat = fit.head[1], cov = fit.top[2].up ? 'hood' : hat ? 'hat' : null; if (hat) HATS[hat](box, t, fit.head[2]);
-  const HC = name === 'Sage' ? 0xa8a6cc : L.hair, hk = t('cel', HC, { lo: -0.36, hi: 0.2, specks: 3 }), hkd = t('flat', tone(HC, -0.4)); (HAIR[name] || HAIR.Calvin)(box, hk, hkd, cov, t('cel', L.shirt, { hi: 0.25 })); /* fringe peeking under the hood */
+  const HC = style === 'Sage' && name === 'Sage' ? 0xa8a6cc : L.hair, hk = t('cel', HC, { lo: -0.36, hi: 0.2, specks: 3 }), hkd = t('flat', tone(HC, -0.4)); (HAIR[style] || HAIR.Calvin)(box, hk, hkd, cov, t('cel', L.shirt, { hi: 0.25 })); /* fringe peeking under the hood */
   [].concat(fit.acc[1] || []).forEach(a => ACC[a](box, t, fit.acc[2], !!hat));
   root.userData.ootd = fit.label; root.userData.mask = /mask/i.test(fit.label); root.userData.ootdDay = dd0;
   const body = new THREE.Group(), head = new THREE.Group(), armL = new THREE.Group(), armR = new THREE.Group(), legL = new THREE.Group(), legR = new THREE.Group();
@@ -213,7 +213,7 @@ export function makeChibi({ name, role, skin = 0xf0c4a6, hair, shirt, pants, day
     head.scale.setScalar(girl ? 0.8 : 0.83); body.children.filter(m => m.isMesh).forEach(m => { m.scale.set(girl ? 0.98 : 1.14, 1, girl ? 1.02 : 1.1); m.rotation.set(0.03, 0.02, -0.01); });
   const pocket = fit.top[1] === 'hoodie' || fit.top[1] === 'jacket'; root.userData.pocket = pocket; armL.children.forEach(m => m.rotation.set(pocket ? -0.3 : -0.1, 0, pocket ? 0.2 : 0.05)); armR.children.forEach(m => m.rotation.set(pocket ? -0.22 : 0.12, 0, pocket ? -0.2 : -0.04)); /* arms hang & hug the body */ // smaller head vs chunkier body (ref proportions)
   // ---- face: open = black vertical-oval eyes + heavy brow; shut = flat lids + per-bot sleep mouth (kept separate for setSleepFace)
-  const fz = 0.335, fg = (w, h, col, x, y, z = fz, rz = 0) => { let gg = new RoundedBoxGeometry(w, h, 0.03, 1, Math.min(w, h) * 0.45); if (gg.index) gg = gg.toNonIndexed(); gg.rotateZ(rz); gg.translate(x, y, z);
+  const fz = 0.335, fg = (w, h, col, x, y, z = fz, rz = 0) => { let gg = lo ? new THREE.BoxGeometry(w, h, 0.03) : new RoundedBoxGeometry(w, h, 0.03, 1, Math.min(w, h) * 0.45); if (gg.index) gg = gg.toNonIndexed(); gg.rotateZ(rz); gg.translate(x, y, z);
     const c = new THREE.Color(col), a = new Float32Array(gg.attributes.position.count * 3); for (let i = 0; i < a.length; i += 3) { a[i] = c.r; a[i + 1] = c.g; a[i + 2] = c.b; } gg.setAttribute('color', new THREE.BufferAttribute(a, 3));
     for (const k of Object.keys(gg.attributes)) if (k !== 'position' && k !== 'color') gg.deleteAttribute(k); return gg; };
   const BROW = tone(L.hair, -0.5).getHex(), MOUTH = 0x6a2f3e, openG = [], shutG = [];

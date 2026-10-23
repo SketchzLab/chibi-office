@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { makeChibi } from './chibi.js';
 import { applyPose } from './behavior.js';
-import { CALVIN_S, DESKS, BOSS_DESK, GLASS, LOUNGE, PANTRY, BACK_Z, FLOOR, LEFT_X, ROOF, STAIRS, BALCONY, PARK, TREES, POOL, WALK_R, inR, heightAt, canopyRadius, headReach, HEAD_R, HEAD_M, PLANTS, PLANT_SPHERES, HOUSE, FIRE, GARDEN, BRIDGE, walkClamp, inBridge, onHome, inBridge2, onShop, SHOP_BLDG, SHOP, shopFront } from './layout.js';
+import { CALVIN_S, DESKS, BOSS_DESK, GLASS, LOUNGE, PANTRY, BACK_Z, FLOOR, LEFT_X, ROOF, STAIRS, BALCONY, PARK, TREES, POOL, WALK_R, inR, heightAt, canopyRadius, headReach, HEAD_R, HEAD_M, PLANTS, PLANT_SPHERES, HOUSE, FIRE, GARDEN, BRIDGE, walkClamp, inBridge, onHome, inBridge2, onShop, SHOP_BLDG, SHOP_SIDE, STREET_TREE, shopBox, STREET_PROPS, SHOP, shopFront } from './layout.js';
 
 const R = 0.42; // body radius (legs/torso vs low furniture, railings)
 const RH = HEAD_R + HEAD_M; // head radius + margin vs anything head-high (walls, glass, panels, foliage)
@@ -27,16 +27,16 @@ const HOME_CIRCLES = [[FIRE.x, FIRE.z, 0.82], ...FIRE.logs.flatMap(L => [-0.55, 
 const HOME_BOXES = [...HB, [HOUSE.x0 - 0.9, HOUSE.z0 + 1.2, HOUSE.x0, HOUSE.z1], [HOUSE.x1, HOUSE.z0 + 1.2, HOUSE.x1 + 0.9, HOUSE.z1], // rim wedges beside the side walls (rim clamp would shove the head into the wall)
   [GARDEN.x - GARDEN.w / 2, GARDEN.z - GARDEN.d / 2, GARDEN.x + GARDEN.w / 2, GARDEN.z + GARDEN.d / 2]];
 const CIRCLES0 = [[L.cx, L.cz, 0.65], [(GLASS.x0 + GLASS.x1) / 2, (GLASS.z0 + GLASS.z1) / 2, 1.25], [-4.6, -7.2, 0.5], [7.4, 2.6, 0.62], [-2.4, 7.2, 0.5], [6.6, 6.9, 0.62], [10.2, -1.2, 0.5], [-3.9, 7.3, 0.3], [9.6, 3.2, 0.3], [-10.2, 7.3, 0.4], [10.1, 7.1, 0.5]];
-const SHOP_CIRCLES = [...SHOP_BLDG.map(b => [b.x, b.z, 1.55]), ...SHOP_BLDG.map(b => [...shopFront(b, 2.1, 1.0), 0.35])]; // shops + clothes racks
-const BOXES = [...BOXES0, ...HOME_BOXES], CIRCLES = [...CIRCLES0, ...HOME_CIRCLES, ...SHOP_CIRCLES];
+const SHOP_CIRCLES = STREET_PROPS.map(([x, z, r]) => [x, z, r]), SHOP_BOXES = [...SHOP_BLDG.map(b => shopBox(b)), ...SHOP_SIDE]; // v16 high street: shop blocks incl. awning/counter footprint + side props + street furniture
+const BOXES = [...BOXES0, ...HOME_BOXES, ...SHOP_BOXES], CIRCLES = [...CIRCLES0, ...HOME_CIRCLES, ...SHOP_CIRCLES];
 // ---- two-level collision: ground (office + lawn), stairs (ramp, side-clamped), rooftop ----
 const P = PARK;
 // head-high thin walls/panels: pushed with the HEAD radius so the big round head never pokes through
 const TALL_BOXES = [[FLOOR.x0, BACK_Z - 0.12, FLOOR.x1, BACK_Z + 0.1], [LEFT_X - 0.12, FLOOR.z0, LEFT_X + 0.12, FLOOR.z1], // back wall, left wall
   [GLASS.x0, GLASS.z1 - 0.06, GLASS.door0, GLASS.z1 + 0.06], [GLASS.x1 - 0.06, GLASS.z0, GLASS.x1 + 0.06, GLASS.z1 + 0.06], // glass room panes (door gap)
-  [ROOF.x0, ROOF.z0, ROOF.x1, ROOF.z1], ...HOUSE_TALL]; // annex block walls (roof only reachable from above), home longhouse
+  [ROOF.x0, ROOF.z0, ROOF.x1, ROOF.z1], ...HOUSE_TALL, ...SHOP_BLDG.map(b => shopBox(b, 0)), ...SHOP_SIDE]; // annex block walls (roof only reachable from above), home longhouse
 // trees: trunk is a body circle; foliage is a head circle sized from the real canopy spheres (3D head-vs-sphere clearance)
-const TALL_CIRCLES = [...TREES.map(([x, z, s]) => [x, z, canopyRadius(s) - RH]), ...PLANTS.map(([x, z, s]) => [x, z, headReach(PLANT_SPHERES, s) - RH]), ...HOME_CIRCLES.filter(c => c[2] === 0.1).map(([x, z]) => [x, z, 0.16])]; // + lantern posts // pushOut adds RH back
+const TALL_CIRCLES = [...TREES.map(([x, z, s]) => [x, z, canopyRadius(s) - RH]), ...PLANTS.map(([x, z, s]) => [x, z, headReach(PLANT_SPHERES, s) - RH]), ...HOME_CIRCLES.filter(c => c[2] === 0.1).map(([x, z]) => [x, z, 0.16]), ...STREET_PROPS.filter(p => p[3] === 'tree').map(([x, z]) => [x, z, STREET_TREE.canopyR + HEAD_R + 0.05 - RH]), ...STREET_PROPS.filter(p => p[3] === 'lamp').map(([x, z]) => [x, z, 0.1])]; // + lamp posts (head vs pole) // + street-tree canopies (3D: canopy above the head line) // + lantern posts // pushOut adds RH back
 const GROUND_BOXES = [
   [STAIRS.x0, STAIRS.z0 - 0.1, STAIRS.x1 - 0.5, STAIRS.z0 + 0.02], [STAIRS.x0, STAIRS.z1 - 0.02, STAIRS.x1 - 0.5, STAIRS.z1 + 0.1]]; // stair sides
 const GROUND_CIRCLES = [...TREES.map(([x, z, s]) => [x, z, 0.24 * s]), [POOL.x, POOL.z, 2.5], [-8.6, 9.6, 1.4], [-1.2, 13.0, 0.8], [P.cx, P.cz, 1.15],
@@ -96,6 +96,10 @@ body.cardon #actb,body.cardon #imenu{display:none!important}`;
     j.addEventListener('pointerdown', e => { id = e.pointerId; j.setPointerCapture(id); mv(e); e.preventDefault(); });
     j.addEventListener('pointermove', e => { if (e.pointerId === id) mv(e); });
     const up = e => { if (e.pointerId !== id) return; id = null; joy.x = joy.y = 0; kn.style.transform = ''; }; j.addEventListener('pointerup', up); j.addEventListener('pointercancel', up); }
+  // ---- run toggle (v15): Shift on keyboard; a latching 🏃 button for touch (or ?joy) ----
+  const runb = document.createElement('button'); runb.id = 'runb'; runb.className = 'hudb'; runb.type = 'button'; runb.textContent = '🚶 Walk';
+  runb.style.cssText = 'left:calc(max(18px,env(safe-area-inset-left)) + clamp(104px,30vmin,148px) + 12px);bottom:max(26px,env(safe-area-inset-bottom));display:' + (touch ? 'block' : 'none');
+  runb.addEventListener('click', () => { api.runOn = !api.runOn; runb.textContent = api.runOn ? '🏃 Run' : '🚶 Walk'; runb.style.background = api.runOn ? '#ffd36a' : ''; }); document.body.appendChild(runb);
   // ---- camera follow toggle ----
   let follow = false; const camb = document.createElement('button'); camb.id = 'camb'; camb.className = 'hudb'; camb.type = 'button';
   const setFollow = f => { follow = f; camb.textContent = f ? '🗺️ Overview' : '🎥 Follow Calvin'; if (!f) { home.active = true; } }; document.body.appendChild(camb);
@@ -105,7 +109,7 @@ body.cardon #actb,body.cardon #imenu{display:none!important}`;
   const api = { chibi: c, speed: 0, moved: false, get follow() { return follow; }, setFollow, joy, keys };
   api.update = (dt, t) => {
     let ix = 0, iy = 0; if (keys.has('a') || keys.has('arrowleft')) ix -= 1; if (keys.has('d') || keys.has('arrowright')) ix += 1; if (keys.has('w') || keys.has('arrowup')) iy -= 1; if (keys.has('s') || keys.has('arrowdown')) iy += 1;
-    let mag; if (ix || iy) { const l = Math.hypot(ix, iy); ix /= l; iy /= l; mag = keys.has('shift') ? 1 : 0.6; } else { ix = joy.x; iy = joy.y; mag = Math.min(1, Math.hypot(ix, iy)); if (mag < 0.12) mag = 0; else { ix /= mag; iy /= mag; } }
+    let mag; if (ix || iy) { const l = Math.hypot(ix, iy); ix /= l; iy /= l; mag = keys.has('shift') || api.runOn ? 1 : 0.6; } else { ix = joy.x; iy = joy.y; mag = Math.min(1, Math.hypot(ix, iy)); if (mag < 0.12) mag = 0; else { ix /= mag; iy /= mag; if (api.runOn) mag = 1; else mag = Math.min(mag, 0.7); } } // touch: run only via the 🏃 toggle
     camera.getWorldDirection(fwd); fwd.y = 0; fwd.normalize(); right.set(-fwd.z, 0, fwd.x);
     if (api.debugDir) { const d = api.debugDir; mag = d[2] ?? 0.6; fwd.set(d[0], 0, d[1]).normalize(); right.set(-fwd.z, 0, fwd.x); ix = 0; iy = -1; } // test hook: world-space walk direction
     const run = mag > 0.72, speed = mag ? (run ? 4.6 : 1.2 + mag * 2.2) : 0; api.speed = speed;
@@ -115,7 +119,7 @@ body.cardon #actb,body.cardon #imenu{display:none!important}`;
     if (api.seat) { if (speed) api.stand(); else { const S = api.seat; c.position.set(S.pos[0], c.position.y + (S.y + heightAt(S.pos[0], S.pos[1]) - c.position.y) * Math.min(1, dt * 7), S.pos[1]); c.rotation.y = S.rot;
         applyPose(c, api.emote && api.emote.until > t ? api.emote.name : S.pose, t, dt, !S.standing, { cup: 0x6b4226 }); api.afterPose?.(t); followCam(dt, S.camDist); return; } }
     else { const gy = heightAt(c.position.x, c.position.z); c.position.y += (gy - c.position.y) * Math.min(1, dt * 14); }
-    applyPose(c, api.emote && api.emote.until > t ? api.emote.name : api.waveUntil > t ? 'wave' : speed ? 'walk' : 'stand', speed ? t * (run ? 1.45 : 0.8 + mag * 0.4) : t, dt, false, {});
+    applyPose(c, api.emote && api.emote.until > t ? api.emote.name : api.waveUntil > t ? 'wave' : speed ? (run ? 'run' : 'walk') : 'stand', speed ? t * (run ? 1.6 : 0.8 + mag * 0.4) : t, dt, false, {});
     if (api.carry && !(api.emote && api.emote.until > t)) { const P = c.userData.parts; c.userData.props.cup.visible = true; P.armR.rotation.x = -1.3; P.armR.rotation.z = -0.25; }
     api.afterPose?.(t); followCam(dt);
   };
@@ -132,7 +136,7 @@ body.cardon #actb,body.cardon #imenu{display:none!important}`;
         const az = Math.atan2(off.x, off.z), lim = 0.55; let tgt = Math.PI - Math.sign(off.x || 1) * Math.min(lim, Math.abs(Math.atan2(Math.sin(az - Math.PI), Math.cos(az - Math.PI))));
         let d = Math.atan2(Math.sin(tgt - az), Math.cos(tgt - az)); const na = az + d * Math.min(1, dt * 1.8), h = Math.hypot(off.x, off.z); off.x = Math.sin(na) * h; off.z = Math.cos(na) * h; }
       camera.position.copy(controls.target).add(off); controls.minDistance = 8; }
-    else if (home.active) { const k = 1 - Math.exp(-dt * 3); controls.target.lerp(home.target, k); camera.position.lerp(home.pos, k); if (camera.position.distanceTo(home.pos) < 0.05) home.active = false; controls.minDistance = 12; }
+    else if (home.active) { const k = 1 - Math.exp(-dt * 3); controls.target.lerp(home.target, k); camera.position.lerp(home.pos, k); if (camera.position.distanceTo(home.pos) < 0.05) home.active = false; controls.minDistance = home.minD ?? 12; }
   }
   // seats: { pos:[x,z], rot, y, pose, camDist, onStand }
   api.sitAt = s => { api.seat = s; c.position.set(s.pos[0], c.position.y, s.pos[1]); c.rotation.y = s.rot; /* snap to the seat's facing, not the walking direction */ api.carry = s.keepMug ? api.carry : api.carry; if (!follow) setFollow(true); };
@@ -145,6 +149,6 @@ body.cardon #actb,body.cardon #imenu{display:none!important}`;
     if (!P) P = { x: s.pos[0], z: s.pos[1] };
     c.position.x = P.x; c.position.z = P.z; c.position.y = heightAt(P.x, P.z); s.onStand?.(); };
   api.setEmote = (name, dur, t) => { api.emote = { name, until: t + dur }; };
-  api.setHome = (pos, tgt) => { home.pos.copy(pos); home.target.copy(tgt); };
+  api.setHome = (pos, tgt) => { home.pos.copy(pos); home.target.copy(tgt); home.minD = Math.min(12, controls.minDistance); }; // ?tgt= debug framing may sit closer than 12
   return api;
 }

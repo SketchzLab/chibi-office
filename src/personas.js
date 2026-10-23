@@ -11,7 +11,7 @@ export const PERSONAS = {
     deskStyle: 'type',
     labels: { shop: 'Browsing the shops on the boutique island',  park: 'Playing fetch in the park', work: 'Coding a game build', fidget: 'Fidget-spinning through a tricky bug', pantry: 'Grabbing a coffee', game: 'Playing a retro game on the sofa', stretch: 'Stretching after a long build' },
     breakAct: 'pantry', cup: 0x6b4226,
-    schedule: [['work', 70], ['fidget', 12], ['work', 60], ['pantry', 22], ['work', 50], ['game', 30], ['work', 25], ['park', 40], ['shop', 30]], parkPose: 'stand',
+    schedule: [['work', 70], ['fidget', 12], ['work', 60], ['pantry', 22], ['work', 50], ['game', 30], ['work', 25], ['park', 40], ['shop', 55]], parkPose: 'stand',
   },
   Jun: {
     role: 'UI Designer', desk: 3, slot: 1,
@@ -22,7 +22,7 @@ export const PERSONAS = {
     deskStyle: 'type',
     labels: { shop: 'Browsing the shops on the boutique island',  park: 'Sketching on a park bench', work: 'Pushing pixels in the UI file', pantry: 'Brewing green tea', sketch: 'Sketching ideas on the sofa', stretch: 'Taking a stretch break' },
     breakAct: 'pantry', cup: 0x9ccf6a,
-    schedule: [['work', 80], ['pantry', 25], ['work', 70], ['sketch', 30], ['work', 60], ['park', 40], ['shop', 30]], parkPose: 'sketch',
+    schedule: [['work', 80], ['pantry', 25], ['work', 70], ['sketch', 30], ['work', 60], ['park', 40], ['shop', 55]], parkPose: 'sketch',
   },
   Sage: {
     role: 'General Advisor', desk: 0, slot: 2,
@@ -33,7 +33,7 @@ export const PERSONAS = {
     deskStyle: 'think',
     labels: { shop: 'Browsing the shops on the boutique island',  roof: 'Stargazing through the rooftop telescope', work: 'Researching and weighing options', pace: 'Pacing by the bookshelves, thinking', read: 'Reading in the lounge', meeting: 'Strategy chat in the meeting room' },
     breakAct: 'read', cup: 0xc9a27a,
-    roofSpot: 3, schedule: [['work', 60], ['roof', 40], ['work', 60], ['read', 35], ['work', 55], ['meeting', 25], ['shop', 30]],
+    roofSpot: 3, schedule: [['work', 60], ['roof', 40], ['work', 60], ['read', 35], ['work', 55], ['meeting', 25], ['shop', 55]],
   },
   Mika: {
     role: 'Video Editor · Imagine.ooo', desk: 2, slot: 3,
@@ -44,6 +44,6 @@ export const PERSONAS = {
     deskStyle: 'bob',
     labels: { shop: 'Browsing the shops on the boutique island',  view: 'Vibing on the balcony with the view', work: 'Cutting a music video timeline', bob: 'Vibing to a new track', pantry: 'Blending a fruit smoothie', stretch: 'Shaking off a long render', meeting: 'Reviewing cuts in the meeting room' },
     breakAct: 'pantry', cup: 0xff7eb6,
-    schedule: [['work', 75], ['bob', 20], ['work', 65], ['pantry', 20], ['work', 55], ['view', 35], ['meeting', 20], ['shop', 30]], viewPose: 'leanBob',
+    schedule: [['work', 75], ['bob', 20], ['work', 65], ['pantry', 20], ['work', 55], ['view', 35], ['meeting', 20], ['shop', 55]], viewPose: 'leanBob',
   },
 };
