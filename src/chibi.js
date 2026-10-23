@@ -8,15 +8,23 @@ import { toonMat } from './toon.js';
 
 const T = 16, N = 4, COOL = new THREE.Color(0x5b5fb4), WARM = new THREE.Color(0xfff0d4), DUST = new THREE.Color(0x8c90a6);
 const mute = (hex, k = 0.22) => new THREE.Color(hex).lerp(DUST, k);
-const tone = (c, k) => { c = new THREE.Color(c); return k < 0 ? c.lerp(COOL, -k) : c.lerp(WARM, k); };
+// v13 tone: every shade stays in the base colour's own hue family — shadows slightly darker, more saturated and nudged toward blue,
+// highlights lighter and nudged toward warm yellow — at ~55% of the v11 contrast. Never lerps toward grey/navy, so no dirty specks.
+const TONE_S = 0.55, TONE_CHROMA = 0.55, _h = {}; // v14: shades never gain saturation (slightly lower), capped chroma
+const hueToward = (h, t, a) => { let d = t - h; d -= Math.round(d); return (h + d * a + 1) % 1; };
+const tone = (c, k) => { c = new THREE.Color(c); c.getHSL(_h); if (!k) return _h.s > TONE_CHROMA ? c.setHSL(_h.h, TONE_CHROMA + (_h.s - TONE_CHROMA) * 0.25, _h.l) : c; const a = Math.abs(k) * TONE_S, sat = _h.s > 0.06; if (!sat) { _h.h = 0.66; _h.s = Math.max(_h.s, 0.1); } // near-neutrals (black hair, white tees) tint cool-blue, never flat grey
+  if (k < 0) c.setHSL(hueToward(_h.h, 0.64, a * 0.35), Math.min(TONE_CHROMA, _h.s * (1 - a * 0.2)), _h.l * (1 - a * 1.1));
+  else c.setHSL(sat ? hueToward(_h.h, 0.12, a * 0.25) : _h.h, Math.min(TONE_CHROMA, _h.s * (1 - a * 0.25)), _h.l + (1 - _h.l) * a * 0.7);
+  return c; };
 const css = c => '#' + c.getHexString();
 const B4 = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
 let seed = 1; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 // painters work on an 8x8 grid of 2x2-px clusters so the pixels read as hand-placed blocks
 const PAINT = {
-  cel(px, b, o) { for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { px(x, y, tone(b, y <= 1 ? (o.hi ?? 0.16) * (y === 0 ? 1 : 0.6) : y >= 6 ? Math.max(o.lo ?? -0.16, -0.18) * (y === 7 ? 1 : 0.6) : 0)); } }, // v12 clean: smooth bands, no dither / specks (read as dirt)
-  knit(px, b) { for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) px(x, y, tone(b, (x & 1 ? -0.07 : 0.06) - (y === 7 ? 0.12 : 0))); },
-  seam(px, b) { PAINT.cel(px, b, { specks: 1 }); for (let y = 0; y < 8; y++) { px(3, y, tone(b, -0.22)); px(4, y, tone(b, 0.12)); } },
+  cel(px, b, o) { for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { const v = 1 - y / 7 + (B4[y & 3][x & 3] / 16 - 0.5) * 0.45; px(x, y, tone(b, v > 0.74 ? (o.hi ?? 0.2) : v > 0.28 ? 0 : (o.lo ?? -0.3))); }
+    for (let i = 0; i < (o.specks ?? 2); i++) px((rnd() * 8) | 0, (rnd() * 6) | 0, tone(b, rnd() > 0.5 ? 0.28 : -0.22)); },
+  knit(px, b) { for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) px(x, y, tone(b, (x & 1 ? -0.14 : 0.1) - (y === 7 ? 0.2 : 0) - ((y & 3) === 3 ? 0.08 : 0))); },
+  seam(px, b) { PAINT.cel(px, b, { specks: 1 }); for (let y = 0; y < 8; y++) { px(3, y, tone(b, -0.4)); px(4, y, tone(b, 0.18)); } },
   stripe(px, b, o) { for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) px(x, y, tone((y >> 1) & 1 ? o.b2 : b, y > 5 ? -0.25 : y < 1 ? 0.18 : 0)); },
   shoe(px, b, o) { for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) px(x, y, y >= 6 ? tone(o.sole, y === 7 ? -0.3 : 0.05) : y >= 3 && y < 5 ? tone(o.strap, y === 3 ? 0.15 : -0.2) : y < 3 && x > 1 && x < 6 && (x + y) % 2 === 0 ? tone(0xf6f2ea, 0.1) : tone(b, y < 2 ? 0.18 : -0.08)); }, // laces / strap / sole
   skin(px, b) { for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) px(x, y, tone(b, 0.04)); }, // clean flat skin: no dither/speckle (read as stubble)
@@ -24,9 +32,9 @@ const PAINT = {
   patch(px, b, o) { PAINT.cel(px, b, { specks: 1 }); [[2, 2], [5, 2], [1, 3], [2, 3], [3, 3], [4, 3], [5, 3], [6, 3], [2, 4], [3, 4], [4, 4], [5, 4], [3, 5], [4, 5]].forEach(([x, y]) => px(x, y, tone(o.c, y < 3 ? 0.2 : 0))); }, // pixel heart
 };
 
-PAINT.hair = (px, b) => { for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { const st = (x + (y >> 2)) % 3; px(x, y, tone(b, y === 0 ? 0.16 : y >= 6 ? -0.14 : st === 0 ? 0.16 : st === 1 ? -0.06 : 0.02)); } }; // 3-tone + highlight streaks
-PAINT.mask = (px, b) => { for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) px(x, y, tone(b, y === 3 || y === 6 ? -0.2 : y === 2 || y === 5 ? 0.12 : 0)); }; // soft pleats
-PAINT.quilt = (px, b) => { for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) px(x, y, tone(b, (y & 3) === 3 ? -0.18 : (y & 3) === 0 ? 0.16 : 0.02)); };
+PAINT.hair = (px, b) => { for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { const st = (x + (y >> 2)) % 3; px(x, y, tone(b, y === 0 ? 0.16 : y >= 6 ? -0.24 : st === 0 ? 0.2 : st === 1 ? -0.14 : 0.02)); } }; // 3-tone + highlight streaks
+PAINT.mask = (px, b) => { for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) px(x, y, tone(b, y === 3 || y === 6 ? -0.2 : y === 2 || y === 5 ? 0.12 : (x * 7 + y * 3) % 11 === 0 ? -0.06 : 0)); }; // soft pleats
+PAINT.quilt = (px, b) => { for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) px(x, y, tone(b, (y & 3) === 3 ? -0.32 : (y & 3) === 0 ? 0.22 : 0.02)); };
 
 /* ---- OOTD: interchangeable wardrobe parts. Rig (part-local): legs pivot y0.5 (ground -0.5), arms pivot (±0.44,1.08) hand ~-0.5, head pivot y1.72.
    b(part, w, h, d, x, y, z, tileKey, opts) where opts = { rx, ry, rz, r: bevel fraction of min dim, tp/bt: taper at top/bottom } and t(painter, colour, o) -> tileKey */
