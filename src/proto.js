@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { makeChibi, ootdDay } from './chibi.js';
 import { PERSONAS } from './personas.js';
+import { applyPose } from './behavior.js';
 const r = new THREE.WebGLRenderer({ antialias: true, stencil: true }); r.setPixelRatio(1); r.setSize(innerWidth, innerHeight); r.outputColorSpace = THREE.SRGBColorSpace; document.body.appendChild(r.domElement);
 const scene = new THREE.Scene(); scene.background = new THREE.Color(0xffffff);
 const q = new URLSearchParams(location.search), only = q.get('only'), grid = q.get('grid'); const a = innerWidth / innerHeight, H = +(q.get('h') ?? (only ? 3.7 : grid ? 14 : 5));
@@ -15,4 +16,5 @@ slots.forEach(([n, j, i]) => { const c = makeChibi({ name: n, ...looks[n], day: 
   const sh = new THREE.Mesh((() => { const sp = new THREE.Shape(), w = 1.0, h = 1.15, r = 0.3; sp.moveTo(-w / 2 + r, -h / 2); sp.lineTo(w / 2 - r, -h / 2); sp.quadraticCurveTo(w / 2, -h / 2, w / 2, -h / 2 + r); sp.lineTo(w / 2, h / 2 - r); sp.quadraticCurveTo(w / 2, h / 2, w / 2 - r, h / 2); sp.lineTo(-w / 2 + r, h / 2); sp.quadraticCurveTo(-w / 2, h / 2, -w / 2, h / 2 - r); sp.lineTo(-w / 2, -h / 2 + r); sp.quadraticCurveTo(-w / 2, -h / 2, -w / 2 + r, -h / 2); return new THREE.ShapeGeometry(sp, 3); })(), new THREE.MeshBasicMaterial({ color: 0xb4c4da })); sh.rotation.x = -Math.PI / 2; sh.position.copy(c.position).add(new THREE.Vector3(0.2, 0.002, 0.15)); scene.add(sh); });
 window.__info = () => ({ calls: r.info.render.calls, tris: r.info.render.triangles });
 if (q.get('sleep')) scene.traverse(o => o.userData.setSleepFace && o.userData.setSleepFace(true));
+if (q.get('pose')) scene.traverse(o => { if (o.userData.props) { if (q.get('sipl') != null) o.userData.forceSip = +q.get('sipl'); for (let i = 0; i < 3; i++) applyPose(o, q.get('pose'), 1, 1, false, { cup: 0x6b4226 }); } });
 r.render(scene, cam); window.__ready = true;

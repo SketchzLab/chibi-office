@@ -12,6 +12,8 @@ import { makeOffice, glows } from './props.js';
 import { makeWorld } from './world.js';
 import { makePets } from './pets.js';
 import { makeHome } from './home.js';
+import { makeShops } from './shops.js';
+import { makeClosets } from './wardrobe.js';
 import { makeChibi } from './chibi.js';
 import { makePlayer } from './player.js';
 import { pickTier, makeAtmosphere, lightPools, steam, radial } from './fx.js';
@@ -43,7 +45,7 @@ controls.minDistance = 12; controls.maxDistance = 110; controls.minPolarAngle = 
 const sky = makeSky(scene);
 const island = makeIsland(scene);
 const nature = makeNature(scene);
-makeOffice(scene); makeWorld(scene, nature.waterMat); const home = makeHome(scene); window.__home = home;
+makeOffice(scene); makeWorld(scene, nature.waterMat); const home = makeHome(scene); window.__home = home; window.__shops = makeShops(scene); window.__closets = makeClosets(scene);
 // ---- Bots: look + persona + clock-driven brain ----
 const chibis = [], brains = [];
 for (const [name, per] of Object.entries(PERSONAS)) {

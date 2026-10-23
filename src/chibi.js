@@ -6,7 +6,7 @@ import { toonMat } from './toon.js';
 // (body, head, armL, armR, legL, legR) = 1 textured fill + 1 navy outline each. Textures are a per-chibi 64x64 atlas of
 // 16px tiles hand-pixel-painted in 2x2 clusters with hue-shifted 3-tone shading (cool shadows, warm lights), nearest-filtered.
 
-const T = 16, N = 4, COOL = new THREE.Color(0x2c2f6e), WARM = new THREE.Color(0xfff0d4), DUST = new THREE.Color(0x8c90a6);
+const T = 16, N = 4, COOL = new THREE.Color(0x5b5fb4), WARM = new THREE.Color(0xfff0d4), DUST = new THREE.Color(0x8c90a6);
 const mute = (hex, k = 0.22) => new THREE.Color(hex).lerp(DUST, k);
 const tone = (c, k) => { c = new THREE.Color(c); return k < 0 ? c.lerp(COOL, -k) : c.lerp(WARM, k); };
 const css = c => '#' + c.getHexString();
@@ -14,10 +14,9 @@ const B4 = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
 let seed = 1; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 // painters work on an 8x8 grid of 2x2-px clusters so the pixels read as hand-placed blocks
 const PAINT = {
-  cel(px, b, o) { for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { const v = 1 - y / 7 + (B4[y & 3][x & 3] / 16 - 0.5) * 0.45; px(x, y, tone(b, v > 0.74 ? (o.hi ?? 0.2) : v > 0.28 ? 0 : (o.lo ?? -0.3))); }
-    for (let i = 0; i < (o.specks ?? 2); i++) px((rnd() * 8) | 0, (rnd() * 6) | 0, tone(b, rnd() > 0.5 ? 0.28 : -0.22)); },
-  knit(px, b) { for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) px(x, y, tone(b, (x & 1 ? -0.14 : 0.1) - (y === 7 ? 0.2 : 0) - ((y & 3) === 3 ? 0.08 : 0))); },
-  seam(px, b) { PAINT.cel(px, b, { specks: 1 }); for (let y = 0; y < 8; y++) { px(3, y, tone(b, -0.4)); px(4, y, tone(b, 0.18)); } },
+  cel(px, b, o) { for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { px(x, y, tone(b, y <= 1 ? (o.hi ?? 0.16) * (y === 0 ? 1 : 0.6) : y >= 6 ? Math.max(o.lo ?? -0.16, -0.18) * (y === 7 ? 1 : 0.6) : 0)); } }, // v12 clean: smooth bands, no dither / specks (read as dirt)
+  knit(px, b) { for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) px(x, y, tone(b, (x & 1 ? -0.07 : 0.06) - (y === 7 ? 0.12 : 0))); },
+  seam(px, b) { PAINT.cel(px, b, { specks: 1 }); for (let y = 0; y < 8; y++) { px(3, y, tone(b, -0.22)); px(4, y, tone(b, 0.12)); } },
   stripe(px, b, o) { for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) px(x, y, tone((y >> 1) & 1 ? o.b2 : b, y > 5 ? -0.25 : y < 1 ? 0.18 : 0)); },
   shoe(px, b, o) { for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) px(x, y, y >= 6 ? tone(o.sole, y === 7 ? -0.3 : 0.05) : y >= 3 && y < 5 ? tone(o.strap, y === 3 ? 0.15 : -0.2) : y < 3 && x > 1 && x < 6 && (x + y) % 2 === 0 ? tone(0xf6f2ea, 0.1) : tone(b, y < 2 ? 0.18 : -0.08)); }, // laces / strap / sole
   skin(px, b) { for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) px(x, y, tone(b, 0.04)); }, // clean flat skin: no dither/speckle (read as stubble)
@@ -25,9 +24,9 @@ const PAINT = {
   patch(px, b, o) { PAINT.cel(px, b, { specks: 1 }); [[2, 2], [5, 2], [1, 3], [2, 3], [3, 3], [4, 3], [5, 3], [6, 3], [2, 4], [3, 4], [4, 4], [5, 4], [3, 5], [4, 5]].forEach(([x, y]) => px(x, y, tone(o.c, y < 3 ? 0.2 : 0))); }, // pixel heart
 };
 
-PAINT.hair = (px, b) => { for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { const st = (x + (y >> 2)) % 3; px(x, y, tone(b, y === 0 ? 0.16 : y >= 6 ? -0.24 : st === 0 ? 0.2 : st === 1 ? -0.14 : 0.02)); } }; // 3-tone + highlight streaks
-PAINT.mask = (px, b) => { for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) px(x, y, tone(b, y === 3 || y === 6 ? -0.2 : y === 2 || y === 5 ? 0.12 : (x * 7 + y * 3) % 11 === 0 ? -0.06 : 0)); }; // soft pleats
-PAINT.quilt = (px, b) => { for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) px(x, y, tone(b, (y & 3) === 3 ? -0.32 : (y & 3) === 0 ? 0.22 : 0.02)); };
+PAINT.hair = (px, b) => { for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) { const st = (x + (y >> 2)) % 3; px(x, y, tone(b, y === 0 ? 0.16 : y >= 6 ? -0.14 : st === 0 ? 0.16 : st === 1 ? -0.06 : 0.02)); } }; // 3-tone + highlight streaks
+PAINT.mask = (px, b) => { for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) px(x, y, tone(b, y === 3 || y === 6 ? -0.2 : y === 2 || y === 5 ? 0.12 : 0)); }; // soft pleats
+PAINT.quilt = (px, b) => { for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) px(x, y, tone(b, (y & 3) === 3 ? -0.18 : (y & 3) === 0 ? 0.16 : 0.02)); };
 
 /* ---- OOTD: interchangeable wardrobe parts. Rig (part-local): legs pivot y0.5 (ground -0.5), arms pivot (±0.44,1.08) hand ~-0.5, head pivot y1.72.
    b(part, w, h, d, x, y, z, tileKey, opts) where opts = { rx, ry, rz, r: bevel fraction of min dim, tp/bt: taper at top/bottom } and t(painter, colour, o) -> tileKey */
@@ -124,10 +123,23 @@ const WARDROBE = {
     shoes: [['brogues', 'brogue', { c: 0x6b4632, strap: 0x5a3a28 }], ['white sneakers', 'sneaker', { c: 0xf0eeea, strap: L.shirt, sole: 0xd8dcea }]],
     head: [...NONE], acc: [NONE[0], NONE[0], ['glasses', 'glasses', {}], ['mask', 'mask', {}]] }),
 };
+/* ---- shopping island: deterministic date-based purchases (same on every device). A bot shops on ~1 in 4 days; what it bought
+   joins its top rotation from the next day. SHOP_START = first trading day. */
+export const SHOPS = [{ name: 'Thread & Co.', kind: 'tees', c: 0xe0a07a }, { name: 'Knit Nook', kind: 'knits', c: 0x8fb39a }, { name: 'Layer Up', kind: 'jackets', c: 0x8a92c4 }];
+export const SHOP_STOCK = [
+  ['Thread & Co. stripe tee', 'tee', { c: 0xf2efe6, patch: 0x6f86c9 }, 0], ['Thread & Co. sunset tee', 'tee', { c: 0xe8a07a }, 0], ['Thread & Co. oxford', 'shirt', { c: 0xcfe0f0 }, 0],
+  ['Knit Nook cable sweater', 'sweater', { c: 0x9fc4a8, c2: 0xf2efe6 }, 1], ['Knit Nook mustard turtleneck', 'turtleneck', { c: 0xd8a84a }, 1], ['Knit Nook cardigan', 'cardigan', { c: 0xc69aa8 }, 1],
+  ['Layer Up puffer', 'jacket', { s: 0xe9e2cf, c: 0x7a86c4, c2: 0x4a5070 }, 2], ['Layer Up hoodie', 'hoodie', { c: 0xa7b5d8, c2: 0x3a3d5c }, 2], ['Layer Up bomber', 'jacket', { s: 0xe9e2cf, c: 0x6a7a5a, c2: 0x3a3a48 }, 2]];
+export const SHOP_START = 20745;
+const hashD = (name, d, k) => { let x = (Math.imul(d, 2654435761) ^ Math.imul([...name].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7) + k, 40503)) >>> 0; x = Math.imul(x ^ (x >>> 15), 2246822519) >>> 0; return (x ^ (x >>> 13)) >>> 0; };
+export const shopsOn = (name, d) => name !== 'Calvin' && hashD(name, d, 1) % 4 === 0; // a shopping day for this bot?
+export const buyOn = (name, d) => shopsOn(name, d) ? SHOP_STOCK[hashD(name, d, 2) % SHOP_STOCK.length] : null;
+export function purchases(name, day = ootdDay()) { const out = []; for (let d = SHOP_START; d < day; d++) { const it = buyOn(name, d); if (it && !out.includes(it)) out.push(it); } return out; }
+export function wardrobeTops(name, L, day = ootdDay()) { return [...(WARDROBE[name] || WARDROBE.Calvin)(L).top, ...purchases(name, day)]; }
 /* outfit day: UTC+8 calendar day (stable all day), ?ootd=N overrides */
 export function ootdDay() { const q = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('ootd') : null; return q != null && q !== '' ? +q : Math.floor((Date.now() / 1000 + 8 * 3600) / 86400); }
 const hashN = s => [...s].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7);
-export function pickOOTD(name, L, day = ootdDay()) { const W = (WARDROBE[name] || WARDROBE.Calvin)(L), h = hashN(name), pk = (arr, m, a) => { let x = (day * 2654435761 + h * a + m * 40503) >>> 0; x = Math.imul(x ^ (x >>> 15), 2246822519) >>> 0; x = Math.imul(x ^ (x >>> 13), 3266489917) >>> 0; return arr[((x ^ (x >>> 16)) >>> 0) % arr.length]; };
+export function pickOOTD(name, L, day = ootdDay()) { const W = { ...(WARDROBE[name] || WARDROBE.Calvin)(L) }, h = hashN(name); W.top = wardrobeTops(name, L, day); const pk = (arr, m, a) => { let x = (day * 2654435761 + h * a + m * 40503) >>> 0; x = Math.imul(x ^ (x >>> 15), 2246822519) >>> 0; x = Math.imul(x ^ (x >>> 13), 3266489917) >>> 0; return arr[((x ^ (x >>> 16)) >>> 0) % arr.length]; };
   const arr0 = a => a[(((day + h) % a.length) + a.length) % a.length]; const o = { top: arr0(W.top), bottom: pk(W.bottom, 3, 5), shoes: pk(W.shoes, 5, 3), head: pk(W.head, 7, 11), acc: pk(W.acc, 2, 13) };
   if (o.top[2].up) { o.head = NONE[0]; if (o.acc[1] === 'headphones') o.acc = NONE[0]; }
   o.label = [o.top, o.bottom, o.shoes, o.head, o.acc].map(x => x[0]).filter(Boolean).join(', '); return o; }
@@ -168,7 +180,7 @@ export function makeChibi({ name, role, skin = 0xf0c4a6, hair, shirt, pants, day
     for (let i = 0; i < uv.count; i++) uv.setXY(i, u0 + e + uv.getX(i) * (s - 2 * e), v0 + e + uv.getY(i) * (s - 2 * e));
     const n = geo.attributes.normal, col = new Float32Array(n.count * 3), v = new THREE.Vector3(), q = new THREE.Quaternion().setFromEuler(new THREE.Euler(o.rx || 0, o.ry || 0, o.rz || 0));
     for (let i = 0; i < n.count; i++) { v.fromBufferAttribute(n, i); const bevel = Math.max(Math.abs(v.x), Math.abs(v.y), Math.abs(v.z)) < 0.97; v.applyQuaternion(q); const dd = v.dot(KEY);
-      const c = new THREE.Color(1, 1, 1); if (tk === 'skin' && part === 'head') { if (dd < 0.1) c.lerp(SH, 0.12); } else if (dd < 0.1) c.lerp(SH, 0.8); else if (dd < 0.5) c.lerp(SH, 0.3); if (bevel && dd > 0.55) c.lerp(WARM, 0.35).multiplyScalar(1.08); col.set([c.r, c.g, c.b], i * 3); }
+      const c = new THREE.Color(1, 1, 1); if (tk === 'skin' && part === 'head') { if (dd < 0.1) c.lerp(SH, 0.12); } else if (dd < 0.1) c.lerp(SH, 0.6); else if (dd < 0.5) c.lerp(SH, 0.22); if (bevel && dd > 0.55) c.lerp(WARM, 0.35).multiplyScalar(1.08); col.set([c.r, c.g, c.b], i * 3); }
     geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
     geo.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(1, 1, 1))); geos[part].push(geo); };
   /* anatomy (soft, tapered head) + today's outfit */
@@ -178,7 +190,7 @@ export function makeChibi({ name, role, skin = 0xf0c4a6, hair, shirt, pants, day
   const hat = fit.head[1], cov = fit.top[2].up ? 'hood' : hat ? 'hat' : null; if (hat) HATS[hat](box, t, fit.head[2]);
   const HC = name === 'Sage' ? 0xa8a6cc : L.hair, hk = t('cel', HC, { lo: -0.36, hi: 0.2, specks: 3 }), hkd = t('flat', tone(HC, -0.4)); (HAIR[name] || HAIR.Calvin)(box, hk, hkd, cov, t('cel', L.shirt, { hi: 0.25 })); /* fringe peeking under the hood */
   [].concat(fit.acc[1] || []).forEach(a => ACC[a](box, t, fit.acc[2], !!hat));
-  root.userData.ootd = fit.label; root.userData.ootdDay = dd0;
+  root.userData.ootd = fit.label; root.userData.mask = /mask/i.test(fit.label); root.userData.ootdDay = dd0;
   const body = new THREE.Group(), head = new THREE.Group(), armL = new THREE.Group(), armR = new THREE.Group(), legL = new THREE.Group(), legR = new THREE.Group();
   root.add(body); head.position.y = 1.68 + LIFT; armL.position.set(-0.5, 1.1 + LIFT, 0.03); armR.position.set(0.5, 1.1 + LIFT, -0.03); body.add(head, armL, armR);
   legL.position.set(-0.19, 0.5 + LIFT, 0.08); legR.position.set(0.19, 0.5 + LIFT, -0.06); root.add(legL, legR); // offset feet = relaxed stance
@@ -218,7 +230,7 @@ export function makeChibi({ name, role, skin = 0xf0c4a6, hair, shirt, pants, day
   [root, body, head, armL, armR, legL, legR].forEach(o => { o.userData.dynamic = true; });
   // held props (toggled by the behaviour system)
   const P = (geo, c) => new THREE.Mesh(geo, toonMat(c)); const handY = -0.52;
-  const cup = new THREE.Group(); cup.add(P(new THREE.CylinderGeometry(0.11, 0.09, 0.22, 8), 0xffffff)); const liq = P(new THREE.CylinderGeometry(0.095, 0.095, 0.02, 8), 0x6b4226); liq.position.y = 0.1; cup.add(liq); cup.position.set(0, handY, 0.1); armR.add(cup);
+  const cup = new THREE.Group(); cup.add(P(new THREE.CylinderGeometry(0.11, 0.09, 0.22, 8), 0xffffff)); const liq = P(new THREE.CylinderGeometry(0.095, 0.095, 0.02, 8), 0x6b4226); liq.position.y = 0.1; cup.add(liq); cup.position.set(0, handY + 0.02, 0.13); cup.scale.setScalar(0.78); armR.add(cup);
   const spinner = new THREE.Group(); for (let i = 0; i < 3; i++) { const lobe = P(new THREE.CylinderGeometry(0.09, 0.09, 0.04, 8), 0xff5d8f); const a = i / 3 * 6.28; lobe.position.set(Math.cos(a) * 0.12, 0, Math.sin(a) * 0.12); spinner.add(lobe); }
   spinner.add(P(new THREE.CylinderGeometry(0.05, 0.05, 0.05, 8), 0x2b2d42)); spinner.position.set(0, handY - 0.05, 0.08); armR.add(spinner);
   const pencil = P(new THREE.CylinderGeometry(0.025, 0.025, 0.4, 6), 0xffd36a); pencil.rotation.x = 1.2; pencil.position.set(0, handY, 0.12); armR.add(pencil);

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { DESKS, PANTRY, LOUNGE, GLASS, ROOF, STAIRS, BALCONY, PARK, HOUSE, FIRE, GARDEN, heightAt } from './layout.js';
 // ---------- Places ----------
 // Each place: pos [x,z], rot (facing), seat (root y when seated, null = standing), approach: waypoints from the main aisle (z≈0).
-import { BOT_S } from './layout.js';
+import { BOT_S, SHOP_BLDG, shopFront } from './layout.js';
 // seat root heights scale with chibi size (hip ~0.37 local units)
 const HIP = 0.37 * (1.5 - BOT_S); export const SEAT_CHAIR = 0.07 + HIP, SEAT_SOFA = -0.06 + HIP, SEAT_STOOL = -0.05 + HIP;
 export function deskPlace(i) { const [x, z] = DESKS[i]; const back = z < 0, sz = back ? z + 1.0 : z - 1.0, side = back ? 0.95 : -0.95, az = back ? -0.25 : 0.25;
@@ -53,7 +53,12 @@ function homePlace(b) { const i = homeSpot[b.name] ?? b.slot;
 export const SLEEP_Y = 0.86; // flat on the back: torso on the mattress, head on the pillow
 function bedPlace(b) { const r = HOUSE.rooms.find(r => r.who === b.name) || HOUSE.rooms[b.slot % 4]; const bz = HOUSE.z1 - 0.85;
   return { pos: [r.cx + 0.95, bz], rot: Math.PI / 2, seat: SLEEP_Y, lie: true, approach: [...TO_HOME, [r.cx + 0.4, HOUSE.z0 - 1.2], [r.cx + 0.4, HOUSE.z0 + 1.4], [r.cx + 0.95, bz - 0.2], [r.cx + 0.95, bz]] }; }
+// ---------- Shopping island (v12): browse in front of a boutique; purchases are the deterministic chibi.js buyOn() rule ----------
+const TO_SHOP = [[2.7, 0.25], [2.7, 8.4], [3.4, 13.9], [6.4, 14.6], [9.2, 13.9], [12.0, 11.0], [21.2, 11.0]];
+function shopPlace(slot) { const b = SHOP_BLDG[slot % 3], [x, z] = shopFront(b, 2.4, slot >= 3 ? 0.3 : -0.4), [ax, az] = shopFront(b, 3.4, slot >= 3 ? 0.3 : -0.4);
+  return { pos: [x, z], rot: b.ry + Math.PI, seat: null, approach: [...TO_SHOP, [ax, az], [x, z]] }; }
 const ACTS = {
+  shop: { place: b => shopPlace(b.slot), pose: () => 'stand', emoji: '🛍️' },
   home: { place: b => homePlace(b), pose: b => (homeSpot[b.name] ?? b.slot) < 3 ? 'warm' : 'water', emoji: '🔥' },
   sleep: { place: b => bedPlace(b), pose: () => 'sleep', emoji: '💤' },
   work: { place: b => deskPlace(b.desk), pose: b => b.deskStyle, emoji: '💻' },
@@ -130,6 +135,7 @@ export function makeBrain(chibi, persona) {
 // ---------- Poses ----------
 export const sleepPhase = c => c.userData.sleepPh ??= ((c.userData.name || '').split('').reduce((a, ch) => a * 31 + ch.charCodeAt(0), 7) % 1000) / 1000 * 6.283;
 export const breath = (c, t) => Math.sin(t * Math.PI / 2 + sleepPhase(c)); // ~4s cycle, per-bot phase
+const _tq = new THREE.Quaternion(), _ax = new THREE.Vector3(1, 0, 0);
 export function applyPose(c, pose, t, dt, seated, b) {
   const P = c.userData.parts, pr = c.userData.props, k = Math.min(1, dt * 9);
   const tgt = { legL: [0, 0], legR: [0, 0], armL: [0, -0.1], armR: [0, 0.1], bodyY: 0, bodyX: 0, bodyZ: 0, headX: 0, headZ: Math.sin(t * 1.1) * 0.05, headY: 0 };
@@ -148,7 +154,9 @@ export function applyPose(c, pose, t, dt, seated, b) {
     case 'bobListen': { tgt.armL = [-0.3, -0.1]; tgt.armR = [-1.9, -0.55]; tgt.headX = Math.max(0, Math.sin(t * 7.6)) * 0.2; tgt.headZ = Math.sin(t * 3.8) * 0.12; tgt.bodyY = Math.max(0, Math.sin(t * 7.6)) * 0.03; break; }
     case 'think': { const a = Math.sin(t * 14); tgt.armL = [-1.05 + a * 0.05, 0.25]; tgt.armR = [-2.15, -0.6]; tgt.headX = 0.05; tgt.headZ = 0.12 + Math.sin(t * 0.7) * 0.04; break; }
     case 'fidget': { tgt.armL = [-1.0, 0.25]; tgt.armR = [-1.55, -0.3]; pr.spinner.rotation.y += dt * 25; tgt.headX = 0.15; tgt.headZ = Math.sin(t * 5) * 0.05; break; }
-    case 'sip': { const lift = (Math.sin(t * 1.2) > 0.55) ? 1 : 0; tgt.armR = [lift ? -2.35 : -1.2, lift ? -0.55 : -0.25]; tgt.armL = [0, -0.12]; tgt.headX = lift ? -0.15 : 0; tgt.bodyY = s * 0.02; break; }
+    case 'sip': { const ph = ((t + sleepPhase(c) * 3) % 7) / 7, sm = THREE.MathUtils.smoothstep; // hold at chest, every ~7s raise to the mouth, tilt, lower
+      const l = c.userData.mask ? 0 : c.userData.forceSip ?? sm(ph, 0.5, 0.62) * (1 - sm(ph, 0.8, 0.92)); c.userData.sipL = l; // masked bots skip the sip (cup stays at chest)
+      tgt.armR = [-1.15 - l * 1.0, -0.22 - l * 0.36]; tgt.armL = [0, -0.12]; tgt.headX = -0.1 * l; tgt.bodyY = s * 0.02; break; }
     case 'read': { tgt.armL = [-1.15, 0.35]; tgt.armR = [-1.15, -0.35]; tgt.headX = 0.22; tgt.headZ = Math.sin(t * 0.5) * 0.04; break; }
     case 'game': { const a = Math.sin(t * 18) * 0.05; tgt.armL = [-1.15 + a, 0.35]; tgt.armR = [-1.15 - a, -0.35]; tgt.headX = 0.12; tgt.bodyY = Math.abs(Math.sin(t * 3)) * 0.02; tgt.headZ = Math.sin(t * 2.6) * 0.08; break; }
     case 'sketch': { tgt.armL = [-1.1, 0.35]; tgt.armR = [-1.2 + Math.sin(t * 6) * 0.08, -0.3 + Math.cos(t * 6) * 0.08]; tgt.headX = 0.25; break; }
@@ -171,5 +179,7 @@ export function applyPose(c, pose, t, dt, seated, b) {
   // look-at offset from main (smoothed/clamped there); added to the pose's head yaw so they never fight
   if (c.userData.lookYaw) tgt.headY = THREE.MathUtils.clamp(tgt.headY * 0.3 + c.userData.lookYaw, -0.95, 0.95);
   ['legL', 'legR', 'armL', 'armR'].forEach(n => { P[n].rotation.x += (tgt[n][0] - P[n].rotation.x) * k; P[n].rotation.z += (tgt[n][1] - P[n].rotation.z) * k; });
+  if (pose === 'sip') { const l = c.userData.sipL || 0; // keep the cup upright in world space (counter the arm), tilt toward the lips while sipping
+    pr.cup.quaternion.copy(P.armR.quaternion).invert().multiply(_tq.setFromAxisAngle(_ax, -0.45 * l)); }
   P.body.position.y += (tgt.bodyY - P.body.position.y) * k; P.body.rotation.x += (tgt.bodyX - P.body.rotation.x) * k; P.body.rotation.z += (tgt.bodyZ - P.body.rotation.z) * k; P.head.rotation.x += (tgt.headX - P.head.rotation.x) * k; P.head.rotation.z += (tgt.headZ - P.head.rotation.z) * k; P.head.rotation.y += (tgt.headY - P.head.rotation.y) * k;
 }

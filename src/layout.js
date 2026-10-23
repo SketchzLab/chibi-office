@@ -31,12 +31,21 @@ HOUSE.walls = [HOUSE.x0, ...HOUSE.rooms.slice(1).map(r => r.x0), HOUSE.x1]; // s
 export const FIRE = { x: HOME.cx, z: HOME.cz - 2.2 };
 FIRE.logs = [Math.PI * 0.5 + 0.0, Math.PI * 1.15, Math.PI * 1.85].map(a => ({ a, x: FIRE.x + Math.cos(a + Math.PI / 2) * 2.0, z: FIRE.z + Math.sin(a + Math.PI / 2) * 2.0 }));
 export const GARDEN = { x: HOME.cx - 6.0, z: HOME.cz - 1.6, w: 2.6, d: 1.6 };
+// ---- shopping island (+x, south-east), joined by a second plank bridge along z = 11 from the park ----
+export const SHOP = { cx: 27, cz: 11, r: 8 }; SHOP.walk = SHOP.r - 1.3;
+export const BRIDGE2 = { z: 11, half: 1.0, x0: 11.6, x1: 21.0, s0: 13.6, s1: 19.8 }; BRIDGE2.walkHalf = BRIDGE2.half - 0.53;
+export const SHOP_BLDG = [[30.6, 6.9], [31.6, 11], [30.6, 15.1]].map(([x, z], i) => ({ i, x, z, w: 2.4, d: 3.0, h: 2.7, ry: Math.atan2(SHOP.cx - x, SHOP.cz - z) })); // local +z = shop front (faces the plaza)
+export const shopFront = (b, f, s = 0) => [b.x + Math.sin(b.ry) * f + Math.cos(b.ry) * s, b.z + Math.cos(b.ry) * f - Math.sin(b.ry) * s];
+export const inBridge2 = (x, z, m = 0) => Math.abs(z - BRIDGE2.z) < BRIDGE2.half + m && x > BRIDGE2.x0 && x < BRIDGE2.x1;
+export const onShop = (x, z, m = 0) => Math.hypot(x - SHOP.cx, z - SHOP.cz) < SHOP.r + m;
+export function bridge2Y(x) { const B = BRIDGE2, u = Math.max(0, Math.min(1, (x - B.s0) / (B.s1 - B.s0))); return 0.1 - 0.3 * Math.sin(Math.PI * u); }
 export const inBridge = (x, z, m = 0) => Math.abs(x - BRIDGE.x) < BRIDGE.half + m && z > BRIDGE.z0 && z < BRIDGE.z1;
 export const onHome = (x, z, m = 0) => Math.hypot(x - HOME.cx, z - HOME.cz) < HOME.r + m;
 // walkable regions: main lawn circle OR bridge corridor OR home lawn circle; anything else snaps to the nearest one
 export function walkClamp(p, W) { const B = BRIDGE, hx = p.x - HOME.cx, hz = p.z - HOME.cz, r = Math.hypot(p.x, p.z), rh = Math.hypot(hx, hz);
-  if (r <= W || rh <= HOME.walk || (Math.abs(p.x - B.x) <= B.walkHalf && p.z >= B.z0 && p.z <= B.z1)) return p;
-  const c = [[p.x * W / r, p.z * W / r], [HOME.cx + hx * HOME.walk / rh, HOME.cz + hz * HOME.walk / rh], [Math.max(B.x - B.walkHalf, Math.min(B.x + B.walkHalf, p.x)), Math.max(B.z0, Math.min(B.z1, p.z))]];
+  const B2 = BRIDGE2, sx = p.x - SHOP.cx, sz = p.z - SHOP.cz, rs = Math.hypot(sx, sz);
+  if (r <= W || rh <= HOME.walk || rs <= SHOP.walk || (Math.abs(p.x - B.x) <= B.walkHalf && p.z >= B.z0 && p.z <= B.z1) || (Math.abs(p.z - B2.z) <= B2.walkHalf && p.x >= B2.x0 && p.x <= B2.x1)) return p;
+  const c = [[SHOP.cx + sx * SHOP.walk / rs, SHOP.cz + sz * SHOP.walk / rs], [Math.max(B2.x0, Math.min(B2.x1, p.x)), Math.max(B2.z - B2.walkHalf, Math.min(B2.z + B2.walkHalf, p.z))], [p.x * W / r, p.z * W / r], [HOME.cx + hx * HOME.walk / rh, HOME.cz + hz * HOME.walk / rh], [Math.max(B.x - B.walkHalf, Math.min(B.x + B.walkHalf, p.x)), Math.max(B.z0, Math.min(B.z1, p.z))]];
   let best = c[0], bd = Infinity; for (const q of c) { const d = Math.hypot(q[0] - p.x, q[1] - p.z); if (d < bd) { bd = d; best = q; } } p.x = best[0]; p.z = best[1]; return p; }
 // bridge deck height: sags in the middle of the rope span
 export function bridgeY(z) { const B = BRIDGE, u = Math.max(0, Math.min(1, (z - B.s0) / (B.s1 - B.s0))); return 0.1 - 0.3 * Math.sin(Math.PI * u); }
@@ -48,6 +57,7 @@ export function heightAt(x, z) {
   if (inR(ROOF, x, z)) return ROOF.y;
   if (inR(BALCONY, x, z)) return BALCONY.y;
   if (inBridge(x, z, 0.1) && Math.hypot(x, z) > ISLAND_R - 2.2 && Math.hypot(x - HOME.cx, z - HOME.cz) > HOME.r - 2.2) return bridgeY(z);
+  if (inBridge2(x, z, 0.1) && Math.hypot(x, z) > ISLAND_R - 2.2 && Math.hypot(x - SHOP.cx, z - SHOP.cz) > SHOP.r - 1.6) return bridge2Y(x);
   if (x > HOUSE.x0 && x < HOUSE.x1 && z > HOUSE.z0 - HOUSE.porch && z < HOUSE.z1) return HOUSE.y;
   return 0;
 }
