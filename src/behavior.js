@@ -4,6 +4,8 @@ import { DESKS, PANTRY, LOUNGE, GLASS, ROOF, STAIRS, BALCONY, PARK, HOUSE, FIRE,
 // Each place: pos [x,z], rot (facing), seat (root y when seated, null = standing), approach: waypoints from the main aisle (z≈0).
 import { BOT_S, SHOP_BLDG, SHOP_X, STREET, STREET_PROPS, TERRACE_Z, AWN, shopFront } from './layout.js';
 import { shopsOn, ootdDay } from './chibi.js';
+import { CAL, CAL_SWING, CAL_FIRE, CAL_DECK, CAL_POOL } from './layout.js';
+import { isAuroraDay, AURORA } from './skyevents.js';
 // seat root heights scale with chibi size (hip ~0.37 local units)
 const HIP = 0.37 * (1.5 - BOT_S); export const SEAT_CHAIR = 0.07 + HIP, SEAT_SOFA = -0.06 + HIP, SEAT_STOOL = -0.05 + HIP;
 export function deskPlace(i) { const [x, z] = DESKS[i]; const back = z < 0, sz = back ? z + 1.0 : z - 1.0, side = back ? 0.95 : -0.95, az = back ? -0.25 : 0.25;
@@ -59,14 +61,29 @@ const TO_SHOP = [[2.7, 0.25], [2.7, 8.4], [3.4, 13.9], [6.4, 14.6], [9.2, 13.9],
 // v15 high street: on a shopping day (chibi.js shopsOn — the same rule that adds the bought top to the wardrobe) a bot goes to
 // Thread & Co.; otherwise it drops by the café, bistro, gadget, computer or stationery shop (rotates by day + slot).
 const VENUE_LABEL = { clothes: 'Shopping for a new top at Thread & Co.', cafe: 'Coffee break at Bean There café', bistro: 'Grabbing a bite at Little Bistro', gadgets: 'Window-shopping gadgets at Gizmo Hub', stationery: 'Picking up pens at Paper Plane', computers: 'Browsing PC parts at Byte Works' };
-const actLabel = (b, a) => a === 'shop' ? VENUE_LABEL[shopVenue(b)] : (b.labels[a] || a);
+const actLabel = (b, a) => a === 'shop' ? VENUE_LABEL[shopVenue(b)] : (b.labels[a] || EXTRA_LABEL[a] || a);
+const EXTRA_LABEL = { calvin: "Hanging out on Calvin's island (invited)", aurora: 'Watching the aurora from the balcony 🌌' };
 export function shopVenue(b, day = ootdDay()) { return shopsOn(b.name, day) ? 'clothes' : ['cafe', 'gadgets', 'bistro', 'stationery', 'computers'][(day + b.slot * 2) % 5]; }
 function shopPlace(b) { const v = shopVenue(b), sb = SHOP_BLDG.find(s => s.kind === v);
   if (v === 'cafe' || v === 'bistro') { const T = STREET_PROPS.filter(p => p[3] === 'table' && (v === 'cafe' ? p[0] < SHOP_X[1] : p[0] > SHOP_X[1]))[b.slot % 2], x = T[0] + (b.slot >= 2 ? 0.3 : -0.3), z = TERRACE_Z - 1.1; // stands by a terrace table (NPC townsfolk sit at them)
     return { pos: [x, z], rot: 0, seat: null, pose: 'sip', approach: [...TO_SHOP, [x, STREET.z - 0.2], [x, z]] }; }
   const o = [-0.3, 0.6, -0.75, 0.3][b.slot % 4], [x, z] = shopFront(sb, sb.d / 2 + AWN.out + 0.55, o), sx = x; // clear of the awning/counter collider
   return { pos: [x, z], rot: sb.ry + Math.PI, seat: null, approach: [...TO_SHOP, [sx, STREET.z], [x, z]] }; }
+// ---------- v20 Calvin's private island: only reachable through the 'calvin' act (his explicit invite) ----------
+const CX = CAL.cx, CZ = CAL.cz; export const TO_CAL = [[-4.65, 0.25], [-4.65, 8.6], [-11.9, 8.2], [-12.3, CZ], [-16.0, CZ], [-26.6, CZ], [CX + 6.2, CZ + 1.4]];
+export const CAL_SPOTS = { // per-bot hangout spot: [x, z, rot, seat y, pose(night?)]
+  Pixel: { name: 'swing', pos: [CAL_SWING.x, CAL_SWING.z], rot: 0, seat: SEAT_STOOL + 0.06, pose: () => 'swing', via: [[CAL_SWING.x + 0.2, CAL_SWING.z + 1.1]] },
+  Sage: { name: 'campfire', pos: [CAL_FIRE.x + 0.6, CAL_FIRE.z + 1.45], rot: Math.PI, seat: SEAT_STOOL + 0.06, pose: n => n ? 'warm' : 'read', via: [[CX + 3.0, CZ + 4.9], [CAL_FIRE.x + 0.6, CAL_FIRE.z + 2.35]] },
+  Jun: { name: 'coffee', pos: [CAL_DECK.bench.x - 0.05, CAL_DECK.bench.z + 0.45], rot: -Math.PI / 2, seat: SEAT_STOOL, pose: () => 'sip', via: [[CX + 3.0, CZ + 4.9], [CX - 3.6, CZ + 5.6], [CX - 8.0, CZ + 1.0], [CAL_DECK.bench.x + 0.9, CAL_DECK.bench.z + 0.45]] },
+  Mika: { name: 'pool', pos: [CAL_POOL.x, CAL_POOL.z + CAL_POOL.rz + 0.32], rot: Math.PI, seat: -0.28, pose: () => 'dangle', via: [[CAL_POOL.x, CAL_POOL.z + CAL_POOL.rz + 1.4]] } };
+function calvinPlace(b) { const s = CAL_SPOTS[b.name] || CAL_SPOTS[['Pixel', 'Jun', 'Sage', 'Mika'][b.slot % 4]]; return { pos: s.pos, rot: s.rot, seat: s.seat, spot: s.name, approach: [...TO_CAL, ...s.via, s.pos] }; }
+// aurora night: everyone on the balcony deck facing the north sky (Calvin's lean spot at x1-1.4 stays free)
+const AUR_SPOTS = { Pixel: [BALCONY.x1 - 2.3, BALCONY.z0 + 0.5], Jun: [BALCONY.x1 - 0.6, BALCONY.z0 + 0.5], Sage: [BALCONY.x1 - 1.9, BALCONY.z0 + 1.6], Mika: [BALCONY.x1 - 0.7, BALCONY.z0 + 1.6] };
+function auroraPlace(b) { const [x, z] = AUR_SPOTS[b.name] || AUR_SPOTS.Pixel; return { pos: [x, z], rot: Math.PI, seat: null, approach: [[9.2, 0.25], [12.2, 0.25], [BALCONY.x0 + 0.4, 0.2], [x, 0.2], [x, z]] }; }
+const isNight = () => { const d = dayOf ? dayOf(Date.now() / 1000) : 12 * H; return d >= 18.5 * H || d < 6.5 * H; };
 const ACTS = {
+  calvin: { place: b => calvinPlace(b), pose: b => (CAL_SPOTS[b.name] || CAL_SPOTS.Pixel).pose(isNight()), emoji: '🏝️' },
+  aurora: { place: b => auroraPlace(b), pose: () => 'skywatch', emoji: '🌌' },
   shop: { place: b => shopPlace(b), pose: b => { const v = shopVenue(b); return v === 'cafe' || v === 'bistro' ? 'sip' : 'stand'; }, emoji: '🛍️' },
   home: { place: b => homePlace(b), pose: b => (homeSpot[b.name] ?? b.slot) < 3 ? 'warm' : 'water', emoji: '🔥' },
   sleep: { place: b => bedPlace(b), pose: () => 'sleep', emoji: '💤' },
@@ -85,7 +102,7 @@ const ACTS = {
   view: { place: b => viewPlace(b.slot), pose: b => b.viewPose || 'lean', emoji: '🌅' },
 };
 export const actEmoji = a => ACTS[a]?.emoji ?? '💻';
-const SPEED = 1.9;
+const SPEED = 1.9; export const SWING_W = 2 * Math.PI / 2.9; // swing period ~2.9 s (rope ~3 m)
 // local day clock (UTC+8 seconds-of-day for a wall time) injected by main; null = no day cycle (pure schedule)
 let dayOf = null; export function setDayClock(f) { dayOf = f; }
 const H = 3600;
@@ -110,6 +127,9 @@ export function makeBrain(chibi, persona) {
     const o = st.override, map = { working: 'work', chatting: 'meeting', idle: 'pantry', away: 'home', break: b.breakAct, meeting: 'meeting' };
     if (o && map[o.state]) return { act: map[o.state], from: deskPlace(b.desk), elapsed: Math.max(0, t - o.since), fromAct: 'work' };
     if (dayOf) { const d = dayOf(t), stg = (homeSpot[b.name] ?? b.slot) * 150; // stagger so they don't walk in a clump
+      const aur = isAuroraDay(ootdDay()), g0 = AURORA.gather[0] + stg / 3, g1 = AURORA.gather[1];
+      if (aur && d >= g0 && d < g1) return { act: 'aurora', fromAct: 'home', from: homePlace(b), elapsed: d - g0 };
+      if (aur && d >= g1) return { act: 'sleep', fromAct: 'aurora', from: auroraPlace(b), elapsed: d - g1 };
       if (d >= 18 * H + stg && d < 22 * H) return { act: 'home', fromAct: 'work', from: deskPlace(b.desk), elapsed: d - 18 * H - stg };
       if (d >= 22 * H || d < 7 * H + stg) return { act: 'sleep', fromAct: 'home', from: homePlace(b), elapsed: (d - 22 * H + 86400) % 86400 };
       if (d < 9 * H) return { act: 'work', fromAct: 'sleep', from: bedPlace(b), elapsed: d - 7 * H - stg }; }
@@ -121,6 +141,12 @@ export function makeBrain(chibi, persona) {
     setOverride(o) { st.override = o; },
     setLocal(act, t, dur) { st.local = { act, since: t, until: t + dur, fromAct: st.act || 'work' }; },
     clearLocal() { st.local = null; },
+    /* v20 invites: walk to Calvin's island and hang out until `until`; sendHome walks back to whatever the routine says now */
+    invite(t, until) { st.local = { act: 'calvin', since: t, until, fromAct: st.act && st.act !== 'calvin' ? st.act : 'work' }; },
+    restoreInvite(until) { st.local = { act: 'calvin', since: -1e9, until, fromAct: 'work' }; },
+    invited(t) { return !!(st.local && st.local.act === 'calvin' && t < st.local.until); },
+    baseAct(t) { const lo = st.local; st.local = null; const a = resolve(t).act; st.local = lo; return a; },
+    sendHome(t) { const a = this.baseAct(t); st.local = { act: a, since: t, until: t + 75, fromAct: 'calvin' }; return a; },
     actAt(t) { return resolve(t).act; }, // pure: used by the dialogue scheduler (same answer on every device)
     update(t, dt, time) {
       const r = resolve(t); const A = ACTS[r.act]; const to = A.place(b); const pts = route(r.fromAct === r.act ? null : r.from, to);
@@ -130,7 +156,7 @@ export function makeBrain(chibi, persona) {
       else { [x, z] = to.pos; rot = to.rot; pose = A.pose(b);
         if (to.pace) { const L2 = pathLen(to.pace), u = ((r.elapsed - travel) * 1.1) % (2 * L2), d = u < L2 ? u : 2 * L2 - u; const pp = along(u < L2 ? to.pace : [...to.pace].reverse(), u < L2 ? d : u - L2); [x, z] = pp; rot = pp[2]; walking = true; pose = 'walk'; } }
       st.act = r.act; st.walking = walking; st.label = walking && pose === 'walk' && !to.pace ? (r.act === 'work' ? 'Heading back to the desk' : 'On the way: ' + actLabel(b, r.act).toLowerCase()) : actLabel(b, r.act);
-      st.seated = !walking && pose !== 'stand' && to.seat !== null; st.asleep = !walking && pose === 'sleep';
+      st.seated = !walking && pose !== 'stand' && to.seat !== null; st.spot = walking ? null : to.spot || null; st.asleep = !walking && pose === 'sleep';
       chibi.userData.setSleepFace?.(!!st.asleep);
       if (st.asleep) { const k = Math.min(1, dt * 4); chibi.rotation.x += (-1.57 - chibi.rotation.x) * k; } else chibi.rotation.x += (0 - chibi.rotation.x) * Math.min(1, dt * 6);
       chibi.position.x = x; chibi.position.z = z;
@@ -184,6 +210,14 @@ export function applyPose(c, pose, t, dt, seated, b) {
     case 'leanBob': { tgt.armL = [-1.15, 0.42]; tgt.armR = [-1.15, -0.42]; tgt.bodyX = 0.16; tgt.headX = -0.05 + Math.max(0, Math.sin(t * 7.6)) * 0.16; tgt.headZ = Math.sin(t * 3.8) * 0.1; break; }
     case 'wave': { tgt.armR = [-2.9, -0.4 + Math.sin(t * 12) * 0.35]; tgt.headX = -0.1; break; }
     case 'talk': { const a = Math.sin(t * 3.2), c2 = Math.sin(t * 2.3 + 1); tgt.armL = [-0.9 + a * 0.3, 0.3]; tgt.armR = [-0.7 + c2 * 0.35, -0.3]; tgt.headZ = Math.sin(t * 1.6) * 0.08; tgt.headY = Math.sin(t * 0.9) * 0.2; break; }
+    // v20 island + sky poses
+    case 'swing': { const w = Math.sin(t * SWING_W); tgt.armL = [-2.45, 0.12]; tgt.armR = [-2.45, -0.12]; tgt.legL = [-1.25 + w * 0.45, -0.06]; tgt.legR = [-1.25 + w * 0.45, 0.06]; tgt.headX = -0.1 - w * 0.12; tgt.bodyX = -w * 0.08; break; }
+    case 'dangle': { const a = Math.sin(t * 2.4); tgt.legL = [-1.0 + a * 0.3, -0.06]; tgt.legR = [-1.0 - a * 0.3, 0.06]; tgt.armL = [0.35, 0.45]; tgt.armR = [0.35, -0.45]; tgt.bodyX = -0.12; tgt.headX = -0.05; tgt.headZ = Math.sin(t * 0.7) * 0.1; break; }
+    case 'skywatch': { const p = (t * 0.13 + sleepPhase(c)) % 1; tgt.headX = -0.42 + Math.sin(t * 0.4) * 0.05; tgt.headY = Math.sin(t * 0.21 + sleepPhase(c)) * 0.35; tgt.bodyX = -0.06;
+      if (p < 0.22) { tgt.armR = [-2.6, -0.35]; tgt.armL = [-0.2, 0.2]; } else { tgt.armL = [-0.55, 0.55]; tgt.armR = [-0.55, -0.55]; } break; } // hands clasped, now and then pointing up
+    case 'wade': { const a = Math.sin(t * 1.6); tgt.armL = [-0.25, 0.9 + a * 0.1]; tgt.armR = [-0.25, -0.9 - a * 0.1]; tgt.bodyY = a * 0.03; tgt.headZ = Math.sin(t * 0.8) * 0.08; break; }
+    case 'swim': { const a = Math.sin(t * 5); tgt.armL = [-2.0 + a * 0.6, 0.6 + a * 0.4]; tgt.armR = [-2.0 + a * 0.6, -0.6 - a * 0.4]; tgt.legL = [a * 0.5, 0]; tgt.legR = [-a * 0.5, 0]; tgt.bodyX = 0.45; tgt.headX = -0.4; tgt.bodyY = -0.05 + Math.abs(a) * 0.03; break; }
+    case 'delight': { const j = Math.max(0, Math.sin(t * 7)); tgt.bodyY = j * 0.22; tgt.armL = [-2.7, 0.55]; tgt.armR = [-2.7, -0.55]; tgt.headX = -0.38; break; } // look up + hop: rainbow!
     default: { tgt.armL = [0, -0.1 - s * 0.04]; tgt.armR = [0, 0.1 + s * 0.04]; tgt.bodyY = s * 0.025; }
   }
   // look-at offset from main (smoothed/clamped there); added to the pose's head yaw so they never fight

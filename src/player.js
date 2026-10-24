@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { makeChibi } from './chibi.js';
 import { applyPose } from './behavior.js';
-import { CALVIN_S, DESKS, BOSS_DESK, GLASS, LOUNGE, PANTRY, BACK_Z, FLOOR, LEFT_X, ROOF, STAIRS, BALCONY, PARK, TREES, POOL, WALK_R, inR, heightAt, canopyRadius, headReach, HEAD_R, HEAD_M, PLANTS, PLANT_SPHERES, HOUSE, FIRE, GARDEN, BRIDGE, walkClamp, inBridge, onHome, inBridge2, onShop, SHOP_BLDG, SHOP_SIDE, STREET_TREE, shopBox, STREET_PROPS, SHOP, shopFront } from './layout.js';
+import { CALVIN_S, DESKS, BOSS_DESK, GLASS, LOUNGE, PANTRY, BACK_Z, FLOOR, LEFT_X, ROOF, STAIRS, BALCONY, PARK, TREES, POOL, WALK_R, inR, heightAt, canopyRadius, headReach, HEAD_R, HEAD_M, PLANTS, PLANT_SPHERES, HOUSE, FIRE, GARDEN, BRIDGE, walkClamp, inBridge, onHome, inBridge2, onShop, SHOP_BLDG, SHOP_SIDE, STREET_TREE, shopBox, STREET_PROPS, SHOP, shopFront, CAL, CAL_TREE, CAL_SWING, CAL_FIRE, CAL_HOUSE, CAL_POOL, CAL_DECK, CAL_SIGN, CAL_LANTERNS, BRIDGE3, onCal, inBridge3, calPoolQ } from './layout.js';
 
 const R = 0.42; // body radius (legs/torso vs low furniture, railings)
 const RH = HEAD_R + HEAD_M; // head radius + margin vs anything head-high (walls, glass, panels, foliage)
@@ -28,15 +28,24 @@ const HOME_BOXES = [...HB, [HOUSE.x0 - 0.9, HOUSE.z0 + 1.2, HOUSE.x0, HOUSE.z1],
   [GARDEN.x - GARDEN.w / 2, GARDEN.z - GARDEN.d / 2, GARDEN.x + GARDEN.w / 2, GARDEN.z + GARDEN.d / 2]];
 const CIRCLES0 = [[L.cx, L.cz, 0.65], [(GLASS.x0 + GLASS.x1) / 2, (GLASS.z0 + GLASS.z1) / 2, 1.25], [-4.6, -7.2, 0.5], [7.4, 2.6, 0.62], [-2.4, 7.2, 0.5], [6.6, 6.9, 0.62], [10.2, -1.2, 0.5], [-3.9, 7.3, 0.3], [9.6, 3.2, 0.3], [-10.2, 7.3, 0.4], [10.1, 7.1, 0.5]];
 const SHOP_CIRCLES = STREET_PROPS.map(([x, z, r]) => [x, z, r]), SHOP_BOXES = [...SHOP_BLDG.map(b => shopBox(b)), ...SHOP_SIDE]; // v16 high street: shop blocks incl. awning/counter footprint + side props + street furniture
-const BOXES = [...BOXES0, ...HOME_BOXES, ...SHOP_BOXES], CIRCLES = [...CIRCLES0, ...HOME_CIRCLES, ...SHOP_CIRCLES];
+// v20 Calvin's island: bed / wardrobe / bench (body), house walls + wardrobe (head), trunk, fire ring, logs, posts, swing seat
+const CH = CAL_HOUSE, CHd = [CH.cx + CH.door[0], CH.cx + CH.door[1]];
+export const CAL_BOXES = [CH.bed, CH.closet, (() => { const b = CAL_DECK.bench; return [b.x - 0.3, b.z - 0.9, b.x + 0.32, b.z + 0.9]; })()];
+export const CAL_TALL = [[CH.x0, CH.z0 - 0.08, CH.x1, CH.z0 + 0.08], [CH.x0 - 0.08, CH.z0, CH.x0 + 0.08, CH.z1], [CH.x1 - 0.08, CH.z0, CH.x1 + 0.08, CH.z1],
+  [CH.x0, CH.z1 - 0.12, CHd[0] + 0.1, CH.z1 + 0.12], [CHd[1] - 0.1, CH.z1 - 0.12, CH.x1, CH.z1 + 0.12], CH.closet];
+export const CAL_CIRCLES = [[CAL_TREE.x, CAL_TREE.z, 1.4], [CAL_FIRE.x, CAL_FIRE.z, 0.82], ...CAL_FIRE.logs.flatMap(L => [-0.55, 0, 0.55].map(k => [L.x + Math.cos(L.ry) * k, L.z - Math.sin(L.ry) * k, 0.34])),
+  ...[...CAL_LANTERNS, [CHd[1] + 0.45, CH.z1 + 0.9], CAL_SIGN].map(([x, z]) => [x, z, 0.12]), [CAL_SWING.x, CAL_SWING.z, 0.4], [CAL_DECK.table.x, CAL_DECK.table.z, 0.34],
+  ...[-1, 1].flatMap(sd => [BRIDGE3.s0 - 0.6, BRIDGE3.s1 + 0.6].map(x => [x, BRIDGE3.z + sd * BRIDGE3.half, 0.14])), [CH.x0 + 0.35, CH.z1 - 0.4, 0.3]];
+const BOXES = [...BOXES0, ...HOME_BOXES, ...SHOP_BOXES, ...CAL_BOXES], CIRCLES = [...CIRCLES0, ...HOME_CIRCLES, ...SHOP_CIRCLES, ...CAL_CIRCLES];
 // ---- two-level collision: ground (office + lawn), stairs (ramp, side-clamped), rooftop ----
 const P = PARK;
 // head-high thin walls/panels: pushed with the HEAD radius so the big round head never pokes through
 const TALL_BOXES = [[FLOOR.x0, BACK_Z - 0.12, FLOOR.x1, BACK_Z + 0.1], [LEFT_X - 0.12, FLOOR.z0, LEFT_X + 0.12, FLOOR.z1], // back wall, left wall
   [GLASS.x0, GLASS.z1 - 0.06, GLASS.door0, GLASS.z1 + 0.06], [GLASS.x1 - 0.06, GLASS.z0, GLASS.x1 + 0.06, GLASS.z1 + 0.06], // glass room panes (door gap)
-  [ROOF.x0, ROOF.z0, ROOF.x1, ROOF.z1], ...HOUSE_TALL, ...SHOP_BLDG.map(b => shopBox(b, 0)), ...SHOP_SIDE]; // annex block walls (roof only reachable from above), home longhouse
+  [ROOF.x0, ROOF.z0, ROOF.x1, ROOF.z1], ...HOUSE_TALL, ...SHOP_BLDG.map(b => shopBox(b, 0)), ...SHOP_SIDE, ...CAL_TALL]; // annex block walls (roof only reachable from above), home longhouse
 // trees: trunk is a body circle; foliage is a head circle sized from the real canopy spheres (3D head-vs-sphere clearance)
-const TALL_CIRCLES = [...TREES.map(([x, z, s]) => [x, z, canopyRadius(s) - RH]), ...PLANTS.map(([x, z, s]) => [x, z, headReach(PLANT_SPHERES, s) - RH]), ...HOME_CIRCLES.filter(c => c[2] === 0.1).map(([x, z]) => [x, z, 0.16]), ...STREET_PROPS.filter(p => p[3] === 'tree').map(([x, z]) => [x, z, STREET_TREE.canopyR + HEAD_R + 0.05 - RH]), ...STREET_PROPS.filter(p => p[3] === 'lamp').map(([x, z]) => [x, z, 0.1])]; // + lamp posts (head vs pole) // + street-tree canopies (3D: canopy above the head line) // + lantern posts // pushOut adds RH back
+const TALL_CIRCLES = [...TREES.map(([x, z, s], i) => [x, z, canopyRadius(s) - RH + (i === 0 ? 0.07 : 0)]), // tree 0 sits by the island-3 bridge landing: a hair more margin
+  ...PLANTS.map(([x, z, s]) => [x, z, headReach(PLANT_SPHERES, s) - RH]), ...HOME_CIRCLES.filter(c => c[2] === 0.1).map(([x, z]) => [x, z, 0.16]), ...STREET_PROPS.filter(p => p[3] === 'tree').map(([x, z]) => [x, z, STREET_TREE.canopyR + HEAD_R + 0.05 - RH]), ...STREET_PROPS.filter(p => p[3] === 'lamp').map(([x, z]) => [x, z, 0.1])]; // + lamp posts (head vs pole) // + street-tree canopies (3D: canopy above the head line) // + lantern posts // pushOut adds RH back
 const GROUND_BOXES = [
   [STAIRS.x0, STAIRS.z0 - 0.1, STAIRS.x1 - 0.5, STAIRS.z0 + 0.02], [STAIRS.x0, STAIRS.z1 - 0.02, STAIRS.x1 - 0.5, STAIRS.z1 + 0.1]]; // stair sides
 const GROUND_CIRCLES = [...TREES.map(([x, z, s]) => [x, z, 0.24 * s]), [POOL.x, POOL.z, 2.5], [-8.6, 9.6, 1.4], [-1.2, 13.0, 0.8], [P.cx, P.cz, 1.15],
@@ -52,7 +61,7 @@ function pushOut(p, boxes, circles) {
   for (const [x, z, r] of circles) { const dx = p.x - x, dz = p.z - z, d = Math.hypot(dx, dz), m = r + RR; if (d < m && d > 1e-4) { p.x = x + dx / d * m; p.z = z + dz / d * m; } } }
 // p = proposed {x,z}; from = current position (decides which level we're on)
 // rim trees: when the island edge and a canopy circle squeeze him, slide along the rim to where the circle meets it
-function rimSlide(p) { const W = WALK_R, r = Math.hypot(p.x, p.z); if (r < W - 0.02 || inR(BALCONY, p.x, p.z, -0.05) || inBridge(p.x, p.z, 0.2) || onHome(p.x, p.z, 1) || inBridge2(p.x, p.z, 0.2) || onShop(p.x, p.z, 1)) return;
+function rimSlide(p) { const W = WALK_R, r = Math.hypot(p.x, p.z); if (r < W - 0.02 || inR(BALCONY, p.x, p.z, -0.05) || inBridge(p.x, p.z, 0.2) || onHome(p.x, p.z, 1) || inBridge2(p.x, p.z, 0.2) || onShop(p.x, p.z, 1) || inBridge3(p.x, p.z, 0.2) || onCal(p.x, p.z, 1)) return;
   for (const [cx, cz, cr] of TALL_CIRCLES) { const m = cr + RH, d = Math.hypot(p.x - cx, p.z - cz); if (d >= m) continue; const C = Math.hypot(cx, cz), ca = (W * W + C * C - m * m) / (2 * W * C);
     if (Math.abs(ca) >= 1) continue; const al = Math.acos(ca), th = Math.atan2(p.z, p.x), tc = Math.atan2(cz, cx), wr = a => Math.atan2(Math.sin(a), Math.cos(a));
     const t = Math.abs(wr(tc + al - th)) < Math.abs(wr(tc - al - th)) ? tc + al : tc - al; const q = 1 - 0.005; p.x = Math.cos(t) * W * q; p.z = Math.sin(t) * W * q; } }
@@ -74,7 +83,9 @@ export function collide(p, others = [], from = null, small = false) { // small =
 }
 
 export function makePlayer({ scene, camera, controls, bots }) {
-  const c = makeChibi({ name: 'Calvin', role: 'Founder · Boss', hair: 0x3b2a22, shirt: 0x2f4f86, pants: 0x3a3a48, skin: 0xffdcc2 });
+  const LOOK = { name: 'Calvin', role: 'Founder · Boss', hair: 0x3b2a22, shirt: 0x2f4f86, pants: 0x3a3a48, skin: 0xffdcc2 };
+  const savedFit = () => { try { const f = JSON.parse(localStorage.getItem('calvinFit') || 'null'); return f && typeof f === 'object' ? f : null; } catch (e) { return null; } };
+  const c = makeChibi({ ...LOOK, fitOverride: savedFit() }); c.rotation.order = 'YXZ';
   c.scale.setScalar(CALVIN_S); c.position.set(BOSS_DESK[0] - 1.6, 0, BOSS_DESK[1] - 1.5); c.rotation.y = Math.PI; scene.add(c);
   // owner touch: little gold lanyard badge
   const badge = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.2, 0.03), new THREE.MeshBasicMaterial({ color: 0xffc94a })); badge.position.set(0.16, 0.95, 0.43); c.userData.parts.body.add(badge);
@@ -110,19 +121,32 @@ body.cardon #actb,body.cardon #imenu{display:none!important}`;
   camb.addEventListener('click', () => setFollow(!follow)); setFollow(false);
   const fwd = new THREE.Vector3(), right = new THREE.Vector3(), mvv = new THREE.Vector3(), tmp = new THREE.Vector3();
   const api = { chibi: c, speed: 0, moved: false, get follow() { return follow; }, setFollow, joy, keys };
+  /* v20 wardrobe: rebuild Calvin's outfit in place (same root/parts/props, so every reference stays valid) and persist it.
+     fit = { top, bottom, shoes, acc } labels from calvinCloset(); null = back to the daily OOTD. */
+  api.fit = savedFit();
+  api.setFit = fit => { if (fit) localStorage.setItem('calvinFit', JSON.stringify(fit)); else localStorage.removeItem('calvinFit'); api.fit = fit;
+    const n = makeChibi({ ...LOOK, fitOverride: fit }), P = c.userData.parts, Q = n.userData.parts;
+    const oldB = P.body.children.find(m => m.userData.hull && m.onBeforeRender && m.onBeforeRender.toString().includes('sin')), base = P.head.position.y - (oldB ? (oldB.scale.y - 1) * 1.6 : 0);
+    for (const k of ['body', 'head', 'armL', 'armR', 'legL', 'legR']) { P[k].children.filter(m => m.userData.hull).forEach(m => { P[k].remove(m); m.geometry.dispose(); });
+      Q[k].children.filter(m => m.userData.hull).forEach(m => P[k].add(m)); }
+    const nb = P.body.children.filter(m => m.userData.hull), ph = Math.random() * 6;
+    if (nb.length) nb[0].onBeforeRender = () => { const sy = 1 + 0.018 * Math.sin(performance.now() / 1000 * 1.7 + ph); nb.forEach(m => m.scale.y = sy); P.head.position.y = base + (sy - 1) * 1.6; };
+    nb.slice(1).forEach(m => { m.onBeforeRender = () => {}; });
+    for (const k of ['ootd', 'mask', 'pocket']) c.userData[k] = n.userData[k]; return c.userData.ootd; };
   api.update = (dt, t) => {
     let ix = 0, iy = 0; if (keys.has('a') || keys.has('arrowleft')) ix -= 1; if (keys.has('d') || keys.has('arrowright')) ix += 1; if (keys.has('w') || keys.has('arrowup')) iy -= 1; if (keys.has('s') || keys.has('arrowdown')) iy += 1;
     let mag; if (ix || iy) { const l = Math.hypot(ix, iy); ix /= l; iy /= l; mag = keys.has('shift') ? 1 : 0.6; } else { ix = joy.x; iy = joy.y; mag = Math.min(1, Math.hypot(ix, iy)); if (mag < 0.12) mag = 0; else { ix /= mag; iy /= mag; if (joy.run) mag = 1; else mag = Math.min(mag, 0.7); } } // touch: auto-run past ~80% stick radius
     camera.getWorldDirection(fwd); fwd.y = 0; fwd.normalize(); right.set(-fwd.z, 0, fwd.x);
     if (api.debugDir) { const d = api.debugDir; mag = d[2] ?? 0.6; fwd.set(d[0], 0, d[1]).normalize(); right.set(-fwd.z, 0, fwd.x); ix = 0; iy = -1; } // test hook: world-space walk direction
-    const run = mag > 0.72, speed = mag ? (run ? 4.6 : 1.2 + mag * 2.2) : 0; api.speed = speed;
+    const inPool = !api.seat && calPoolQ(c.position.x, c.position.z) < 0.92; api.inPool = inPool;
+    const run = mag > 0.72 && !inPool, speed = mag ? (inPool ? 1.3 : run ? 4.6 : 1.2 + mag * 2.2) : 0; api.speed = speed;
     if (speed) { mvv.copy(right).multiplyScalar(ix).addScaledVector(fwd, -iy).normalize(); if (!api.moved) { api.moved = true; setFollow(true); }
       const p = collide({ x: c.position.x + mvv.x * speed * dt, z: c.position.z + mvv.z * speed * dt }, bots.filter(b => Math.abs(b.position.y - c.position.y) < 1).map(b => [b.position.x, b.position.z, 0.45]), c.position);
       c.position.x = p.x; c.position.z = p.z; let dr = Math.atan2(mvv.x, mvv.z) - c.rotation.y; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); c.rotation.y += dr * Math.min(1, dt * 10); }
     if (api.seat) { if (speed) api.stand(); else { const S = api.seat; c.position.set(S.pos[0], c.position.y + (S.y + heightAt(S.pos[0], S.pos[1]) - c.position.y) * Math.min(1, dt * 7), S.pos[1]); c.rotation.y = S.rot;
         applyPose(c, api.emote && api.emote.until > t ? api.emote.name : S.pose, t, dt, !S.standing, { cup: 0x6b4226 }); api.afterPose?.(t); followCam(dt, S.camDist); return; } }
     else { const gy = heightAt(c.position.x, c.position.z); c.position.y += (gy - c.position.y) * Math.min(1, dt * 14); }
-    applyPose(c, api.emote && api.emote.until > t ? api.emote.name : api.waveUntil > t ? 'wave' : speed ? (run ? 'run' : 'walk') : 'stand', speed ? t * (run ? 1.6 : 0.8 + mag * 0.4) : t, dt, false, {});
+    applyPose(c, api.emote && api.emote.until > t ? api.emote.name : api.waveUntil > t ? 'wave' : inPool ? (speed ? 'swim' : 'wade') : speed ? (run ? 'run' : 'walk') : 'stand', speed && !inPool ? t * (run ? 1.6 : 0.8 + mag * 0.4) : t, dt, false, {});
     if (api.carry && !(api.emote && api.emote.until > t)) { const P = c.userData.parts; c.userData.props.cup.visible = true; P.armR.rotation.x = -1.3; P.armR.rotation.z = -0.25; }
     api.afterPose?.(t); followCam(dt);
   };
@@ -143,7 +167,7 @@ body.cardon #actb,body.cardon #imenu{display:none!important}`;
   }
   // seats: { pos:[x,z], rot, y, pose, camDist, onStand }
   api.sitAt = s => { api.seat = s; c.position.set(s.pos[0], c.position.y, s.pos[1]); c.rotation.y = s.rot; /* snap to the seat's facing, not the walking direction */ api.carry = s.keepMug ? api.carry : api.carry; if (!follow) setFollow(true); };
-  api.stand = () => { const s = api.seat; api.seat = null; if (!s) return;
+  api.stand = () => { const s = api.seat; api.seat = null; if (!s) return; c.rotation.x = 0; c.userData.setSleepFace?.(false);
     // step off on the SAME level: try behind (pull the chair back), then in front, then the sides; accept the first walkable,
     // unobstructed spot whose floor height matches the seat's floor (never re-snap to the ground from the roof)
     const lv = heightAt(s.pos[0], s.pos[1]), fx = Math.sin(s.rot), fz = Math.cos(s.rot), from = { x: s.pos[0], z: s.pos[1] };

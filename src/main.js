@@ -16,10 +16,13 @@ import { makeHome } from './home.js';
 import { makeShops } from './shops.js';
 import { makeNPCs } from './npcs.js';
 import { makeClosets } from './wardrobe.js';
-import { makeChibi } from './chibi.js';
+import { makeChibi, calvinCloset } from './chibi.js';
+import { makeCalvinIsland } from './calvin.js';
+import { skyEvents, AURORA } from './skyevents.js';
+import { SWING_W, SLEEP_Y } from './behavior.js';
 import { makePlayer } from './player.js';
 import { pickTier, makeAtmosphere, lightPools, steam, radial } from './fx.js';
-import { DESKS, BOSS_DESK, BOT_S, CALVIN_S, LOUNGE, GLASS, PANTRY, ROOF, BALCONY, PARK, heightAt } from './layout.js';
+import { DESKS, BOSS_DESK, BOT_S, CALVIN_S, LOUNGE, GLASS, PANTRY, ROOF, BALCONY, PARK, heightAt, CAL, CAL_SWING, CAL_FIRE, CAL_HOUSE, CAL_POOL, CAL_DECK, onCal } from './layout.js';
 import { makeDayClock, makeDayCycle, fireflies, glowPoints, dayUniforms } from './daycycle.js';
 import { speechAt, GREET, HI_BACK, ZONE } from './dialogue.js';
 import { buildRoot, buildGroup, pickLine, mem, setTalkClock } from './talk.js';
@@ -47,7 +50,7 @@ controls.minDistance = tgtP ? 3 : 12; controls.maxDistance = 110; controls.minPo
 const sky = makeSky(scene);
 const island = makeIsland(scene);
 const nature = makeNature(scene);
-makeOffice(scene); makeWorld(scene, nature.waterMat); const home = makeHome(scene); window.__home = home; window.__shops = makeShops(scene); const npcs = makeNPCs(scene, window.__shops.userData.keepers); window.__npcs = npcs; window.__closets = makeClosets(scene);
+makeOffice(scene); makeWorld(scene, nature.waterMat); const home = makeHome(scene); window.__home = home; const calIsl = makeCalvinIsland(scene, nature.waterMat); window.__calIsl = calIsl; window.__shops = makeShops(scene); const npcs = makeNPCs(scene, window.__shops.userData.keepers); window.__npcs = npcs; window.__closets = makeClosets(scene);
 // ---- Bots: look + persona + clock-driven brain ----
 const chibis = [], brains = [];
 for (const [name, per] of Object.entries(PERSONAS)) {
@@ -64,7 +67,7 @@ const steamFx = tier === 'low' ? null : steam(scene, [...DESKS, BOSS_DESK].map((
 const pools = lightPools(scene, [[-3.9, 7.3, 2.6, 0xffc070, 0.55], [9.6, 3.2, 2.6, 0xffc070, 0.55], [-7.8, 4.6, 3.4, 0xffb060, 0.28], [8.2, -5.2, 3.0, 0xffd090, 0.3], [5.2, 2.0, 2.2, 0xffc890, 0.3], [-7.9, -5.1, 3.0, 0xfff0c0, 0.22]]);
 // ---- day / night (Calvin's local UTC+8 clock; ?t=HH:MM preview) ----
 const dayClock = makeDayClock(); setDayClock(wt => ((dayClock() + wt - wallTime()) % 86400 + 86400) % 86400); setTalkClock(() => dayClock() / 3600); const day = makeDayCycle({ skyMat: sky.mat, atmoEl: atmo, raysEl: atmos.rays });
-const flies = [fireflies(scene, { cx: PARK.cx, cz: PARK.cz, r: PARK.r + 0.6, n: 34, seed: 11 }), home.flies];
+const flies = [fireflies(scene, { cx: PARK.cx, cz: PARK.cz, r: PARK.r + 0.6, n: 34, seed: 11 }), home.flies, calIsl.flies];
 const lampGlow = glowPoints(scene, [[-3.9, 2.1, 7.3, 1.6], [9.6, 2.1, 3.2, 1.6]], { size: 70, color: 0xffc070 });
 window.__day = () => ({ ...day.state, sec: dayClock() });
 buildShadows(scene); const blobsExtra = []; const blobs = [...chibis, calvin].map(c => [c, chibiShadow(scene)]);
@@ -97,7 +100,7 @@ let prevT = 0;
 const card = document.createElement('div'); card.id = 'card';
 card.innerHTML = '<button class="x" type="button" aria-label="Close">✕</button><div class="hd"><div class="n"></div><div class="r"></div></div><div class="a"><span class="dot"></span><span class="t"></span></div><div class="w"><b>Currently working on</b><span class="wt"></span></div><div class="lv" title="Live from status.json (updated < 30 min ago)"><i></i>live</div>'
   + '<div class="sc"><div class="sec"><h4>Personality</h4><div class="chips tr"></div></div><div class="sec"><h4>Hobbies</h4><ul class="hb"></ul></div><div class="sec"><h4>Habits</h4><ul class="ht"></ul></div></div>'
-  + '<button class="chat" type="button">💬 Open chat</button><div class="note"></div>';
+  + '<div class="acts"><div class="inv"><button class="invb" type="button">🏝️ Invite over</button><button class="homeb" type="button">🏠 Send home</button></div><button class="chat" type="button">💬 Open chat</button></div><div class="note"></div>';
 document.body.appendChild(card);
 const css = document.createElement('style'); css.textContent = `#card{position:fixed;left:50%;bottom:max(18px,env(safe-area-inset-bottom));transform:translate(-50%,20px);opacity:0;pointer-events:none;transition:.2s;
  width:min(360px,92vw);box-sizing:border-box;max-height:min(70vh,560px);display:flex;flex-direction:column;padding:12px 16px;border-radius:18px;background:rgba(255,248,240,.94);border:3px solid #2a1f35;box-shadow:0 6px 0 #2a1f35;font-family:system-ui,sans-serif;color:#2a1f35}
@@ -113,6 +116,14 @@ const css = document.createElement('style'); css.textContent = `#card{position:f
  @media (max-height:700px){#card{max-height:62vh}} @media (max-width:480px){#card{max-height:50vh;padding:10px 12px} #card .n{font-size:19px}}
  #card{position:fixed} #card .lv{display:none;margin-top:6px;font:600 11px system-ui;color:#2f8a4f;letter-spacing:.04em;text-transform:uppercase} #card .lv i{display:inline-block;width:7px;height:7px;border-radius:50%;background:#3ccf6e;margin-right:5px;box-shadow:0 0 0 2px #3ccf6e33;vertical-align:1px} #card.live .lv{display:block} #card .x{position:absolute;top:6px;right:8px;width:36px;height:36px;border:0;background:transparent;font-size:18px;color:#2a1f35;cursor:pointer} #card .dot{width:10px;height:10px;border-radius:50%;background:#3ccf7a;box-shadow:0 0 6px #3ccf7a}`;
 document.head.appendChild(css);
+{ const c2 = document.createElement('style'); c2.textContent = `#card .inv{display:flex;gap:8px;margin-top:10px;flex:0 0 auto} #card .inv button{flex:1;min-height:40px;border:2px solid #2a1f35;border-radius:12px;background:#fff1d6;color:#2a1f35;font:700 14px system-ui,sans-serif;box-shadow:0 3px 0 #2a1f35;cursor:pointer}
+ #card .inv button:disabled{opacity:.45;cursor:default} #card .inv button[hidden]{display:none} #card .inv .homeb{background:#e7f5f2} #card .acts{flex:0 0 auto}
+ @media (max-height:460px){#card .acts{display:flex;gap:8px;align-items:stretch;margin-top:8px} #card .acts>.inv,#card .acts>.chat{flex:1;margin-top:0;min-width:0} #card .acts>.chat{min-height:40px;font-size:14px}}
+ #feed{position:fixed;left:50%;top:max(10px,env(safe-area-inset-top));transform:translate(-50%,-140%);transition:transform .35s;z-index:7;width:min(420px,88vw);box-sizing:border-box;padding:9px 34px 9px 12px;border-radius:14px;background:rgba(255,248,240,.95);border:2.5px solid #2a1f35;box-shadow:0 4px 0 #2a1f35;font:500 13.5px/1.35 system-ui,"Noto Color Emoji",sans-serif;color:#2a1f35}
+ #feed.on{transform:translate(-50%,0)} #feed b{display:block;font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:#2f7f76;margin-bottom:2px} #feed .fx{position:absolute;right:6px;top:6px;border:0;background:none;font-size:15px;cursor:pointer;color:#2a1f35;min-width:28px;min-height:28px}
+ #wardrobe{position:fixed;left:50%;bottom:max(18px,env(safe-area-inset-bottom));transform:translate(-50%,20px);opacity:0;pointer-events:none;transition:.2s;z-index:8;width:min(340px,92vw);box-sizing:border-box;padding:12px 16px 14px;border-radius:18px;background:rgba(255,248,240,.96);border:3px solid #2a1f35;box-shadow:0 6px 0 #2a1f35;font-family:system-ui,sans-serif;color:#2a1f35}
+ #wardrobe.on{opacity:1;transform:translate(-50%,0);pointer-events:auto} #wardrobe h3{margin:0 0 2px;font-size:19px} #wardrobe .sub{font-size:12.5px;opacity:.7;margin-bottom:8px} #wardrobe label{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:6px 0;font:600 13px system-ui}
+ #wardrobe select{flex:0 0 62%;min-height:36px;border:2px solid #2a1f35;border-radius:10px;background:#fff;font:500 14px system-ui;padding:0 6px;color:#2a1f35} #wardrobe .row{display:flex;gap:8px;margin-top:10px} #wardrobe .row button{flex:1;min-height:42px;border:2px solid #2a1f35;border-radius:12px;font:700 14px system-ui;box-shadow:0 3px 0 #2a1f35;cursor:pointer;background:#fff1d6;color:#2a1f35} #wardrobe .row .ok{background:#4fb3a9;color:#fff}`; document.head.appendChild(c2); }
 let selected = null;
 const ring = new THREE.Mesh(new THREE.RingGeometry(1.15, 1.4, 32), new THREE.MeshBasicMaterial({ color: 0xfff1a8, transparent: true, opacity: 0.85, depthWrite: false }));
 ring.rotation.x = -Math.PI / 2; ring.visible = false; scene.add(ring);
@@ -120,7 +131,7 @@ function select(c) { selected = c; document.body.classList.toggle('cardon', !!c)
   card.querySelector('.note').textContent = '';
   if (c) { const per = c.userData.persona; card.querySelector('.n').textContent = c.userData.name; card.querySelector('.r').textContent = c.userData.role + (c.userData.ootd ? ' · OOTD: ' + c.userData.ootd : ''); card.querySelector('.chat').hidden = !chatLink(c.userData.name);
     const fill = (sel, arr, tag) => { const el = card.querySelector(sel); el.replaceChildren(...arr.map(x => { const e = document.createElement(tag); e.textContent = x; return e; })); };
-    fill('.tr', per.traits, 'span'); fill('.hb', per.hobbies, 'li'); fill('.ht', per.habits, 'li'); card.querySelector('.sc').scrollTop = 0; } }
+    fill('.tr', per.traits, 'span'); fill('.hb', per.hobbies, 'li'); fill('.ht', per.habits, 'li'); card.querySelector('.sc').scrollTop = 0; invUI(); } }
 // 'Open chat' -> Grok Bot deep link; if the page is still visible shortly after, the app probably isn't installed.
 let chatTimer = 0;
 card.querySelector('.x').addEventListener('click', e => { e.stopPropagation(); select(null); });
@@ -208,7 +219,7 @@ const OBJS = [
   { label: '🖍️ Doodle on whiteboard', x: 2.9, z: -6.8, fx: 2.9, fz: -9, r: 1.4, run: () => { emoteCalvin('sketch', 2.5); say('Calvin', pick(['Drew a tiny cat. 🐱', 'Q4 plan: ☕ → 🚀', 'Added a smiley. Morale +10.']), wallTime(), 3); } },
   ...[[-4.6, -7.2], [7.4, 2.6], [-2.4, 7.2], [6.6, 6.9], [10.2, -1.2], [-10.2, 7.3], [10.1, 7.1]].map(([x, z]) => ({ label: '💧 Water plant', x, z, r: 1.3, run: () => { emoteCalvin('water', 2.4); say('Calvin', pick(['There you go, buddy 🌱', 'Grow big and leafy!', 'Hydration is self-care 💧']), wallTime(), 3); } })),
 ];
-function onSit(kind) { const wt = wallTime();
+function onSit(kind) { const wt = wallTime(); onIsland(kind);
   if (kind === 'desk') { bossGlow.visible = true; say('Calvin', pick(['Time to build. 💻', 'Inbox zero, here I come.', 'Okay, focus mode.']), wt, 2.5); }
   if (kind === 'sofa' || kind === 'meeting') { const zone = kind === 'sofa' ? 'lounge' : 'meeting'; const here = chibis.filter(c => zoneOf(c) === zone && Math.hypot(c.position.x - calvin.position.x, c.position.z - calvin.position.z) < 6);
     if (player.seat && chibis.find(c => c.userData.name === 'Pixel')?.userData.brain.state.act === 'game' && kind === 'sofa') { player.seat.pose = 'game'; calvin.userData.props.ctrl.visible = true; say('Pixel', 'Player 2 has entered the game! 🎮', wt + 0.8, 4); emoteBot('Pixel', 'jump'); }
@@ -231,7 +242,7 @@ function interact(wt, t, dt) {
   const sameLv = o => Math.abs((o.y || 0) - cp.y) < 1.2;
   if (t - _pickT >= 0.08 || !!player.seat !== (_tgCache?.kind === 'stand')) { _pickT = t;
   const near = chibis.map(c => [c, Math.hypot(c.position.x - cp.x, c.position.z - cp.z)]).filter(([, d]) => d < 3.2).sort((a, b) => a[1] - b[1]);
-  let closeObj = null; { let bd = 0.95; OBJS.forEach(o => { const d = Math.hypot(o.x - cp.x, o.z - cp.z); if (d < bd && sameLv(o)) { bd = d; closeObj = o; } }); }
+  let closeObj = null; { let bd = 0.95; OBJS.forEach(o => { const d = Math.hypot(o.x - cp.x, o.z - cp.z); if (d < bd && sameLv(o) && (!o.when || o.when())) { bd = d; closeObj = o; } }); }
   const social = near.filter(([c]) => zoneOf(c) !== 'desk');
   if (player.seat) tg = { kind: 'stand', label: player.seat.kind === 'desk' ? '⬆️ Stand up' : '⬆️ Stand', id: 'stand' };
   else {
@@ -246,7 +257,7 @@ function interact(wt, t, dt) {
     else if (botT) tg = botT;
   }
   if (tg) {}
-  else { let bd = 1e9; OBJS.forEach(o => { const d = Math.hypot(o.x - cp.x, o.z - cp.z); if (d < o.r && d < bd && sameLv(o)) { bd = d; tg = { kind: 'obj', o, label: typeof o.label === 'function' ? o.label() : o.label, id: 'o' + o.x + o.z }; } }); }
+  else { let bd = 1e9; OBJS.forEach(o => { const d = Math.hypot(o.x - cp.x, o.z - cp.z); if (d < o.r && d < bd && sameLv(o) && (!o.when || o.when())) { bd = d; tg = { kind: 'obj', o, label: typeof o.label === 'function' ? o.label() : o.label, id: 'o' + o.x + o.z }; } }); }
   _tgCache = tg; } else tg = _tgCache;
   if ((tg?.id) !== (target?.id)) { if (mode && !(tg && (tg.id === mode.bot?.userData.name || tg.kind === 'group' || tg.kind === 'stand'))) closeTalk(); }
   if (tg?.kind === 'pet' && tg.p.mode === 'wander') { tg.p.holdUntil = wt + 4; if (Math.hypot(tg.p.tx - tg.p.x, tg.p.tz - tg.p.z) > 0.2 && !tg.p.waitSet) { tg.p.tx = tg.p.x; tg.p.tz = tg.p.z; } }
@@ -282,9 +293,9 @@ const EVENING_HI = { Pixel: ['Boss! Marshmallow? 🔥', 'Calvin came to the camp
   Sage: ['Good evening, Calvin. Sit a while.', 'Calvin. Nice night for thinking.'], Mika: ['Hey boss! Garden\'s looking good, right?', 'Campfire playlist is on 🎶'] };
 const REMEMBER_HI = (n, topic) => ({ Pixel: `Boss! Still thinking about ${topic}!`, Jun: `Hi Calvin! I sketched something about ${topic}.`, Sage: `Calvin. I've been pondering ${topic}.`, Mika: `Heyy! Our ${topic} chat inspired a new cut!` })[n];
 const pick = a => a[Math.floor(Math.random() * a.length)];
-window.__seatAudit = () => [...OBJS.filter(o => o.seatDef).map(o => ({ who: 'Calvin', label: o.label, pos: o.seatDef.pos, rot: o.seatDef.rot })), ...seatPlaces().map(s => ({ who: 'bot', label: s.name, pos: s.pos, rot: s.rot }))];
+window.__seatAudit = () => [...OBJS.filter(o => o.seatDef).map(o => ({ who: 'Calvin', label: typeof o.label === 'function' ? o.label() : o.label, pos: o.seatDef.pos, rot: o.seatDef.rot })), ...seatPlaces().map(s => ({ who: 'bot', label: s.name, pos: s.pos, rot: s.rot }))];
 // test hook: vertical clearance above Calvin's head (crown + extra for the tallest chibi) against any static mesh overhead
-window.__Box3 = THREE.Box3; window.__Frustum = THREE.Frustum; window.__Mat4 = THREE.Matrix4;
+window.__Box3 = THREE.Box3; window.__V3 = THREE.Vector3; window.__Frustum = THREE.Frustum; window.__Mat4 = THREE.Matrix4;
 window.__headClear = () => { scene.updateMatrixWorld(true); const hb = new THREE.Box3().setFromObject(calvin.userData.parts.head), extra = Math.max(0, ...chibis.map(c => new THREE.Box3().setFromObject(c.userData.parts.head).max.y - c.position.y)) - (hb.max.y - calvin.position.y);
   const top = hb.max.y + Math.max(0, extra), cx = (hb.min.x + hb.max.x) / 2, cz = (hb.min.z + hb.max.z) / 2, rx = (hb.max.x - hb.min.x) / 2 * 0.8, rz = (hb.max.z - hb.min.z) / 2 * 0.8;
   const rc = new THREE.Raycaster(); rc.far = 3; rc.camera = camera; let gap = Infinity; const skip = o => { for (let n = o; n; n = n.parent) if (n.userData.chibi || n.userData.pet || n.userData.name || n.isSprite) return true; return !o.visible; };
@@ -310,7 +321,94 @@ function autoTier(fps, t) { if (QMODE !== 'auto' || t < 3) return; slow = fps < 
   qb.onclick = () => { const nx = { auto: 'high', high: 'low', low: 'auto' }[QMODE]; localStorage.setItem('chibiQuality', nx); const u = new URL(location.href); u.searchParams.delete('q'); location.href = u.toString(); };
   document.body.appendChild(qb); }
 window.__quality = () => ({ mode: QMODE, tier, mid, pr: renderer.getPixelRatio(), target: PR_TARGET });
-function loop() { const t = clock.getElapsedTime(); toonUniforms.uTime.value = t; atmos.update(t); if (steamFx) steamFx.material.uniforms.uTime.value = t; const dt = Math.min(0.1, t - prevT); prevT = t; const wt = wallTime(); brains.forEach(b => b.update(wt, dt, t));
+// ================= v20: Calvin's island, invites, wardrobe, sky events =================
+const DAY = () => dayClock(); const hOf = () => DAY() / 3600;
+const GUEST_KEY = 'calvinGuests'; const guests = (() => { try { return JSON.parse(localStorage.getItem(GUEST_KEY) || '{}'); } catch (e) { return {}; } })();
+const saveGuests = () => localStorage.setItem(GUEST_KEY, JSON.stringify(guests));
+Object.entries(guests).forEach(([n, until]) => { const c = botBy(n); if (c && until > wallTime()) c.userData.brain.restoreInvite(until); else delete guests[n]; }); saveGuests();
+function inviteUntil() { const h = hOf(), wt = wallTime(); const end = h < 18 ? 18 : h < 21.5 ? 22 : null; return end === null ? null : wt + (end * 3600 - DAY()); }
+const INV_YES = { Pixel: ['Your island?! On my way, boss! 🏝️', 'Dibs on the swing!! 🪢'], Jun: ['Oh I would love that! Bringing my sketchbook ☕', "Calvin's island! Coming ✨"],
+  Sage: ['An invitation. How lovely. I will bring a book.', 'Coming. I hear the campfire is excellent.'], Mika: ['Ooh, pool party? Be right there 🎶', "Say less, I'm coming over!"] };
+const BYE = { Pixel: ['Thanks boss! Best. Island. Ever.', 'Okay okay, going! GG 🎮'], Jun: ['Thank you for having me! 💛', 'That was so cozy. Bye Calvin!'], Sage: ['Thank you, Calvin. Very restful.', 'Until next time.'], Mika: ['Thanks for the hang! ✌️', 'Bye boss! Sick spot 🎶'] };
+const ARRIVE = { Pixel: 'Wheee! This swing rules! 🪢', Jun: 'This view… I need to paint this ☕', Sage: 'A fine fire. Thank you, Calvin.', Mika: 'Feet in the pool. Perfection 🎶' };
+function invUI() { if (!selected) return; const b = selected.userData.brain, wt = wallTime(), inv = b.invited(wt), ib = card.querySelector('.invb'), hb = card.querySelector('.homeb');
+  ib.hidden = inv; hb.hidden = !inv; const until = inviteUntil(); ib.disabled = !!b.state.asleep || until === null;
+  const k = (b.state.asleep ? 'z' : '') + inv + (until === null); if (card._invk !== k) { card._invk = k; ib.title = b.state.asleep ? 'Sleeping — try tomorrow' : until === null ? 'Too late tonight' : 'Invite to your island'; } }
+function invite(n) { const c = botBy(n); if (!c) return false; const b = c.userData.brain, wt = wallTime(), until = inviteUntil(); if (until === null || b.state.asleep || b.invited(wt)) return false;
+  b.invite(wt, until); guests[n] = until; saveGuests(); say(n, pick(INV_YES[n] || ['Coming!']), wt, 4); emoteBot(n, 'jump', 1.6); invUI(); return true; }
+function sendHome(n, auto) { const c = botBy(n); if (!c) return false; const b = c.userData.brain, wt = wallTime(); if (!b.invited(wt) && !guests[n]) return false;
+  b.sendHome(wt); delete guests[n]; saveGuests(); say(n, auto ? (hOf() >= 18 ? 'Getting late — heading home. Thanks, Calvin! 🌙' : 'Back to work for me. Thanks, Calvin!') : pick(BYE[n] || ['Bye!']), wt, 4); emoteBot(n, 'wave', 1.6); invUI(); return true; }
+card.querySelector('.invb').addEventListener('click', e => { e.stopPropagation(); if (selected) invite(selected.userData.name); });
+card.querySelector('.homeb').addEventListener('click', e => { e.stopPropagation(); if (selected) sendHome(selected.userData.name); });
+window.__invite = invite; window.__chibisBrains = () => chibis.map(c => [c, c.userData.brain]); window.__onCal = (x, z) => onCal(x, z, 0); window.__sendHome = sendHome; window.__guests = () => ({ ...guests });
+// ---- wardrobe UI (Calvin's choice persists in localStorage and overrides his OOTD)
+const wd = document.createElement('div'); wd.id = 'wardrobe'; const CL = calvinCloset(), PARTS = [['top', 'Top'], ['bottom', 'Bottom'], ['shoes', 'Shoes'], ['acc', 'Extra']];
+wd.innerHTML = '<h3>👔 Calvin\'s wardrobe</h3><div class="sub"></div>' + PARTS.map(([k, l]) => `<label>${l}<select data-k="${k}">${CL[k].map(v => `<option value="${v}">${v || '— none —'}</option>`).join('')}</select></label>`).join('')
+  + '<div class="row"><button class="rs" type="button">↺ Daily OOTD</button><button class="ok" type="button">✓ Done</button></div>'; document.body.appendChild(wd);
+const wsub = () => { wd.querySelector('.sub').textContent = player.fit ? 'Custom outfit · saved on this device' : "Today's OOTD: " + (calvin.userData.ootd || ''); };
+const fitFromUI = () => Object.fromEntries(PARTS.map(([k]) => [k, wd.querySelector(`select[data-k=${k}]`).value]));
+const curFit = () => { if (player.fit) return player.fit; const o = (calvin.userData.ootd || '').toLowerCase(), out = {}; PARTS.forEach(([k]) => { out[k] = CL[k].find(v => v && o.includes(v.toLowerCase())) ?? CL[k][0]; }); return out; };
+function openWardrobe() { const f = curFit(); PARTS.forEach(([k]) => { const sel = wd.querySelector(`select[data-k=${k}]`); if (CL[k].includes(f[k])) sel.value = f[k]; }); wsub(); wd.classList.add('on'); select(null); }
+const closeWardrobe = () => wd.classList.remove('on');
+wd.querySelectorAll('select').forEach(sel => sel.addEventListener('change', () => { player.setFit(fitFromUI()); wsub(); emoteCalvin('nod', 1.0); }));
+wd.querySelector('.rs').addEventListener('click', e => { e.stopPropagation(); player.setFit(null); openWardrobe(); say('Calvin', 'Back to the daily look.', wallTime(), 2.4); });
+wd.querySelector('.ok').addEventListener('click', e => { e.stopPropagation(); closeWardrobe(); say('Calvin', pick(['Looking sharp. 😎', 'Fit check: passed ✅', 'Island drip. 🏝️']), wallTime(), 2.6); emoteCalvin('thumbs', 1.4); });
+window.__wardrobe = { open: openWardrobe, close: closeWardrobe, set: f => { player.setFit(f); wsub(); return calvin.userData.ootd; }, closet: CL };
+// ---- island interactions
+{ const SW = CAL_SWING, F = CAL_FIRE, Hh = CAL_HOUSE, P = CAL_POOL, D = CAL_DECK, night = () => hOf() >= 18.5 || hOf() < 6.5, botOn = sp => chibis.some(c => c.userData.brain.state.spot === sp);
+  const bedZ = (Hh.bed[1] + Hh.bed[3]) / 2;
+  OBJS.push(
+    { ...seat('swing', [SW.x, SW.z], 0, -0.05 + HIPC + 0.06, 'swing', '🪢 Swing on the swing', { camDist: 9, camYaw: 0.9 }), when: () => !botOn('swing') },
+    { label: () => night() ? '🔥 Sit by the campfire' : '🪵 Sit on the log', x: F.x - 1.45, z: F.z - 0.2, r: 1.3, seatDef: { kind: 'fire', pos: [F.x - 1.45, F.z - 0.2], rot: Math.PI / 2 }, run: () => { player.sitAt({ kind: 'fire', pos: [F.x - 1.45, F.z - 0.2], rot: Math.PI / 2, y: -0.01 + HIPC, pose: night() ? 'warm' : 'stand', camDist: 9, camYaw: 1.1 }); closeTalk(); onSit('fire'); } },
+    { label: () => night() ? '🔥 Sit by the campfire' : '🪵 Sit on the log', x: F.x - 0.52, z: F.z + 1.45, r: 1.1, seatDef: { kind: 'fire', pos: [F.x - 0.52, F.z + 1.45], rot: Math.PI }, run: () => { player.sitAt({ kind: 'fire', pos: [F.x - 0.52, F.z + 1.45], rot: Math.PI, y: -0.01 + HIPC, pose: night() ? 'warm' : 'stand', camDist: 9, camYaw: 0.4 }); closeTalk(); onSit('fire'); } },
+    { label: '😴 Nap in bed', x: Hh.x0 + 2.0, z: Hh.z0 + 2.05, r: 1.2, run: () => { player.sitAt({ kind: 'bed', pos: [Hh.x0 + 2.55, bedZ], rot: Math.PI / 2, y: SLEEP_Y, pose: 'sleep', camDist: 7, camYaw: 0.6 }); closeTalk(); say('Calvin', pick(['Just a quick nap… zzz', 'Five minutes. Founder recharge.']), wallTime(), 2.6); } },
+    { label: '👔 Open wardrobe', x: Hh.x1 - 1.1, z: Hh.z0 + 1.9, fx: Hh.x1 - 0.6, fz: Hh.z0, r: 1.2, run: () => { closeTalk(); openWardrobe(); } },
+    { label: '🏊 Take a dip', x: P.x, z: P.z + P.rz + 0.55, fx: P.x, fz: P.z, r: 1.1, run: () => { calvin.position.set(P.x, heightAt(P.x, P.z), P.z); say('Calvin', pick(['Ahh, refreshing! 💦', 'Perfect temperature.', 'Private pool perks 😎']), wallTime(), 2.8); } },
+    { ...seat('coffee', [D.bench.x - 0.05, D.bench.z - 0.45], D.bench.ry, D.y - 0.05 + HIPC, 'sip', '☕ Coffee with a view', { camDist: 7.5, camYaw: 2.6, y0: 0 }), when: () => !botOn('coffee') },
+  ); }
+function onIsland(kind) { const wt = wallTime(); if (kind === 'coffee') { say('Calvin', pick(['Coffee. Sea. Silence. 😌', 'Best seat in the whole archipelago.', 'Ahh… this is the life ☕']), wt + 0.6, 3.2); }
+  if (kind === 'fire' && hOf() >= 18.5) say('Calvin', pick(['Nothing beats a campfire. 🔥', 'Warm hands, happy founder.']), wt + 0.5, 3); }
+// v20 Calvin poses on the island: lying in bed, swinging, sipping on the coffee bench
+player.afterPose = t => { const S = player.seat; if (!S) return;
+  if (S.kind === 'bed') { calvin.rotation.x = -1.57; calvin.userData.setSleepFace?.(true); }
+  if (S.kind === 'swing') { const th = CAL_SWING.amp * Math.sin(t * SWING_W), L = CAL_SWING.py - CAL_SWING.y; const a = calIsl.swing.rotation.x; calvin.position.z = CAL_SWING.z - Math.sin(a) * L; calvin.position.y = heightAt(CAL_SWING.x, CAL_SWING.z) + S.y + (1 - Math.cos(a)) * L; calvin.rotation.x = a * 0.6; }
+};
+// ---- office feed (Sage's aurora heads-up, rainbow shout-outs) — local UI, nothing is posted anywhere
+const feed = document.createElement('div'); feed.id = 'feed'; feed.innerHTML = '<b></b><span></span><button class="fx" type="button" aria-label="Dismiss">✕</button>'; document.body.appendChild(feed);
+let feedKey = null, feedHide = 0; const dismissed = new Set(JSON.parse(sessionStorage.getItem('feedDismiss') || '[]'));
+feed.querySelector('.fx').addEventListener('click', e => { e.stopPropagation(); if (feedKey) { dismissed.add(feedKey); sessionStorage.setItem('feedDismiss', JSON.stringify([...dismissed])); } feed.classList.remove('on'); });
+function post(key, who, text, holdSec) { if (dismissed.has(key)) return; if (feedKey !== key) { feedKey = key; feed.querySelector('b').textContent = '📣 Office feed · ' + who; feed.querySelector('span').textContent = text; } feed.classList.add('on'); feedHide = holdSec ? performance.now() + holdSec * 1000 : 0; }
+window.__feed = () => feed.classList.contains('on') ? feed.textContent : null;
+const AUR_POST = "Aurora expected tonight around 21:00 ✨ Viewing on the balcony deck from 21:00 — bring a blanket! 🌌";
+const RB_LINES = { Pixel: ['RAINBOW!!! 🌈 Screenshot it!', 'Is that a double?! 🌈'], Jun: ['Look at those colours… 🌈✨', 'I need my pastels, NOW 🌈'], Sage: ['Sunlight, rain, 42 degrees. Beautiful. 🌈', 'A rainbow. Make a wish.'], Mika: ['Rainbow vibes! 🌈🎶', 'Everyone look outside!! 🌈'] };
+const AUR_LINES = { Pixel: ['WHOA it\'s dancing! 🌌', 'Best. Light show. Ever.'], Jun: ['Green and violet… so dreamy 💚💜', 'I\'ll never forget this 🌌'], Sage: ['Solar wind meeting our sky. Wonderful.', 'Told you. 21:00. 🌌'], Mika: ['Aurora playlist: ON 🎶🌌', 'Goosebumps, boss.'] };
+// sparkles over delighted bots (one Points draw, hidden unless a rainbow is out)
+const SPK = 10, spkGeo = new THREE.BufferGeometry(); spkGeo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(chibis.length * SPK * 3), 3)); spkGeo.setAttribute('aSeed', new THREE.Float32BufferAttribute(Array.from({ length: chibis.length * SPK }, (_, i) => i * 1.37 % 7 + i * 0.13), 1));
+const sparkles = new THREE.Points(spkGeo, new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, uniforms: { uTime: { value: 0 }, uSize: { value: 26 * Math.min(devicePixelRatio, 1.5) } },
+  vertexShader: `uniform float uTime, uSize; attribute float aSeed; varying float vB; varying vec3 vC; void main(){ float ph = fract(uTime*0.45 + aSeed*0.31); vec3 q = position + vec3(sin(aSeed*5.0)*0.75, ph*1.1, cos(aSeed*3.0)*0.75);
+    vec4 mv = modelViewMatrix*vec4(q,1.0); gl_Position = projectionMatrix*mv; vB = sin(ph*3.1416); vC = 0.5+0.5*cos(6.283*(aSeed*0.17+vec3(0.0,0.33,0.67))); gl_PointSize = uSize*vB*(10.0 / -mv.z); }`,
+  fragmentShader: `varying float vB; varying vec3 vC; void main(){ vec2 d = abs(gl_PointCoord-0.5); float a = max(smoothstep(0.08,0.0,d.x)*smoothstep(0.5,0.0,d.y), smoothstep(0.08,0.0,d.y)*smoothstep(0.5,0.0,d.x)) + smoothstep(0.25,0.0,length(d))*0.6; gl_FragColor = vec4(mix(vec3(1.0),vC,0.5)*a*vB, 1.0); }` }));
+sparkles.frustumCulled = false; sparkles.visible = false; sparkles.renderOrder = 4; scene.add(sparkles);
+let skyNow = { rainbow: 0, aurora: 0 }, rbReact = 0, aurSay = 0, sageNote = 0;
+window.__sky = () => ({ ...skyNow, sec: DAY() });
+function skyUpdate(t, wt) { const ev = skyEvents(DAY()); skyNow = ev; const U = sky.mat.uniforms; U.uRainbow.value = ev.rainbow; U.uAurora.value = ev.aurora;
+  if (ev.headsUp) { post('aurora-' + ev.auroraDay, 'Sage', AUR_POST); if (t > sageNote && t > 2 && !ev.gather && ev.aurora < 0.05) { /* daytime heads-up only; during the viewing the bots use AUR_LINES */ sageNote = t + 150; const sg = botBy('Sage'); if (sg && !sg.userData.brain.state.asleep) { say('Sage', 'Heads-up: aurora tonight ~21:00. Viewing on the balcony deck! 🌌', wt, 12); emoteBot('Sage', 'wave', 2); } } }
+  else if (ev.rainbow > 0.3) post('rainbow', 'Pixel', 'RAINBOW over the western sea right now!! 🌈 Go look!', 20);
+  else if (feedKey && feedHide && performance.now() > feedHide) feed.classList.remove('on');
+  else if (!ev.headsUp && feedKey?.startsWith('aurora') && feed.classList.contains('on')) feed.classList.remove('on');
+  // rainbow: awake bots look up, hop, cheer and sparkle
+  const rb = ev.rainbow > 0.35; sparkles.visible = rb;
+  if (rb) { const pa = spkGeo.attributes.position; chibis.forEach((c, i) => { const ok = !c.userData.brain.state.asleep; for (let k = 0; k < SPK; k++) pa.setXYZ(i * SPK + k, c.position.x, ok ? c.position.y + 2.9 * BOT_S / 1.5 : -999, c.position.z); }); pa.needsUpdate = true; sparkles.material.uniforms.uTime.value = t;
+    if (t > rbReact) { rbReact = t + 9; chibis.forEach((c, i) => { const n = c.userData.name; if (c.userData.brain.state.asleep) return; emoteBot(n, i % 2 ? 'delight' : 'skywatch', 8.5); if ((Math.floor(t / 9) + i) % 2 === 0) say(n, pick(RB_LINES[n] || ['🌈!']), wt + i * 0.6, 4); }); } }
+  // aurora: gathered bots on the balcony coo at it
+  if (ev.aurora > 0.3 && t > aurSay) { aurSay = t + 11; const here = chibis.filter(c => c.userData.brain.state.act === 'aurora' && !c.userData.brain.state.walking); if (here.length) { const c = pick(here); say(c.userData.name, pick(AUR_LINES[c.userData.name] || ['🌌']), wt, 4.5); emoteBot(c.userData.name, 'delight', 2.4); } } }
+function calvinUpdate(t, wt, dt) { calIsl.update(t, skyNow.aurora || 0); const th = CAL_SWING.amp * Math.sin(t * SWING_W), busy = player.seat?.kind === 'swing' || chibis.some(c => c.userData.brain.state.spot === 'swing');
+  const sw = calIsl.swing; const want = busy ? th : 0.05 * Math.sin(t * 1.3); sw.rotation.x += (want - sw.rotation.x) * Math.min(1, dt * 6);
+  chibis.forEach(c => { const bs = c.userData.brain.state; if (bs.spot === 'swing' && bs.seated) { const L = CAL_SWING.py - CAL_SWING.y; c.position.z = CAL_SWING.z - Math.sin(sw.rotation.x) * L; c.position.y += (1 - Math.cos(sw.rotation.x)) * L; c.rotation.x = sw.rotation.x * 0.6; }
+    const n = c.userData.name; if (guests[n] && wt >= guests[n] - 1) sendHome(n, true);
+    if (bs.act === 'calvin' && !bs.walking && !c.userData._arr) { c.userData._arr = true; say(n, ARRIVE[n] || '🏝️', wt, 4); emoteBot(n, 'wave', 1.6); } if (bs.act !== 'calvin') c.userData._arr = false; });
+  if (selected) invUI(); if (wd.classList.contains('on') && Math.hypot(calvin.position.x - (CAL_HOUSE.x1 - 1.1), calvin.position.z - (CAL_HOUSE.z0 + 1.9)) > 2.2) closeWardrobe(); }
+function loop() { const t = clock.getElapsedTime(); toonUniforms.uTime.value = t; atmos.update(t); if (steamFx) steamFx.material.uniforms.uTime.value = t; const dt = Math.min(0.1, t - prevT); prevT = t; const wt = wallTime(); if (!window.__pauseBots) brains.forEach(b => b.update(wt, dt, t));
   island.children.forEach(c => { if (c.userData.float !== undefined) c.position.y += Math.sin(t + c.userData.float) * 0.003; });
   const ds = day.update(dayClock()); sky.mat.uniforms.uTime.value = t; lampGlow.material.uniforms.uTime.value = t;
   glows.forEach((h,i)=>{ const b = h.userData.base ?? (h.userData.base = h.material.opacity); h.material.opacity = b * (1 + (b < 0.3 ? 2.4 : 0.35) * ds.glow) * (0.92 + 0.08 * Math.sin(t * 2 + i)); });
@@ -320,7 +418,7 @@ function loop() { const t = clock.getElapsedTime(); toonUniforms.uTime.value = t
     home.covers[n].visible = !!bs.asleep; if (bs.asleep) home.covers[n].scale.y = 1 + (breath(c, t) * 0.5 + 0.5) * 0.07; });
   flies.forEach(f => { f.visible = ds.fireflies > 0.01; f.material.uniforms.uA.value = ds.fireflies; f.material.uniforms.uTime.value = t; });
   frames++; const now=performance.now(); if(now-last>1000){window.__info=renderer.info.render; window.__fps=frames*1000/(now-last); autoTier(window.__fps, t); fpsEl.textContent=window.__fps.toFixed(0)+' fps'; frames=0; last=now;}
-  player.update(dt, t); petsys.update(dt, t, wt); npcs.update(dt, t, dayClock() / 3600, camera); interact(wt, t, dt);
+  calvinUpdate(t, wt, dt); skyUpdate(t, wt); player.update(dt, t); petsys.update(dt, t, wt); npcs.update(dt, t, dayClock() / 3600, camera); interact(wt, t, dt);
   const sp = speechAt(wt, talkers);
   talkersAll.forEach((c, i) => { const nm = c.userData.name, bs = c.userData.brain?.state; const loc = localSay[nm]; let text = loc && loc.until > wt ? loc.text : (sp && sp.name === nm ? sp.text : '');
     drawBubble(bubbles[i], bs ? (bs.walking ? '🚶' : actEmoji(bs.act)) : '', text); const bb = bubbles[i]; bb.sp.visible = bb.big || !!bs;

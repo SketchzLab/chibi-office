@@ -7,7 +7,7 @@ const b = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', arg
 const p = await b.newPage(); await p.goto(process.argv[2] || 'http://localhost:5179/?at=40&q=low', { waitUntil: 'networkidle0' });
 const W = ms => new Promise(r => setTimeout(r, ms)); let bad = 0; const out = (ok, s) => { if (!ok) bad++; console.log((ok ? 'OK   ' : 'FAIL ') + s); };
 const n = await p.evaluate(() => window.__objs.length);
-for (let i = 0; i < (process.env.HOMEONLY ? 0 : n); i++) { const lab = await p.evaluate(i => { const o = window.__objs[i]; if (!o.seatDef && !/Lean/.test(o.label)) return null; window.__player.stand?.(); o.run(); return o.label; }, i); if (!lab) continue;
+for (let i = 0; i < (process.env.HOMEONLY ? 0 : n); i++) { const lab = await p.evaluate(i => { const o = window.__objs[i]; if (!o.seatDef && !/Lean/.test(o.label)) return null; window.__player.stand?.(); o.run(); return String(typeof o.label === "function" ? o.label() : o.label); }, i); if (!lab) continue;
   await W(1400); const r = await p.evaluate(() => window.__headClear()); out(r.gap === null || r.gap > MIN, `seat  ${lab.padEnd(34)} at (${r.pos}) crown y ${r.top}  gap ${r.gap ?? '∞'}`);
   if (r.pos[1] > 2) { const lv = r.pos[1]; await p.evaluate(() => window.__player.stand()); await W(700); const q = await p.evaluate(() => { const c = window.__player.chibi.position; return [c.x, c.y, c.z]; });
     out(Math.abs(q[1] - lv) < 0.1, `stand ${lab.padEnd(34)} seat floor ${lv} -> after stand y ${q[1].toFixed(2)} at (${q[0].toFixed(2)}, ${q[2].toFixed(2)})`); } }

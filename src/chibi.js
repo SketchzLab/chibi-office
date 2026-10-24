@@ -143,6 +143,12 @@ const hashD = (name, d, k) => { let x = (Math.imul(d, 2654435761) ^ Math.imul([.
 export const shopsOn = (name, d) => name !== 'Calvin' && hashD(name, d, 1) % 4 === 0; // a shopping day for this bot?
 export const buyOn = (name, d) => shopsOn(name, d) ? SHOP_STOCK[hashD(name, d, 2) % SHOP_STOCK.length] : null;
 export function purchases(name, day = ootdDay()) { const out = []; for (let d = SHOP_START; d < day; d++) { const it = buyOn(name, d); if (it && !out.includes(it)) out.push(it); } return out; }
+/* v20 Calvin's own closet (island house): his rotation + a few island-casual pieces. Labels are the persistence keys. */
+const CLOSET_EXTRA = { top: [['linen shirt', 'shirt', { c: 0xefe6d4 }], ['island tee', 'tee', { c: 0x7fb0a8, patch: 0xf2efe6 }], ['cosy cardigan', 'cardigan', { c: 0x9a8270 }]],
+  bottom: [['chino shorts', 'shorts', { c: 0xc8b48e, sock: 0xf2efe6 }], ['joggers', 'joggers', { c: 0x5a6070 }]],
+  shoes: [['teal sneakers', 'sneaker', { c: 0x7fb0a8, strap: 0xf4f2ee, sole: 0xd8dcea }], ['loafers', 'loafer', { c: 0x6b4632, strap: 0x4a3020 }]], acc: [] };
+function closetOf(L) { const W = WARDROBE.Calvin(L), o = {}; for (const k of ['top', 'bottom', 'shoes', 'acc']) { const seen = new Set(); o[k] = [...W[k], ...CLOSET_EXTRA[k]].filter(x => !seen.has(x[0]) && seen.add(x[0])); } return o; }
+export function calvinCloset() { const o = closetOf({}); for (const k in o) o[k] = o[k].map(x => x[0]); return o; } // labels/kinds only (colours resolved inside makeChibi)
 export function wardrobeTops(name, L, day = ootdDay(), style = name) { return [...(WARDROBE[style] || WARDROBE.Calvin)(L).top, ...purchases(name, day)]; }
 /* outfit day: UTC+8 calendar day (stable all day), ?ootd=N overrides */
 export function ootdDay() { const q = typeof location !== 'undefined' ? new URLSearchParams(location.search).get('ootd') : null; return q != null && q !== '' ? +q : Math.floor((Date.now() / 1000 + 8 * 3600) / 86400); }
@@ -157,9 +163,11 @@ let STENCIL_ID = 0; const OUT = new THREE.MeshBasicMaterial({ color: 0x1d2050, s
 OUT.onBeforeCompile = s => { s.vertexShader = s.vertexShader.replace('#include <begin_vertex>', 'vec3 transformed = position + normal * 0.03;').replace('#include <project_vertex>', '#include <project_vertex>\n gl_Position.z += 0.003 * gl_Position.w;'); };
 const KEY = new THREE.Vector3(-0.45, 0.8, 0.45).normalize(), SH = new THREE.Color(0x98a0d4);
 
-export function makeChibi({ name, role, skin = 0xf0c4a6, hair, shirt, pants, day, style = name, lo = false }) { // style: persona whose hair/wardrobe/build to borrow (NPCs); lo: coarser sculpt (NPC LOD)
+export function makeChibi({ name, role, skin = 0xf0c4a6, hair, shirt, pants, day, style = name, lo = false, fitOverride = null }) { // style: persona whose hair/wardrobe/build to borrow (NPCs); lo: coarser sculpt (NPC LOD)
   const root = new THREE.Group(); root.userData = { name, role, activity: 'Working at desk' };
   const L = { hair: mute(hair), shirt: mute(shirt), pants: mute(pants), skin: mute(skin, 0.1) }, dd0 = day ?? ootdDay(), fit = pickOOTD(name, L, dd0, style);
+  if (fitOverride) { const C = closetOf(L); for (const k of ['top', 'bottom', 'shoes', 'acc']) { const it = fitOverride[k] != null && C[k].find(x => x[0] === fitOverride[k]); if (it) fit[k] = it; }
+    if (fit.top[2].up && fit.acc[1] === 'headphones') fit.acc = NONE[0]; fit.label = [fit.top, fit.bottom, fit.shoes, fit.head, fit.acc].map(x => x[0]).filter(Boolean).join(', '); fit.own = true; }
   /* atlas: 8x8 tiles painted lazily as outfit parts ask for them */
   const AN = 8, cv = document.createElement('canvas'); cv.width = cv.height = T * AN; const g = cv.getContext('2d'); const tiles = {}; let nt = 0; seed = (name || 'x').length * 977 + 13;
   const t = (fn, base, o = {}) => { const key = fn + new THREE.Color(base).getHexString() + JSON.stringify(o); if (tiles[key] === undefined) { if (nt >= AN * AN) return 'skin'; const i = nt++;
@@ -210,7 +218,7 @@ export function makeChibi({ name, role, skin = 0xf0c4a6, hair, shirt, pants, day
   for (const l of ['legL', 'legR']) for (const gg of geos[l]) { const pa = gg.attributes.position; for (let i = 0; i < pa.count; i++) if (pa.getY(i) > -0.33) { pa.setX(i, pa.getX(i) * 0.84); pa.setZ(i, pa.getZ(i) * 0.9); } }
   for (const [k, list] of Object.entries(geos)) { if (!list.length) continue; const m = mergeGeometries(list); list.forEach(x => x.dispose()); const og = new THREE.BufferGeometry(); og.setAttribute('position', m.attributes.position.clone()); const ogm = mergeVertices(og, 1e-4); ogm.computeVertexNormals(); og.dispose(); /* smooth normals so the hull never cracks */
     const f = new THREE.Mesh(m, fill), o = new THREE.Mesh(ogm, outM);
-    if (k === 'body') { const ph = sid * 1.7; f.onBeforeRender = () => { const sy = 1 + 0.018 * Math.sin(performance.now() / 1000 * 1.7 + ph); f.scale.y = o.scale.y = sy; head.position.y = (1.68 + LIFT) + (sy - 1) * 1.6; }; } /* idle breathing */ o.renderOrder = 2; o.raycast = () => {}; grp[k].add(f, o); }
+    if (k === 'body') { const ph = sid * 1.7; f.onBeforeRender = () => { const sy = 1 + 0.018 * Math.sin(performance.now() / 1000 * 1.7 + ph); f.scale.y = o.scale.y = sy; head.position.y = (1.68 + LIFT) + (sy - 1) * 1.6; }; } /* idle breathing */ o.renderOrder = 2; o.raycast = () => {}; f.userData.hull = o.userData.hull = true; grp[k].add(f, o); }
   legR.children.forEach(m => { m.rotation.set(0, 0.42, 0.05); }); legL.children.forEach(m => { m.rotation.set(0, -0.12, -0.04); }); // toes out, asymmetric
     head.scale.setScalar(girl ? 0.8 : 0.83); body.children.filter(m => m.isMesh).forEach(m => { m.scale.set(girl ? 0.98 : 1.14, 1, girl ? 1.02 : 1.1); m.rotation.set(0.03, 0.02, -0.01); });
   const pocket = fit.top[1] === 'hoodie' || fit.top[1] === 'jacket'; root.userData.pocket = pocket; armL.children.forEach(m => m.rotation.set(pocket ? -0.3 : -0.1, 0, pocket ? 0.2 : 0.05)); armR.children.forEach(m => m.rotation.set(pocket ? -0.22 : 0.12, 0, pocket ? -0.2 : -0.04)); /* arms hang & hug the body */ // smaller head vs chunkier body (ref proportions)

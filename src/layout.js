@@ -61,6 +61,35 @@ export const STREET_PROPS = [...[SHOP_X[0], SHOP_X[2]].flatMap(x => [[x - 1.6, T
 export const STREET_TREE = { canopyY: 3.55, canopyR: 1.0 }; // street trees: canopy centre/radius (world) — head collider in player.js
 export const LAMP_H = 3.7; // lamp globe height (above any head)
 export const shopFront = (b, f, s = 0) => [b.x + Math.sin(b.ry) * f + Math.cos(b.ry) * s, b.z + Math.cos(b.ry) * f - Math.sin(b.ry) * s];
+// ---- v20 Calvin's private island (west, -x), joined by a third plank bridge along z = CAL.cz. Strictly Calvin's: bot routes only lead
+// here through the 'calvin' act (an explicit invite from his card), NPC loops never do.
+export const CAL = { cx: -35, cz: 0.3, r: 11 }; CAL.walk = 8.5; CAL.hedge = 9.7; // walk circle sits inside the hedge ring
+export const BRIDGE3 = { z: CAL.cz, half: 1.4, x0: -26.6, x1: -16.0, s0: -24.4, s1: -17.4 }; BRIDGE3.walkHalf = BRIDGE3.half - 0.53;
+BRIDGE3.mouths = [[-16.4, CAL.cz, 1.9], [-25.9, CAL.cz, 1.9]];
+const cl = (x, z) => [CAL.cx + x, CAL.cz + z];
+// features (world coords). Tree trunk at the centre, swing on its east branch, campfire SW of the trunk, house NW, pool NE, coffee deck W (through a hedge gap).
+export const CAL_TREE = { x: CAL.cx, z: CAL.cz - 0.8, s: 2.4 };
+export const CAL_SWING = { x: CAL_TREE.x + 2.3, z: CAL_TREE.z, py: 3.6, y: 0.55, amp: 0.3 }; // pivot height, seat height; swings along z
+export const CAL_FIRE = { x: CAL.cx - 1.2, z: CAL.cz + 2.4 };
+CAL_FIRE.logs = [{ x: CAL_FIRE.x, z: CAL_FIRE.z + 1.45, ry: 0 }, { x: CAL_FIRE.x - 1.45, z: CAL_FIRE.z - 0.2, ry: Math.PI / 2 }]; // log axis along local x
+export const CAL_HOUSE = { cx: CAL.cx - 4.4, cz: CAL.cz - 3.6, w: 5.0, d: 4.0, h: 3.1, t: 0.16, door: [-0.9, 1.9] }; // door gap (local x) in the +z wall
+{ const H = CAL_HOUSE; H.x0 = H.cx - H.w / 2; H.x1 = H.cx + H.w / 2; H.z0 = H.cz - H.d / 2; H.z1 = H.cz + H.d / 2;
+  H.bed = [H.x0 + 0.1, H.z0 + 0.08, H.x0 + 3.1, H.z0 + 1.43]; H.closet = [H.x1 - 1.15, H.z0 + 0.08, H.x1 - 0.08, H.z0 + 0.7]; }
+export const CAL_POOL = { x: CAL.cx + 5.0, z: CAL.cz - 4.4, rx: 2.1, rz: 1.4, depth: 0.55 };
+export const CAL_DECK = { x0: CAL.cx - 11.9, x1: CAL.cx - 8.4, z0: CAL.cz - 1.6, z1: CAL.cz + 1.6, y: 0.15, gap: 1.75 }; // gap: hedge opening half-width (z)
+CAL_DECK.bench = { x: CAL.cx - 10.3, z: CAL.cz, ry: -Math.PI / 2 }; CAL_DECK.table = { x: CAL.cx - 10.35, z: CAL.cz + 1.2 };
+export const CAL_SIGN = [CAL.cx + 7.4, CAL.cz + 2.6], CAL_LANTERNS = [[-26.6, CAL.cz - 2.1], [-26.6, CAL.cz + 2.1]];
+export const onCal = (x, z, m = 0) => Math.hypot(x - CAL.cx, z - CAL.cz) < CAL.r + m;
+export const inBridge3 = (x, z, m = 0) => Math.abs(z - BRIDGE3.z) < BRIDGE3.half + m && x > BRIDGE3.x0 && x < BRIDGE3.x1;
+export const inCalDeck = (x, z, m = 0) => x > CAL_DECK.x0 - m && x < CAL_DECK.x1 + m && z > CAL_DECK.z0 - m && z < CAL_DECK.z1 + m;
+export const calPoolQ = (x, z) => Math.hypot((x - CAL_POOL.x) / CAL_POOL.rx, (z - CAL_POOL.z) / CAL_POOL.rz); // <1 inside the water
+export function bridge3Y(x) { const B = BRIDGE3, u = Math.max(0, Math.min(1, (x - B.s0) / (B.s1 - B.s0))); return 0.1 - 0.3 * Math.sin(Math.PI * u); }
+/* the private island as a set of walkable shapes (walk circle, bridge corridor + funnel mouths, coffee deck inset by the body radius) */
+export function inCalWalk(x, z) { const B = BRIDGE3; return Math.hypot(x - CAL.cx, z - CAL.cz) <= CAL.walk || (Math.abs(z - B.z) <= B.walkHalf && x >= B.x0 && x <= B.x1) || B.mouths.some(([mx, mz, mr]) => Math.hypot(x - mx, z - mz) <= mr)
+  || (x >= CAL_DECK.x0 + 0.5 && x <= CAL_DECK.x1 && z >= CAL_DECK.z0 + 0.45 && z <= CAL_DECK.z1 - 0.45); }
+function calNearest(x, z) { const B = BRIDGE3, dx = x - CAL.cx, dz = z - CAL.cz, r = Math.hypot(dx, dz) || 1;
+  return [[CAL.cx + dx * CAL.walk / r, CAL.cz + dz * CAL.walk / r], [Math.max(B.x0, Math.min(B.x1, x)), Math.max(B.z - B.walkHalf, Math.min(B.z + B.walkHalf, z))],
+    [Math.max(CAL_DECK.x0 + 0.5, Math.min(CAL_DECK.x1, x)), Math.max(CAL_DECK.z0 + 0.45, Math.min(CAL_DECK.z1 - 0.45, z))]]; }
 export const inBridge2 = (x, z, m = 0) => Math.abs(z - BRIDGE2.z) < BRIDGE2.half + m && x > BRIDGE2.x0 && x < BRIDGE2.x1;
 export const onShop = (x, z, m = 0) => Math.hypot(x - SHOP.cx, z - SHOP.cz) < SHOP.r + m;
 export function bridge2Y(x) { const B = BRIDGE2, u = Math.max(0, Math.min(1, (x - B.s0) / (B.s1 - B.s0))); return 0.1 - 0.3 * Math.sin(Math.PI * u); }
@@ -69,8 +98,8 @@ export const onHome = (x, z, m = 0) => Math.hypot(x - HOME.cx, z - HOME.cz) < HO
 // walkable regions: main lawn circle OR bridge corridor OR home lawn circle; anything else snaps to the nearest one
 export function walkClamp(p, W) { const B = BRIDGE, hx = p.x - HOME.cx, hz = p.z - HOME.cz, r = Math.hypot(p.x, p.z), rh = Math.hypot(hx, hz);
   const B2 = BRIDGE2, sx = p.x - SHOP.cx, sz = p.z - SHOP.cz, rs = Math.hypot(sx, sz);
-  if (r <= W || rh <= HOME.walk || rs <= SHOP.walk || (Math.abs(p.x - B.x) <= B.walkHalf && p.z >= B.z0 && p.z <= B.z1) || (Math.abs(p.z - B2.z) <= B2.walkHalf && p.x >= B2.x0 && p.x <= B2.x1) || B2.mouths.some(([mx, mz, mr]) => Math.hypot(p.x - mx, p.z - mz) <= mr)) return p;
-  const c = [[SHOP.cx + sx * SHOP.walk / rs, SHOP.cz + sz * SHOP.walk / rs], [Math.max(B2.x0, Math.min(B2.x1, p.x)), Math.max(B2.z - B2.walkHalf, Math.min(B2.z + B2.walkHalf, p.z))], [p.x * W / r, p.z * W / r], [HOME.cx + hx * HOME.walk / rh, HOME.cz + hz * HOME.walk / rh], [Math.max(B.x - B.walkHalf, Math.min(B.x + B.walkHalf, p.x)), Math.max(B.z0, Math.min(B.z1, p.z))]];
+  if (r <= W || rh <= HOME.walk || rs <= SHOP.walk || (Math.abs(p.x - B.x) <= B.walkHalf && p.z >= B.z0 && p.z <= B.z1) || (Math.abs(p.z - B2.z) <= B2.walkHalf && p.x >= B2.x0 && p.x <= B2.x1) || B2.mouths.some(([mx, mz, mr]) => Math.hypot(p.x - mx, p.z - mz) <= mr) || inCalWalk(p.x, p.z)) return p;
+  const c = [[SHOP.cx + sx * SHOP.walk / rs, SHOP.cz + sz * SHOP.walk / rs], [Math.max(B2.x0, Math.min(B2.x1, p.x)), Math.max(B2.z - B2.walkHalf, Math.min(B2.z + B2.walkHalf, p.z))], [p.x * W / r, p.z * W / r], [HOME.cx + hx * HOME.walk / rh, HOME.cz + hz * HOME.walk / rh], [Math.max(B.x - B.walkHalf, Math.min(B.x + B.walkHalf, p.x)), Math.max(B.z0, Math.min(B.z1, p.z))], ...calNearest(p.x, p.z)];
   let best = c[0], bd = Infinity; for (const q of c) { const d = Math.hypot(q[0] - p.x, q[1] - p.z); if (d < bd) { bd = d; best = q; } } p.x = best[0]; p.z = best[1]; return p; }
 // bridge deck height: sags in the middle of the rope span
 export function bridgeY(z) { const B = BRIDGE, u = Math.max(0, Math.min(1, (z - B.s0) / (B.s1 - B.s0))); return 0.1 - 0.3 * Math.sin(Math.PI * u); }
@@ -84,6 +113,11 @@ export function heightAt(x, z) {
   if (inBridge(x, z, 0.1) && Math.hypot(x, z) > ISLAND_R - 2.2 && Math.hypot(x - HOME.cx, z - HOME.cz) > HOME.r - 2.2) return bridgeY(z);
   if (inBridge2(x, z, 0.1) && Math.hypot(x, z) > ISLAND_R - 2.2 && Math.hypot(x - SHOP.cx, z - SHOP.cz) > SHOP.r - 1.6) return bridge2Y(x);
   if (x > HOUSE.x0 && x < HOUSE.x1 && z > HOUSE.z0 - HOUSE.porch && z < HOUSE.z1) return HOUSE.y;
+  if (x < -15) { // v20 Calvin's island: bridge sag, coffee deck, house floor, pool basin (he wades in)
+    if (inBridge3(x, z, 0.1) && Math.hypot(x, z) > ISLAND_R - 2.2 && Math.hypot(x - CAL.cx, z - CAL.cz) > CAL.r - 1.6) return bridge3Y(x);
+    if (inCalDeck(x, z) && x < CAL.cx - 8.6) return CAL_DECK.y;
+    if (x > CAL_HOUSE.x0 && x < CAL_HOUSE.x1 && z > CAL_HOUSE.z0 && z < CAL_HOUSE.z1 + 0.1) return 0.1;
+    const q = calPoolQ(x, z); if (q < 1) return -CAL_POOL.depth * Math.min(1, (1 - q) / 0.35); }
   return 0;
 }
 
