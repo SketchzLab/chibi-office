@@ -65,7 +65,7 @@ export function makeNature(scene) {
     const addStone = (x, z) => { if (si < 40) { e.set(0, rnd() * 3, 0); q.setFromEuler(e); M.compose(new THREE.Vector3(x, -0.03, z), q, new THREE.Vector3(1, 1, 0.85)); stones.setMatrixAt(si++, M); } };
   for (let t = 0; t <= 1; t += 0.12) { addStone(0.5 - 3.0 * t, FLOOR.z1 + 0.7 + 2.9 * t); } for (let t = 0.1; t <= 1; t += 0.16) { addStone(0.6 + 2.6 * t, FLOOR.z1 + 1.9 + 2.4 * t); }
   stones.count = si; g.add(stones);
-  [[-8.6, 9.6, 1.6, 1.0]].forEach(([x, z, w, d]) => {
+  [[-8.4, 10.0, 1.6, 1.0]].forEach(([x, z, w, d]) => {
     const bed = toonMesh(new THREE.CylinderGeometry(1, 1, 0.25, 16), 0x9a6a44); bed.scale.set(w, 1, d); bed.position.set(x, 0.0, z); g.add(bed);
     const soil = toonMesh(new THREE.CylinderGeometry(0.92, 0.92, 0.05, 16), 0x6b4a33, { outline: false }); soil.scale.set(w, 1, d); soil.position.set(x, 0.13, z); g.add(soil);
     const cols = [0xff9bb8, 0xffd36a, 0xffffff, 0xb7a2ff, 0xff7a59];

@@ -48,7 +48,7 @@ const TALL_CIRCLES = [...TREES.map(([x, z, s], i) => [x, z, canopyRadius(s) - RH
   ...PLANTS.map(([x, z, s]) => [x, z, headReach(PLANT_SPHERES, s) - RH]), ...HOME_CIRCLES.filter(c => c[2] === 0.1).map(([x, z]) => [x, z, 0.16]), ...STREET_PROPS.filter(p => p[3] === 'tree').map(([x, z]) => [x, z, STREET_TREE.canopyR + HEAD_R + 0.05 - RH]), ...STREET_PROPS.filter(p => p[3] === 'lamp').map(([x, z]) => [x, z, 0.1])]; // + lamp posts (head vs pole) // + street-tree canopies (3D: canopy above the head line) // + lantern posts // pushOut adds RH back
 const GROUND_BOXES = [
   [STAIRS.x0, STAIRS.z0 - 0.1, STAIRS.x1 - 0.5, STAIRS.z0 + 0.02], [STAIRS.x0, STAIRS.z1 - 0.02, STAIRS.x1 - 0.5, STAIRS.z1 + 0.1]]; // stair sides
-const GROUND_CIRCLES = [...TREES.map(([x, z, s]) => [x, z, 0.24 * s]), [POOL.x, POOL.z, 2.5], [-8.6, 9.6, 1.4], [-1.2, 13.0, 0.8], [P.cx, P.cz, 1.15],
+const GROUND_CIRCLES = [...TREES.map(([x, z, s]) => [x, z, 0.24 * s]), [POOL.x, POOL.z, 2.5], [-9.0, 10.0, 0.95], [-7.8, 10.0, 0.95], [-1.2, 13.0, 0.8], [P.cx, P.cz, 1.15],
   ...[0, 2.1, 4.2].map(a => [P.cx + Math.cos(a + 0.5) * 1.75, P.cz + Math.sin(a + 0.5) * 1.75, 0.5]), ...P.benches.map(([x, z]) => [x, z, 0.75]),
   [BALCONY.x0 + 0.9, BALCONY.z1 - 0.35, 0.35], [BALCONY.x0 + 0.9, BALCONY.z0 + 0.35, 0.35]];
 const ROOF_TALL = [[-5.3, -9.7, canopyRadius(0.7) - RH]]; // little rooftop tree: head vs its canopy
@@ -104,15 +104,33 @@ body.cardon #actb,body.cardon #imenu{display:none!important}`;
   document.head.appendChild(st);
   /* v19 floating joystick: no fixed stick. A touch that starts on the 3D view in the left half spawns the base under the thumb;
      drag steers, past ~80% of the radius = auto-run; release hides it. Disabled while a bot card is open (body.cardon). */
-  if (touch) { const j = document.createElement('div'); j.id = 'joy'; j.innerHTML = '<div class="k"></div>'; document.body.appendChild(j); const kn = j.firstChild; let id = null, ox = 0, oy = 0, rad = 60;
-    const hide = () => { id = null; joy.x = joy.y = 0; joy.run = false; kn.style.transform = ''; j.classList.remove('on', 'run'); controls.enabled = true; };
+  if (touch) { const j = document.createElement('div'); j.id = 'joy'; j.innerHTML = '<div class="k"></div>'; document.body.appendChild(j); const kn = j.firstChild; let id = null, ox = 0, oy = 0, rad = 60; joy.isStick = pid => pid === id;
+    const hide = () => { id = null; joy.x = joy.y = 0; joy.run = false; kn.style.transform = ''; j.classList.remove('on', 'run'); };
     const mv = e => { let dx = e.clientX - ox, dy = e.clientY - oy; const d = Math.hypot(dx, dy), m = Math.min(d, rad); if (d > 0) { dx = dx / d * m; dy = dy / d * m; }
       joy.x = dx / rad; joy.y = dy / rad; joy.run = m / rad > 0.8; kn.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`; j.classList.toggle('run', joy.run); };
     addEventListener('pointerdown', e => { if (id != null || document.body.classList.contains('cardon') || e.clientX > innerWidth / 2 || e.target.tagName !== 'CANVAS') return;
-      id = e.pointerId; rad = Math.max(44, Math.min(74, Math.min(innerWidth, innerHeight) * 0.15)); ox = e.clientX; oy = e.clientY; j.style.width = rad * 2 + 'px'; j.style.left = ox - rad + 'px'; j.style.top = oy - rad + 'px'; j.classList.add('on'); controls.enabled = false; mv(e); }, true);
-    addEventListener('pointermove', e => { if (e.pointerId === id) { if (document.body.classList.contains('cardon')) hide(); else mv(e); } }, true);
+      id = e.pointerId; rad = Math.max(44, Math.min(74, Math.min(innerWidth, innerHeight) * 0.15)); ox = e.clientX; oy = e.clientY; j.style.width = rad * 2 + 'px'; j.style.left = ox - rad + 'px'; j.style.top = oy - rad + 'px'; j.classList.add('on'); controls.enabled = false; setTimeout(() => { controls.enabled = true; }); mv(e); }, true); // OrbitControls never tracks the stick's finger (tap-select still sees it)
+    addEventListener('pointermove', e => { if (e.pointerId === id) { e.stopImmediatePropagation(); if (document.body.classList.contains('cardon')) hide(); else mv(e); } }, true);
     const up = e => { if (e.pointerId === id) hide(); }; addEventListener('pointerup', up, true); addEventListener('pointercancel', up, true);
     new MutationObserver(() => { if (document.body.classList.contains('cardon')) hide(); }).observe(document.body, { attributes: true, attributeFilter: ['class'] }); }
+
+  /* v21 manual camera: every non-stick pointer on the 3D view (touch finger or left mouse button) orbits the camera one-to-one,
+     tracked by pointerId so it runs at the same time as the stick. OrbitControls keeps wheel + two-finger pinch zoom only.
+     While held nothing auto-moves the angle; on release, after a short beat, it eases back to the pre-drag follow angle. */
+  controls.enableRotate = false;
+  const cam = { held: false, back: false, id: null, x: 0, y: 0, moved: 0, wait: 0, yaw0: 0, pol0: 0, fingers: new Set() };
+  const sph = new THREE.Spherical(), offv = new THREE.Vector3();
+  const getSph = () => { offv.copy(camera.position).sub(controls.target); sph.setFromVector3(offv); return sph; };
+  const setSph = (th, ph) => { const S = getSph(); S.theta = th; S.phi = Math.max(controls.minPolarAngle, Math.min(controls.maxPolarAngle, ph)); offv.setFromSpherical(S); camera.position.copy(controls.target).add(offv); };
+  addEventListener('pointerdown', e => { if (e.target !== controls.domElement || (e.pointerType === 'mouse' && e.button !== 0) || joy.isStick?.(e.pointerId)) return; cam.fingers.add(e.pointerId);
+    if (cam.id != null) return; const S = getSph(); if (!cam.back) { cam.yaw0 = S.theta; cam.pol0 = S.phi; }
+    cam.id = e.pointerId; cam.x = e.clientX; cam.y = e.clientY; cam.moved = 0; cam.held = true; cam.back = false; home.active = false; }, true);
+  addEventListener('pointermove', e => { if (e.pointerId !== cam.id) return; const dx = e.clientX - cam.x, dy = e.clientY - cam.y; cam.x = e.clientX; cam.y = e.clientY;
+    if (cam.pinch) return; // two camera fingers = pinch zoom, no orbit
+    cam.moved += Math.abs(dx) + Math.abs(dy); const S = getSph(), k = 2 * Math.PI / controls.domElement.clientHeight; setSph(S.theta - dx * k, S.phi - dy * k); }, true);
+  const camUp = e => { cam.fingers.delete(e.pointerId); if (e.pointerId !== cam.id) return; cam.id = null; cam.held = false;
+    if (cam.moved > 6) { cam.back = true; cam.wait = 0.45; } }; addEventListener('pointerup', camUp, true); addEventListener('pointercancel', camUp, true);
+  Object.defineProperty(cam, 'pinch', { get: () => { let n = 0; for (const f of cam.fingers) if (f !== cam.id) n++; return n > 0; } });
   // run: Shift on keyboard; on touch the stick auto-runs past ~80% radius (the v15 Walk/Run toggle is gone)
   // ---- camera follow toggle ----
   let follow = false; const camb = document.createElement('button'); camb.id = 'camb'; camb.className = 'hudb'; camb.type = 'button';
@@ -120,7 +138,7 @@ body.cardon #actb,body.cardon #imenu{display:none!important}`;
   const home = { target: controls.target.clone(), pos: camera.position.clone(), active: false };
   camb.addEventListener('click', () => setFollow(!follow)); setFollow(false);
   const fwd = new THREE.Vector3(), right = new THREE.Vector3(), mvv = new THREE.Vector3(), tmp = new THREE.Vector3();
-  const api = { chibi: c, speed: 0, moved: false, get follow() { return follow; }, setFollow, joy, keys };
+  const api = { chibi: c, cam, get camYaw() { return getSph().theta; }, speed: 0, moved: false, get follow() { return follow; }, setFollow, joy, keys };
   /* v20 wardrobe: rebuild Calvin's outfit in place (same root/parts/props, so every reference stays valid) and persist it.
      fit = { top, bottom, shoes, acc } labels from calvinCloset(); null = back to the daily OOTD. */
   api.fit = savedFit();
@@ -153,16 +171,23 @@ body.cardon #actb,body.cardon #imenu{display:none!important}`;
   function followCam(dt, near) {
     const CL = window.__camLock; if (CL) { camera.position.set(...CL[0]); controls.target.set(...CL[1]); return; } // test hook: fixed inspection camera
     // camera: follow with smoothing (shift target and camera by the same delta, so orbiting still works)
-    const SL = api.seat?.look; if (SL && !api.look) { const k = 1 - Math.exp(-dt * 1.6); controls.target.lerp(SL.tgt.clone().sub(SL.pos).setLength(6).add(SL.pos), k); camera.position.lerp(SL.pos, k); return; }
-    if (api.seat && api.seat.camYaw !== undefined && !api.look) { const S2 = api.seat, d = S2.camDist || 11, a = S2.rot + S2.camYaw; tmp.set(c.position.x, c.position.y + 1.0, c.position.z); const k = 1 - Math.exp(-dt * 2.4);
+    if (cam.back && !cam.held) { cam.wait -= dt; if (cam.wait <= 0 && (!follow || api.seat || api.look)) { cam.back = false; if (!follow) home.active = true; } }
+    const manual = cam.held || (cam.back && cam.wait > 0); // user owns the angle (held, or the short beat after release)
+    if (manual && !follow) return;
+    const SL = api.seat?.look; if (!manual && SL && !api.look) { const k = 1 - Math.exp(-dt * 1.6); controls.target.lerp(SL.tgt.clone().sub(SL.pos).setLength(6).add(SL.pos), k); camera.position.lerp(SL.pos, k); return; }
+    if (!manual && api.seat && api.seat.camYaw !== undefined && !api.look) { const S2 = api.seat, d = S2.camDist || 11, a = S2.rot + S2.camYaw; tmp.set(c.position.x, c.position.y + 1.0, c.position.z); const k = 1 - Math.exp(-dt * 2.4);
       controls.target.lerp(tmp, k); camera.position.lerp(new THREE.Vector3(tmp.x + Math.sin(a) * d * 0.78, tmp.y + d * 0.55, tmp.z + Math.cos(a) * d * 0.78), k); return; }
-    if (api.look) { const L = api.look; const k = 1 - Math.exp(-dt * 2); controls.target.lerp(L.tgt, k); camera.position.lerp(L.pos, k); return; }
+    if (!manual && api.look) { const L = api.look; const k = 1 - Math.exp(-dt * 2); controls.target.lerp(L.tgt, k); camera.position.lerp(L.pos, k); return; }
     if (follow) { tmp.set(c.position.x, 1.2, c.position.z); const k = 1 - Math.exp(-dt * 3.2); const delta = tmp.sub(controls.target).multiplyScalar(k); controls.target.add(delta); camera.position.add(delta);
-      const off = camera.position.clone().sub(controls.target); const want = near || (innerWidth < innerHeight ? 17 : 13); off.setLength(off.length() + (want - off.length()) * Math.min(1, dt * 1.5));
-      if (onHome(c.position.x, c.position.z) && c.position.z > HOUSE.z0 - 2.5) { // near the longhouse: swing round to its open (-z) front so the rooms aren't hidden behind the back wall
+      const off = camera.position.clone().sub(controls.target); if (!near && cam.lastLen && Math.abs(off.length() - cam.lastLen) > 0.05) cam.zoom = Math.max(8, Math.min(40, off.length())); // pinch / wheel while following sticks
+      const want = near || cam.zoom || (innerWidth < innerHeight ? 17 : 13); off.setLength(off.length() + (want - off.length()) * Math.min(1, dt * 1.5));
+      if (cam.back && cam.wait <= 0) { const az = Math.atan2(off.x, off.z), h0 = off.length(), pol = Math.acos(Math.max(-1, Math.min(1, off.y / h0))), k2 = 1 - Math.exp(-dt * 3.2);
+        const dy = Math.atan2(Math.sin(cam.yaw0 - az), Math.cos(cam.yaw0 - az)), dp = cam.pol0 - pol; // ease back to the pre-drag follow angle
+        if (Math.abs(dy) < 0.004 && Math.abs(dp) < 0.004) { cam.back = false; offv.setFromSphericalCoords(h0, cam.pol0, cam.yaw0); } else offv.setFromSphericalCoords(h0, pol + dp * k2, az + dy * k2); off.copy(offv); }
+      else if (!manual && onHome(c.position.x, c.position.z) && c.position.z > HOUSE.z0 - 2.5) { // near the longhouse: swing round to its open (-z) front so the rooms aren't hidden behind the back wall
         const az = Math.atan2(off.x, off.z), lim = 0.55; let tgt = Math.PI - Math.sign(off.x || 1) * Math.min(lim, Math.abs(Math.atan2(Math.sin(az - Math.PI), Math.cos(az - Math.PI))));
         let d = Math.atan2(Math.sin(tgt - az), Math.cos(tgt - az)); const na = az + d * Math.min(1, dt * 1.8), h = Math.hypot(off.x, off.z); off.x = Math.sin(na) * h; off.z = Math.cos(na) * h; }
-      camera.position.copy(controls.target).add(off); controls.minDistance = 8; }
+      camera.position.copy(controls.target).add(off); cam.lastLen = near ? 0 : off.length(); controls.minDistance = 8; }
     else if (home.active) { const k = 1 - Math.exp(-dt * 3); controls.target.lerp(home.target, k); camera.position.lerp(home.pos, k); if (camera.position.distanceTo(home.pos) < 0.05) home.active = false; controls.minDistance = home.minD ?? 12; }
   }
   // seats: { pos:[x,z], rot, y, pose, camDist, onStand }
