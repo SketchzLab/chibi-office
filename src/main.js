@@ -223,7 +223,7 @@ actb.addEventListener('click', e => { e.stopPropagation(); if (mode && imenu.cla
     else { mode = { type: 'pet' }; showMenu([{ t: '🐾 Pet Biscuit', run: () => { emoteCalvin('pet', 2.6); petsys.pet(p, clock.getElapsedTime()); say('Biscuit', pick(['Arf! 💛', '*happy wiggles* 🐶', 'Woof woof! 💛']), wallTime() + 0.4, 3); } },
       { t: '🎾 Play fetch', run: () => { emoteCalvin('highfive', 0.9); petsys.throwBall(calvin, clock.getElapsedTime()); say('Calvin', pick(['Fetch, Biscuit!', 'Go get it! 🎾', 'Who\'s a good pup?']), wallTime(), 2.2); setTimeout(() => say('Biscuit', 'Woof! 🎾', wallTime(), 2.5), 3500); } },
       { t: '🐕 Come along, Biscuit!', run: () => { p.mode = 'follow'; p.followUntil = wallTime() + 60; p.slot = Math.floor(wallTime() / 11 + p.seed) + 2; say('Biscuit', '*trots after you* 🐾', wallTime(), 2.5); } }]); } } });
-const v3 = new THREE.Vector3(); let _joyR = null, _joyT = 0; function joyRect() { const n = performance.now(); if (n - _joyT > 500) { _joyT = n; const j = document.getElementById('joy'); _joyR = j && j.offsetParent !== null ? j.getBoundingClientRect() : null; } return _joyR; } addEventListener('resize', () => { _joyT = 0; });
+const v3 = new THREE.Vector3(); let _joyR = null, _joyT = 0; function joyRect() { const n = performance.now(); if (n - _joyT > 500) { _joyT = n; const j = document.getElementById('joy'); _joyR = j && j.classList.contains('on') ? j.getBoundingClientRect() : null; } return _joyR; } addEventListener('resize', () => { _joyT = 0; });
 let _pickT = -1, _tgCache = null;
 function interact(wt, t, dt) {
   // pick the best target: seated -> Stand; group of 2+ bots; nearest bot; nearest object
@@ -293,7 +293,7 @@ window.__headClear = () => { scene.updateMatrixWorld(true); const hb = new THREE
     const h = rc.intersectObjects(scene.children, true).find(i => i.object.isMesh && !skip(i.object) && !(i.object.material?.side === THREE.BackSide)); if (h && h.point.y - top < gap) { gap = h.point.y - top; window.__hcHit = [h.object.geometry?.type, h.object.position.toArray().map(v=>+v.toFixed(2)), +h.point.y.toFixed(2), +h.point.x.toFixed(2), +h.point.z.toFixed(2)]; } }
   sides.forEach((_, m) => { m.side = THREE.FrontSide; });
   return { top: +top.toFixed(2), gap: gap === Infinity ? null : +gap.toFixed(2), pos: [+calvin.position.x.toFixed(2), +calvin.position.y.toFixed(2), +calvin.position.z.toFixed(2)], seat: player.seat?.kind || null }; };
-window.__near = () => target?.label || null; window.__target = () => target; window.__mode = () => mode; window.__objs = OBJS; window.__choose = i => imenu.children[i]?.click();
+window.__select = n => select(n == null ? null : chibis.find(c => c.userData.persona?.name === n) || null); /* v19 test hook */ window.__near = () => target?.label || null; window.__target = () => target; window.__mode = () => mode; window.__objs = OBJS; window.__choose = i => imenu.children[i]?.click();
 // eager auto quality (desktop + mobile): dynamic resolution steps first, then FX tiers. Recovers resolution if fps is high again.
 // Auto: scale is relative to the target ratio. Desktop never drops below 0.85x target; downscale only on sustained low fps (<45 for 3 s), step back up after 2 s of good fps.
 const PR_STEPS = COARSE ? [1, 0.85, 0.7, 0.6] : [1, 0.925, 0.85]; let prI = 0, slow = 0, fast = 0, mid = false;

@@ -1,5 +1,5 @@
 // Calvin: the playable boss chibi. Local to this device (not synced).
-// Desktop: WASD / arrows (Shift = run). Touch: analog virtual joystick (bottom-left). Camera follows with smoothing.
+// Desktop: WASD / arrows (Shift = run). Touch: floating analog joystick (left half, auto-run past 80%). Camera follows with smoothing.
 import * as THREE from 'three';
 import { makeChibi } from './chibi.js';
 import { applyPose } from './behavior.js';
@@ -83,23 +83,26 @@ export function makePlayer({ scene, camera, controls, bots }) {
   addEventListener('keyup', e => keys.delete(e.key.toLowerCase())); addEventListener('blur', () => keys.clear());
   // ---- virtual joystick (touch devices, or ?joy for testing) ----
   const touch = matchMedia('(pointer: coarse)').matches || location.search.includes('joy');
-  const st = document.createElement('style'); st.textContent = `#joy{position:fixed;left:max(18px,env(safe-area-inset-left));bottom:max(22px,env(safe-area-inset-bottom));width:clamp(104px,30vmin,148px);aspect-ratio:1;border-radius:50%;background:rgba(255,255,255,.22);border:2px solid rgba(42,31,53,.35);touch-action:none;z-index:5;backdrop-filter:blur(2px)}
+  const st = document.createElement('style'); st.textContent = `#joy{position:fixed;box-sizing:border-box;left:0;top:0;width:120px;aspect-ratio:1;opacity:0;pointer-events:none;border-radius:50%;background:rgba(255,255,255,.22);border:2px solid rgba(42,31,53,.35);touch-action:none;z-index:5;backdrop-filter:blur(2px)}
+#joy.on{opacity:1} #joy.run .k{background:rgba(255,211,106,.9)} body.cardon #joy{opacity:0!important}
 #joy .k{position:absolute;left:50%;top:50%;width:44%;aspect-ratio:1;border-radius:50%;background:rgba(255,250,242,.75);border:2px solid rgba(42,31,53,.55);transform:translate(-50%,-50%);box-shadow:0 3px 0 rgba(42,31,53,.3)}
 .hudb{position:fixed;z-index:5;border:2px solid #2a1f35;border-radius:14px;background:rgba(255,250,242,.92);color:#2a1f35;font:700 14px system-ui,sans-serif;box-shadow:0 3px 0 #2a1f35;cursor:pointer;min-height:44px;padding:0 14px}
 #camb{top:max(12px,env(safe-area-inset-top));right:12px} #actb{right:max(16px,env(safe-area-inset-right));bottom:max(26px,env(safe-area-inset-bottom));min-height:60px;min-width:60px;border-radius:30px;background:#ffd36a;font-size:15px;display:none}
 #imenu{position:fixed;right:max(16px,env(safe-area-inset-right));bottom:calc(max(26px,env(safe-area-inset-bottom)) + 72px);z-index:6;display:none;flex-direction:column;gap:8px} #imenu.on{display:flex} #imenu button{position:static}
 body.cardon #actb,body.cardon #imenu{display:none!important}`;
   document.head.appendChild(st);
-  if (touch) { const j = document.createElement('div'); j.id = 'joy'; j.innerHTML = '<div class="k"></div>'; document.body.appendChild(j); const kn = j.firstChild; let id = null;
-    const mv = e => { const r = j.getBoundingClientRect(), rad = r.width / 2; let dx = e.clientX - (r.left + rad), dy = e.clientY - (r.top + rad); const d = Math.hypot(dx, dy), m = Math.min(d, rad); if (d > 0) { dx = dx / d * m; dy = dy / d * m; }
-      joy.x = dx / rad; joy.y = dy / rad; kn.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`; };
-    j.addEventListener('pointerdown', e => { id = e.pointerId; j.setPointerCapture(id); mv(e); e.preventDefault(); });
-    j.addEventListener('pointermove', e => { if (e.pointerId === id) mv(e); });
-    const up = e => { if (e.pointerId !== id) return; id = null; joy.x = joy.y = 0; kn.style.transform = ''; }; j.addEventListener('pointerup', up); j.addEventListener('pointercancel', up); }
-  // ---- run toggle (v15): Shift on keyboard; a latching 🏃 button for touch (or ?joy) ----
-  const runb = document.createElement('button'); runb.id = 'runb'; runb.className = 'hudb'; runb.type = 'button'; runb.textContent = '🚶 Walk';
-  runb.style.cssText = 'left:calc(max(18px,env(safe-area-inset-left)) + clamp(104px,30vmin,148px) + 12px);bottom:max(26px,env(safe-area-inset-bottom));display:' + (touch ? 'block' : 'none');
-  runb.addEventListener('click', () => { api.runOn = !api.runOn; runb.textContent = api.runOn ? '🏃 Run' : '🚶 Walk'; runb.style.background = api.runOn ? '#ffd36a' : ''; }); document.body.appendChild(runb);
+  /* v19 floating joystick: no fixed stick. A touch that starts on the 3D view in the left half spawns the base under the thumb;
+     drag steers, past ~80% of the radius = auto-run; release hides it. Disabled while a bot card is open (body.cardon). */
+  if (touch) { const j = document.createElement('div'); j.id = 'joy'; j.innerHTML = '<div class="k"></div>'; document.body.appendChild(j); const kn = j.firstChild; let id = null, ox = 0, oy = 0, rad = 60;
+    const hide = () => { id = null; joy.x = joy.y = 0; joy.run = false; kn.style.transform = ''; j.classList.remove('on', 'run'); controls.enabled = true; };
+    const mv = e => { let dx = e.clientX - ox, dy = e.clientY - oy; const d = Math.hypot(dx, dy), m = Math.min(d, rad); if (d > 0) { dx = dx / d * m; dy = dy / d * m; }
+      joy.x = dx / rad; joy.y = dy / rad; joy.run = m / rad > 0.8; kn.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`; j.classList.toggle('run', joy.run); };
+    addEventListener('pointerdown', e => { if (id != null || document.body.classList.contains('cardon') || e.clientX > innerWidth / 2 || e.target.tagName !== 'CANVAS') return;
+      id = e.pointerId; rad = Math.max(44, Math.min(74, Math.min(innerWidth, innerHeight) * 0.15)); ox = e.clientX; oy = e.clientY; j.style.width = rad * 2 + 'px'; j.style.left = ox - rad + 'px'; j.style.top = oy - rad + 'px'; j.classList.add('on'); controls.enabled = false; mv(e); }, true);
+    addEventListener('pointermove', e => { if (e.pointerId === id) { if (document.body.classList.contains('cardon')) hide(); else mv(e); } }, true);
+    const up = e => { if (e.pointerId === id) hide(); }; addEventListener('pointerup', up, true); addEventListener('pointercancel', up, true);
+    new MutationObserver(() => { if (document.body.classList.contains('cardon')) hide(); }).observe(document.body, { attributes: true, attributeFilter: ['class'] }); }
+  // run: Shift on keyboard; on touch the stick auto-runs past ~80% radius (the v15 Walk/Run toggle is gone)
   // ---- camera follow toggle ----
   let follow = false; const camb = document.createElement('button'); camb.id = 'camb'; camb.className = 'hudb'; camb.type = 'button';
   const setFollow = f => { follow = f; camb.textContent = f ? '🗺️ Overview' : '🎥 Follow Calvin'; if (!f) { home.active = true; } }; document.body.appendChild(camb);
@@ -109,7 +112,7 @@ body.cardon #actb,body.cardon #imenu{display:none!important}`;
   const api = { chibi: c, speed: 0, moved: false, get follow() { return follow; }, setFollow, joy, keys };
   api.update = (dt, t) => {
     let ix = 0, iy = 0; if (keys.has('a') || keys.has('arrowleft')) ix -= 1; if (keys.has('d') || keys.has('arrowright')) ix += 1; if (keys.has('w') || keys.has('arrowup')) iy -= 1; if (keys.has('s') || keys.has('arrowdown')) iy += 1;
-    let mag; if (ix || iy) { const l = Math.hypot(ix, iy); ix /= l; iy /= l; mag = keys.has('shift') || api.runOn ? 1 : 0.6; } else { ix = joy.x; iy = joy.y; mag = Math.min(1, Math.hypot(ix, iy)); if (mag < 0.12) mag = 0; else { ix /= mag; iy /= mag; if (api.runOn) mag = 1; else mag = Math.min(mag, 0.7); } } // touch: run only via the 🏃 toggle
+    let mag; if (ix || iy) { const l = Math.hypot(ix, iy); ix /= l; iy /= l; mag = keys.has('shift') ? 1 : 0.6; } else { ix = joy.x; iy = joy.y; mag = Math.min(1, Math.hypot(ix, iy)); if (mag < 0.12) mag = 0; else { ix /= mag; iy /= mag; if (joy.run) mag = 1; else mag = Math.min(mag, 0.7); } } // touch: auto-run past ~80% stick radius
     camera.getWorldDirection(fwd); fwd.y = 0; fwd.normalize(); right.set(-fwd.z, 0, fwd.x);
     if (api.debugDir) { const d = api.debugDir; mag = d[2] ?? 0.6; fwd.set(d[0], 0, d[1]).normalize(); right.set(-fwd.z, 0, fwd.x); ix = 0; iy = -1; } // test hook: world-space walk direction
     const run = mag > 0.72, speed = mag ? (run ? 4.6 : 1.2 + mag * 2.2) : 0; api.speed = speed;
