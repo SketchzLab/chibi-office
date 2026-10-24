@@ -98,17 +98,19 @@ export function makePlayer({ scene, camera, controls, bots }) {
 #joy.on{opacity:1} #joy.run .k{background:rgba(255,211,106,.9)} body.cardon #joy{opacity:0!important}
 #joy .k{position:absolute;left:50%;top:50%;width:44%;aspect-ratio:1;border-radius:50%;background:rgba(255,250,242,.75);border:2px solid rgba(42,31,53,.55);transform:translate(-50%,-50%);box-shadow:0 3px 0 rgba(42,31,53,.3)}
 .hudb{position:fixed;z-index:5;border:2px solid #2a1f35;border-radius:14px;background:rgba(255,250,242,.92);color:#2a1f35;font:700 14px system-ui,sans-serif;box-shadow:0 3px 0 #2a1f35;cursor:pointer;min-height:44px;padding:0 14px}
-#camb{top:max(12px,env(safe-area-inset-top));right:12px} #actb{right:max(16px,env(safe-area-inset-right));bottom:max(26px,env(safe-area-inset-bottom));min-height:60px;min-width:60px;border-radius:30px;background:#ffd36a;font-size:15px;display:none}
+#camb{top:max(12px,env(safe-area-inset-top));right:max(12px,env(safe-area-inset-right))} #actb{right:max(16px,env(safe-area-inset-right));bottom:max(26px,env(safe-area-inset-bottom));min-height:60px;min-width:60px;border-radius:30px;background:#ffd36a;font-size:15px;display:none}
 #imenu{position:fixed;right:max(16px,env(safe-area-inset-right));bottom:calc(max(26px,env(safe-area-inset-bottom)) + 72px);z-index:6;display:none;flex-direction:column;gap:8px} #imenu.on{display:flex} #imenu button{position:static}
-body.cardon #actb,body.cardon #imenu{display:none!important}`;
+body.cardon #actb,body.cardon #imenu{display:none!important}
+#freeb{top:calc(max(12px,env(safe-area-inset-top)) + 56px);right:max(12px,env(safe-area-inset-right));width:48px;padding:0;font-size:20px} #freeb.on{background:#ffd36a}
+#backp{top:max(12px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);border-radius:22px;display:none} body.freecam #backp{display:block} body.freecam #joy{display:none!important} body.freecam #actb,body.freecam #imenu{display:none!important}`;
   document.head.appendChild(st);
   /* v19 floating joystick: no fixed stick. A touch that starts on the 3D view in the left half spawns the base under the thumb;
      drag steers, past ~80% of the radius = auto-run; release hides it. Disabled while a bot card is open (body.cardon). */
-  if (touch) { const j = document.createElement('div'); j.id = 'joy'; j.innerHTML = '<div class="k"></div>'; document.body.appendChild(j); const kn = j.firstChild; let id = null, ox = 0, oy = 0, rad = 60; joy.isStick = pid => pid === id;
+  if (touch) { const j = document.createElement('div'); j.id = 'joy'; j.innerHTML = '<div class="k"></div>'; document.body.appendChild(j); const kn = j.firstChild; let id = null, ox = 0, oy = 0, rad = 60; joy.isStick = pid => pid === id; joy.hide = () => hide();
     const hide = () => { id = null; joy.x = joy.y = 0; joy.run = false; kn.style.transform = ''; j.classList.remove('on', 'run'); };
     const mv = e => { let dx = e.clientX - ox, dy = e.clientY - oy; const d = Math.hypot(dx, dy), m = Math.min(d, rad); if (d > 0) { dx = dx / d * m; dy = dy / d * m; }
       joy.x = dx / rad; joy.y = dy / rad; joy.run = m / rad > 0.8; kn.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`; j.classList.toggle('run', joy.run); };
-    addEventListener('pointerdown', e => { if (id != null || document.body.classList.contains('cardon') || e.clientX > innerWidth / 2 || e.target.tagName !== 'CANVAS') return;
+    addEventListener('pointerdown', e => { if (id != null || document.body.classList.contains('cardon') || document.body.classList.contains('freecam') || e.clientX > innerWidth / 2 || e.target.tagName !== 'CANVAS') return;
       id = e.pointerId; rad = Math.max(44, Math.min(74, Math.min(innerWidth, innerHeight) * 0.15)); ox = e.clientX; oy = e.clientY; j.style.width = rad * 2 + 'px'; j.style.left = ox - rad + 'px'; j.style.top = oy - rad + 'px'; j.classList.add('on'); controls.enabled = false; setTimeout(() => { controls.enabled = true; }); mv(e); }, true); // OrbitControls never tracks the stick's finger (tap-select still sees it)
     addEventListener('pointermove', e => { if (e.pointerId === id) { e.stopImmediatePropagation(); if (document.body.classList.contains('cardon')) hide(); else mv(e); } }, true);
     const up = e => { if (e.pointerId === id) hide(); }; addEventListener('pointerup', up, true); addEventListener('pointercancel', up, true);
@@ -122,7 +124,7 @@ body.cardon #actb,body.cardon #imenu{display:none!important}`;
   const sph = new THREE.Spherical(), offv = new THREE.Vector3();
   const getSph = () => { offv.copy(camera.position).sub(controls.target); sph.setFromVector3(offv); return sph; };
   const setSph = (th, ph) => { const S = getSph(); S.theta = th; S.phi = Math.max(controls.minPolarAngle, Math.min(controls.maxPolarAngle, ph)); offv.setFromSpherical(S); camera.position.copy(controls.target).add(offv); };
-  addEventListener('pointerdown', e => { if (e.target !== controls.domElement || (e.pointerType === 'mouse' && e.button !== 0) || joy.isStick?.(e.pointerId)) return; cam.fingers.add(e.pointerId);
+  addEventListener('pointerdown', e => { if (free || e.target !== controls.domElement || (e.pointerType === 'mouse' && e.button !== 0) || joy.isStick?.(e.pointerId)) return; cam.fingers.add(e.pointerId);
     if (cam.id != null) return; const S = getSph(); if (!cam.back) { cam.yaw0 = S.theta; cam.pol0 = S.phi; }
     cam.id = e.pointerId; cam.x = e.clientX; cam.y = e.clientY; cam.moved = 0; cam.held = true; cam.back = false; home.active = false; }, true);
   addEventListener('pointermove', e => { if (e.pointerId !== cam.id) return; const dx = e.clientX - cam.x, dy = e.clientY - cam.y; cam.x = e.clientX; cam.y = e.clientY;
@@ -136,9 +138,40 @@ body.cardon #actb,body.cardon #imenu{display:none!important}`;
   let follow = false; const camb = document.createElement('button'); camb.id = 'camb'; camb.className = 'hudb'; camb.type = 'button';
   const setFollow = f => { follow = f; camb.textContent = f ? '🗺️ Overview' : '🎥 Follow Calvin'; if (!f) { home.active = true; } }; document.body.appendChild(camb);
   const home = { target: controls.target.clone(), pos: camera.position.clone(), active: false };
-  camb.addEventListener('click', () => setFollow(!follow)); setFollow(false);
+  camb.addEventListener('click', () => { if (free) setFree(false); else setFollow(!follow); }); setFollow(false);
+
+  /* v22 free camera (📷 button or C): detaches from Calvin. OrbitControls does the work: mouse left = rotate, right / middle /
+     Shift+left = pan on the ground plane, wheel = zoom to cursor; touch 1 finger = pan, 2 fingers = pinch zoom + drag/twist rotate.
+     WASD / arrows pan the camera (Calvin stands still). Leaving (button, C, 'Back to me') eases back to the default follow. */
+  let free = false; const FREE = { minD: 2.2, maxD: 125, minP: 0.12, maxP: 1.45, box: [-50, 42, -24, 47] };
+  const freeb = document.createElement('button'); freeb.id = 'freeb'; freeb.className = 'hudb'; freeb.type = 'button'; freeb.textContent = '📷'; freeb.title = 'Free camera (C)'; freeb.setAttribute('aria-label', 'Free camera (C)'); document.body.appendChild(freeb);
+  const backp = document.createElement('button'); backp.id = 'backp'; backp.className = 'hudb'; backp.type = 'button'; backp.textContent = '↩ Back to me'; document.body.appendChild(backp);
+  const saved = {};
+  const setFree = f => { f = !!f; if (f === free) return; free = f; document.body.classList.toggle('freecam', f); freeb.classList.toggle('on', f); freeb.setAttribute('aria-pressed', f);
+    if (f) { joy.hide?.(); keys.clear(); cam.id = null; cam.held = false; cam.back = false; home.active = false; const S = getSph(); saved.yaw = S.theta; saved.pol = S.phi;
+      Object.assign(controls, { enableRotate: true, enablePan: true, screenSpacePanning: false, zoomToCursor: true, minDistance: FREE.minD, maxDistance: FREE.maxD, minPolarAngle: FREE.minP, maxPolarAngle: FREE.maxP, dampingFactor: 0.12, rotateSpeed: 0.8 });
+      controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE }; controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.PAN }; }
+    else { Object.assign(controls, { enableRotate: false, enablePan: false, zoomToCursor: false, maxDistance: 110, minPolarAngle: 0.3, maxPolarAngle: 1.35, dampingFactor: 0.05, rotateSpeed: 1 });
+      controls.minDistance = Math.min(8, camera.position.distanceTo(controls.target)); controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }; controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
+      cam.zoom = null; cam.lastLen = 0; cam.yaw0 = saved.yaw ?? Math.PI / 4; cam.pol0 = Math.min(1.35, Math.max(0.3, saved.pol ?? 1.0)); cam.back = true; cam.wait = 0; if (!follow) setFollow(true); } };
+  freeb.addEventListener('click', () => setFree(!free)); backp.addEventListener('click', () => setFree(false));
+  addEventListener('keydown', e => { if (e.target.closest?.('input,textarea') || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return; if (e.key.toLowerCase() === 'c') setFree(!free); });
+  controls.domElement.addEventListener('contextmenu', e => e.preventDefault());
+  // two-finger twist rotates (OrbitControls only rotates on a two-finger drag)
+  const tw = new Map(); let twA = null; const twAng = () => { const [a, b] = [...tw.values()]; return Math.atan2(b[1] - a[1], b[0] - a[0]); };
+  addEventListener('pointerdown', e => { if (free && e.pointerType === 'touch' && e.target === controls.domElement) { tw.set(e.pointerId, [e.clientX, e.clientY]); twA = tw.size === 2 ? twAng() : null; } }, true);
+  addEventListener('pointermove', e => { if (!tw.has(e.pointerId)) return; tw.set(e.pointerId, [e.clientX, e.clientY]); if (free && tw.size === 2 && twA != null) { const a = twAng(), d = Math.atan2(Math.sin(a - twA), Math.cos(a - twA)); twA = a;
+    const S = getSph(); setSph(S.theta + d, S.phi); } }, true);
+  const twUp = e => { tw.delete(e.pointerId); twA = tw.size === 2 ? twAng() : null; }; addEventListener('pointerup', twUp, true); addEventListener('pointercancel', twUp, true);
+  const fpan = new THREE.Vector3(), ff = new THREE.Vector3();
+  function freeCam(dt) { let px = 0, pz = 0; if (keys.has('a') || keys.has('arrowleft')) px -= 1; if (keys.has('d') || keys.has('arrowright')) px += 1; if (keys.has('w') || keys.has('arrowup')) pz += 1; if (keys.has('s') || keys.has('arrowdown')) pz -= 1;
+    if (px || pz) { camera.getWorldDirection(ff); ff.y = 0; ff.normalize(); const sp = Math.max(3, camera.position.distanceTo(controls.target) * 0.9) * (keys.has('shift') ? 2 : 1) * dt / Math.hypot(px, pz);
+      fpan.set(-ff.z, 0, ff.x).multiplyScalar(px * sp).addScaledVector(ff, pz * sp); controls.target.add(fpan); camera.position.add(fpan); }
+    const T = controls.target, B = FREE.box, ox = T.x, oz = T.z, oy = T.y; T.x = Math.max(B[0], Math.min(B[1], T.x)); T.z = Math.max(B[2], Math.min(B[3], T.z)); T.y = Math.max(-1, Math.min(4, T.y));
+    camera.position.x += T.x - ox; camera.position.z += T.z - oz; camera.position.y += T.y - oy; if (camera.position.y < 0.6) camera.position.y = 0.6; }
+
   const fwd = new THREE.Vector3(), right = new THREE.Vector3(), mvv = new THREE.Vector3(), tmp = new THREE.Vector3();
-  const api = { chibi: c, cam, get camYaw() { return getSph().theta; }, speed: 0, moved: false, get follow() { return follow; }, setFollow, joy, keys };
+  const api = { chibi: c, cam, get free() { return free; }, setFree, get camYaw() { return getSph().theta; }, speed: 0, moved: false, get follow() { return follow; }, setFollow, joy, keys };
   /* v20 wardrobe: rebuild Calvin's outfit in place (same root/parts/props, so every reference stays valid) and persist it.
      fit = { top, bottom, shoes, acc } labels from calvinCloset(); null = back to the daily OOTD. */
   api.fit = savedFit();
@@ -152,8 +185,8 @@ body.cardon #actb,body.cardon #imenu{display:none!important}`;
     nb.slice(1).forEach(m => { m.onBeforeRender = () => {}; });
     for (const k of ['ootd', 'mask', 'pocket']) c.userData[k] = n.userData[k]; return c.userData.ootd; };
   api.update = (dt, t) => {
-    let ix = 0, iy = 0; if (keys.has('a') || keys.has('arrowleft')) ix -= 1; if (keys.has('d') || keys.has('arrowright')) ix += 1; if (keys.has('w') || keys.has('arrowup')) iy -= 1; if (keys.has('s') || keys.has('arrowdown')) iy += 1;
-    let mag; if (ix || iy) { const l = Math.hypot(ix, iy); ix /= l; iy /= l; mag = keys.has('shift') ? 1 : 0.6; } else { ix = joy.x; iy = joy.y; mag = Math.min(1, Math.hypot(ix, iy)); if (mag < 0.12) mag = 0; else { ix /= mag; iy /= mag; if (joy.run) mag = 1; else mag = Math.min(mag, 0.7); } } // touch: auto-run past ~80% stick radius
+    let ix = 0, iy = 0; if (free) { /* keys pan the free camera instead */ } else if (keys.has('a') || keys.has('arrowleft')) ix -= 1; if (keys.has('d') || keys.has('arrowright')) ix += 1; if (keys.has('w') || keys.has('arrowup')) iy -= 1; if (keys.has('s') || keys.has('arrowdown')) iy += 1;
+    if (free) { ix = 0; iy = 0; } let mag; if (ix || iy) { const l = Math.hypot(ix, iy); ix /= l; iy /= l; mag = keys.has('shift') ? 1 : 0.6; } else if (free) { mag = 0; } else { ix = joy.x; iy = joy.y; mag = Math.min(1, Math.hypot(ix, iy)); if (mag < 0.12) mag = 0; else { ix /= mag; iy /= mag; if (joy.run) mag = 1; else mag = Math.min(mag, 0.7); } } // touch: auto-run past ~80% stick radius
     camera.getWorldDirection(fwd); fwd.y = 0; fwd.normalize(); right.set(-fwd.z, 0, fwd.x);
     if (api.debugDir) { const d = api.debugDir; mag = d[2] ?? 0.6; fwd.set(d[0], 0, d[1]).normalize(); right.set(-fwd.z, 0, fwd.x); ix = 0; iy = -1; } // test hook: world-space walk direction
     const inPool = !api.seat && calPoolQ(c.position.x, c.position.z) < 0.92; api.inPool = inPool;
@@ -168,7 +201,7 @@ body.cardon #actb,body.cardon #imenu{display:none!important}`;
     if (api.carry && !(api.emote && api.emote.until > t)) { const P = c.userData.parts; c.userData.props.cup.visible = true; P.armR.rotation.x = -1.3; P.armR.rotation.z = -0.25; }
     api.afterPose?.(t); followCam(dt);
   };
-  function followCam(dt, near) {
+  function followCam(dt, near) { if (free) { freeCam(dt); return; }
     const CL = window.__camLock; if (CL) { camera.position.set(...CL[0]); controls.target.set(...CL[1]); return; } // test hook: fixed inspection camera
     // camera: follow with smoothing (shift target and camera by the same delta, so orbiting still works)
     if (cam.back && !cam.held) { cam.wait -= dt; if (cam.wait <= 0 && (!follow || api.seat || api.look)) { cam.back = false; if (!follow) home.active = true; } }
@@ -187,7 +220,7 @@ body.cardon #actb,body.cardon #imenu{display:none!important}`;
       else if (!manual && onHome(c.position.x, c.position.z) && c.position.z > HOUSE.z0 - 2.5) { // near the longhouse: swing round to its open (-z) front so the rooms aren't hidden behind the back wall
         const az = Math.atan2(off.x, off.z), lim = 0.55; let tgt = Math.PI - Math.sign(off.x || 1) * Math.min(lim, Math.abs(Math.atan2(Math.sin(az - Math.PI), Math.cos(az - Math.PI))));
         let d = Math.atan2(Math.sin(tgt - az), Math.cos(tgt - az)); const na = az + d * Math.min(1, dt * 1.8), h = Math.hypot(off.x, off.z); off.x = Math.sin(na) * h; off.z = Math.cos(na) * h; }
-      camera.position.copy(controls.target).add(off); cam.lastLen = near ? 0 : off.length(); controls.minDistance = 8; }
+      camera.position.copy(controls.target).add(off); cam.lastLen = near ? 0 : off.length(); controls.minDistance = Math.min(8, off.length()); }
     else if (home.active) { const k = 1 - Math.exp(-dt * 3); controls.target.lerp(home.target, k); camera.position.lerp(home.pos, k); if (camera.position.distanceTo(home.pos) < 0.05) home.active = false; controls.minDistance = home.minD ?? 12; }
   }
   // seats: { pos:[x,z], rot, y, pose, camDist, onStand }

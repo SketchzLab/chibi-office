@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { registerPWA } from './pwa.js'; registerPWA();
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { makeSky } from './sky.js';
 import { toonUniforms } from './toon.js'; window.__toonU = toonUniforms;
@@ -154,7 +155,7 @@ window.__screenPos = n => { const c = chibis.find(c => c.userData.name === n); c
 // subtle always-on FPS counter (top-left, clear of the joystick/buttons; never takes input)
 const fpsEl = document.createElement('div'); fpsEl.id = 'fps'; fpsEl.style.cssText = 'position:fixed;top:max(6px,env(safe-area-inset-top));left:max(6px,env(safe-area-inset-left));z-index:5;pointer-events:none;color:#fff;font:600 10px/1.2 ui-monospace,monospace;background:rgba(20,16,30,.32);padding:2px 5px;border-radius:5px;opacity:.7';
 document.body.appendChild(fpsEl);
-let frames = 0, last = performance.now(); window.__fps = 0;
+let farLod = false, frames = 0, last = performance.now(); window.__fps = 0;
 const clock = new THREE.Clock();
 // Shared wall clock: routines are driven by UTC epoch seconds (modulo loop length inside each walker),
 // so every device shows each bot at the same spot at the same moment. ?at=<sec> pins the phase for tests.
@@ -428,8 +429,10 @@ function loop() { const t = clock.getElapsedTime(); toonUniforms.uTime.value = t
   if (selected) { const bs = selected.userData.brain.state; card.querySelector('.t').textContent = bs.label + (bs.override ? ' (live)' : ''); card.querySelector('.wt').textContent = selected.userData.task || '—'; card.classList.toggle('live', !!selected.userData.live); ring.position.set(selected.position.x, 0.04, selected.position.z); }
   sky.clouds.children.forEach(c => { c.position.y += Math.sin(t * 0.3 + c.userData.drift * 6) * 0.004; });
   nature.update(t);
-  { const d = camera.position.distanceTo(controls.target); toonUniforms.uFogRange.value.set(d + 15, d + 170); }
-  { const want = OCC_MODE === '0' ? 0 : (OCC_MODE === '1' || (player.follow && !player.look)) ? 1 : 0; // v17 see-through: buildings/props between camera and Calvin dither to ~25%
+  { const d = camera.position.distanceTo(controls.target); toonUniforms.uFogRange.value.set(d + 15, d + 170);
+    // v22 far LOD (free camera only): past 60 u the chibi outline hulls are ~1 px, so skip them (-60 draws, -45k tris at a wide zoom-out)
+    const far = player.free && d > 60; if (far !== farLod) { farLod = far; scene.traverse(o => { if (o.isMesh && o.userData.hull && o.material?.type === 'MeshBasicMaterial') o.visible = !far; }); } }
+  { const want = OCC_MODE === '0' ? 0 : (OCC_MODE === '1' || (player.follow && !player.look && !player.free)) ? 1 : 0; // v22: off in free camera // v17 see-through: buildings/props between camera and Calvin dither to ~25%
     toonUniforms.uOccK.value += (want - toonUniforms.uOccK.value) * Math.min(1, dt * 3); toonUniforms.uOccP.value.set(calvin.position.x, calvin.position.y + 1.3, calvin.position.z); }
   controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop); }
 loop();
