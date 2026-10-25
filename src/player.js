@@ -82,6 +82,10 @@ export function collide(p, others = [], from = null, small = false) { // small =
   return p;
 }
 
+// v24: a spot is free when collide() leaves it where it is (body + head clear of every collider) on the wanted floor level
+export function isFree(x, z, lv = null) { const q = { x, z }, r = collide({ x, z }, [], q); return Math.hypot(r.x - x, r.z - z) < 0.03 && (lv == null || Math.abs(heightAt(x, z) - lv) < 0.05); }
+export function findFree(x, z, lv = null) { if (isFree(x, z, lv)) return { x, z };
+  for (let rad = 0.3; rad <= 4.0; rad += 0.15) for (let k = 0; k < 24; k++) { const a = k / 24 * Math.PI * 2, q = { x: x + Math.cos(a) * rad, z: z + Math.sin(a) * rad }; if (isFree(q.x, q.z, lv)) return q; } return null; }
 export function makePlayer({ scene, camera, controls, bots }) {
   const LOOK = { name: 'Calvin', role: 'Founder · Boss', hair: 0x3b2a22, shirt: 0x2f4f86, pants: 0x3a3a48, skin: 0xffdcc2 };
   const savedFit = () => { try { const f = JSON.parse(localStorage.getItem('calvinFit') || 'null'); return f && typeof f === 'object' ? f : null; } catch (e) { return null; } };
@@ -101,7 +105,7 @@ export function makePlayer({ scene, camera, controls, bots }) {
 #camb{top:max(12px,env(safe-area-inset-top));right:max(12px,env(safe-area-inset-right))} #actb{right:max(16px,env(safe-area-inset-right));bottom:max(26px,env(safe-area-inset-bottom));min-height:60px;min-width:60px;border-radius:30px;background:#ffd36a;font-size:15px;display:none}
 #imenu{position:fixed;right:max(16px,env(safe-area-inset-right));bottom:calc(max(26px,env(safe-area-inset-bottom)) + 72px);z-index:6;display:none;flex-direction:column;gap:8px} #imenu.on{display:flex} #imenu button{position:static}
 body.cardon #actb,body.cardon #imenu{display:none!important}
-#freeb{top:calc(max(12px,env(safe-area-inset-top)) + 56px);right:max(12px,env(safe-area-inset-right));width:48px;padding:0;font-size:20px} #freeb.on{background:#ffd36a}
+#freeb{top:calc(max(12px,env(safe-area-inset-top)) + 56px);right:max(12px,env(safe-area-inset-right));width:48px;padding:0;font-size:20px} #freeb.on{background:#ffd36a} #fpb{top:calc(max(12px,env(safe-area-inset-top)) + 112px);right:max(12px,env(safe-area-inset-right));width:48px;padding:0;font-size:20px} #fpb.on{background:#ffd36a} body.freecam #fpb{opacity:.85} #autob{top:calc(max(12px,env(safe-area-inset-top)) + 168px);right:max(12px,env(safe-area-inset-right));width:48px;padding:0;font-size:20px;opacity:.85} #autob.on{background:#ffd36a;opacity:1} body.freecam #autob{display:none}
 #backp{top:max(12px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);border-radius:22px;display:none} body.freecam #backp{display:block} body.freecam #joy{display:none!important} body.freecam #actb,body.freecam #imenu{display:none!important}`;
   document.head.appendChild(st);
   /* v19 floating joystick: no fixed stick. A touch that starts on the 3D view in the left half spawns the base under the thumb;
@@ -120,6 +124,9 @@ body.cardon #actb,body.cardon #imenu{display:none!important}
      tracked by pointerId so it runs at the same time as the stick. OrbitControls keeps wheel + two-finger pinch zoom only.
      While held nothing auto-moves the angle; on release, after a short beat, it eases back to the pre-drag follow angle. */
   controls.enableRotate = false;
+  /* v24: MANUAL camera by default. Following keeps Calvin's position but never touches the yaw/pitch the user set: no ease-back after a
+     drag, no swing round the longhouse, no re-framing when he sits. The old behaviour is an opt-in setting (🧭, persisted). */
+  let autoCam = localStorage.getItem('camAuto') === '1';
   const cam = { held: false, back: false, id: null, x: 0, y: 0, moved: 0, wait: 0, yaw0: 0, pol0: 0, fingers: new Set() };
   const sph = new THREE.Spherical(), offv = new THREE.Vector3();
   const getSph = () => { offv.copy(camera.position).sub(controls.target); sph.setFromVector3(offv); return sph; };
@@ -129,16 +136,16 @@ body.cardon #actb,body.cardon #imenu{display:none!important}
     cam.id = e.pointerId; cam.x = e.clientX; cam.y = e.clientY; cam.moved = 0; cam.held = true; cam.back = false; home.active = false; }, true);
   addEventListener('pointermove', e => { if (e.pointerId !== cam.id) return; const dx = e.clientX - cam.x, dy = e.clientY - cam.y; cam.x = e.clientX; cam.y = e.clientY;
     if (cam.pinch) return; // two camera fingers = pinch zoom, no orbit
-    cam.moved += Math.abs(dx) + Math.abs(dy); const S = getSph(), k = 2 * Math.PI / controls.domElement.clientHeight; setSph(S.theta - dx * k, S.phi - dy * k); }, true);
+    cam.moved += Math.abs(dx) + Math.abs(dy); if (fp.on) { const k = 2.2 / controls.domElement.clientHeight; fp.yaw -= dx * k; fp.pitch = Math.max(-1.2, Math.min(1.2, fp.pitch - dy * k)); return; } const S = getSph(), k = 2 * Math.PI / controls.domElement.clientHeight; setSph(S.theta - dx * k, S.phi - dy * k); }, true);
   const camUp = e => { cam.fingers.delete(e.pointerId); if (e.pointerId !== cam.id) return; cam.id = null; cam.held = false;
-    if (cam.moved > 6) { cam.back = true; cam.wait = 0.45; } }; addEventListener('pointerup', camUp, true); addEventListener('pointercancel', camUp, true);
+    if (cam.moved > 6 && autoCam) { cam.back = true; cam.wait = 0.45; } }; addEventListener('pointerup', camUp, true); addEventListener('pointercancel', camUp, true);
   Object.defineProperty(cam, 'pinch', { get: () => { let n = 0; for (const f of cam.fingers) if (f !== cam.id) n++; return n > 0; } });
   // run: Shift on keyboard; on touch the stick auto-runs past ~80% radius (the v15 Walk/Run toggle is gone)
   // ---- camera follow toggle ----
   let follow = false; const camb = document.createElement('button'); camb.id = 'camb'; camb.className = 'hudb'; camb.type = 'button';
   const setFollow = f => { follow = f; camb.textContent = f ? '🗺️ Overview' : '🎥 Follow Calvin'; if (!f) { home.active = true; } }; document.body.appendChild(camb);
   const home = { target: controls.target.clone(), pos: camera.position.clone(), active: false };
-  camb.addEventListener('click', () => { if (free) setFree(false); else setFollow(!follow); }); setFollow(false);
+  camb.addEventListener('click', () => { if (fp.on) setFp(false); else if (free) setFree(false); else setFollow(!follow); }); setFollow(false);
 
   /* v22 free camera (📷 button or C): detaches from Calvin. OrbitControls does the work: mouse left = rotate, right / middle /
      Shift+left = pan on the ground plane, wheel = zoom to cursor; touch 1 finger = pan, 2 fingers = pinch zoom + drag/twist rotate.
@@ -147,13 +154,34 @@ body.cardon #actb,body.cardon #imenu{display:none!important}
   const freeb = document.createElement('button'); freeb.id = 'freeb'; freeb.className = 'hudb'; freeb.type = 'button'; freeb.textContent = '📷'; freeb.title = 'Free camera (C)'; freeb.setAttribute('aria-label', 'Free camera (C)'); document.body.appendChild(freeb);
   const backp = document.createElement('button'); backp.id = 'backp'; backp.className = 'hudb'; backp.type = 'button'; backp.textContent = '↩ Back to me'; document.body.appendChild(backp);
   const saved = {};
+  const autob = document.createElement('button'); autob.id = 'autob'; autob.className = 'hudb'; autob.type = 'button'; autob.textContent = '🧭'; document.body.appendChild(autob);
+  const setAuto = v => { autoCam = !!v; localStorage.setItem('camAuto', autoCam ? '1' : '0'); autob.classList.toggle('on', autoCam); autob.setAttribute('aria-pressed', autoCam); const t = 'Auto-rotate camera: ' + (autoCam ? 'on' : 'off'); autob.title = t; autob.setAttribute('aria-label', t); if (!autoCam) cam.back = false; };
+  autob.addEventListener('click', () => setAuto(!autoCam)); setAuto(autoCam);
   const setFree = f => { f = !!f; if (f === free) return; free = f; document.body.classList.toggle('freecam', f); freeb.classList.toggle('on', f); freeb.setAttribute('aria-pressed', f);
-    if (f) { joy.hide?.(); keys.clear(); cam.id = null; cam.held = false; cam.back = false; home.active = false; const S = getSph(); saved.yaw = S.theta; saved.pol = S.phi;
+    if (f) { if (fp.on) setFp(false); joy.hide?.(); keys.clear(); cam.id = null; cam.held = false; cam.back = false; home.active = false; const S = getSph(); saved.yaw = S.theta; saved.pol = S.phi;
       Object.assign(controls, { enableRotate: true, enablePan: true, screenSpacePanning: false, zoomToCursor: true, minDistance: FREE.minD, maxDistance: FREE.maxD, minPolarAngle: FREE.minP, maxPolarAngle: FREE.maxP, dampingFactor: 0.12, rotateSpeed: 0.8 });
       controls.touches = { ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.DOLLY_ROTATE }; controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.PAN }; }
     else { Object.assign(controls, { enableRotate: false, enablePan: false, zoomToCursor: false, maxDistance: 110, minPolarAngle: 0.3, maxPolarAngle: 1.35, dampingFactor: 0.05, rotateSpeed: 1 });
       controls.minDistance = Math.min(8, camera.position.distanceTo(controls.target)); controls.touches = { ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }; controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN };
-      cam.zoom = null; cam.lastLen = 0; cam.yaw0 = saved.yaw ?? Math.PI / 4; cam.pol0 = Math.min(1.35, Math.max(0.3, saved.pol ?? 1.0)); cam.back = true; cam.wait = 0; if (!follow) setFollow(true); } };
+      cam.zoom = null; cam.lastLen = 0; cam.yaw0 = saved.yaw ?? Math.PI / 4; cam.pol0 = Math.min(1.35, Math.max(0.3, saved.pol ?? 1.0)); cam.back = autoCam; cam.wait = 0; if (!follow) setFollow(true); } };
+  /* v24 first-person view (👁️ button or V): camera at Calvin's eyes, his body hidden; drag / right-half finger looks around,
+     stick / WASD move relative to the look direction. Mutually exclusive with the free camera; leaving restores the previous view. */
+  const fp = { on: false, yaw: 0, pitch: 0, eye: 1.75, bob: 0, saved: null };
+  const fpb = document.createElement('button'); fpb.id = 'fpb'; fpb.className = 'hudb'; fpb.type = 'button'; fpb.textContent = '👁️'; fpb.title = 'First-person view (V)'; fpb.setAttribute('aria-label', 'First-person view (V)'); document.body.appendChild(fpb);
+  const fpDir = new THREE.Vector3();
+  const setFp = on => { on = !!on; if (on === fp.on) return; if (on && free) setFree(false);
+    fp.on = on; document.body.classList.toggle('fpv', on); camb.textContent = on ? '🧍 Third person' : follow ? '🗺️ Overview' : '🎥 Follow Calvin'; fpb.classList.toggle('on', on); fpb.setAttribute('aria-pressed', on);
+    if (on) { fp.saved = { off: camera.position.clone().sub(controls.target), tgtY: controls.target.y, follow, near: camera.near };
+      c.updateMatrixWorld(true); const hb = new THREE.Box3().setFromObject(c.userData.parts.head); fp.eye = Math.max(1.2, (hb.min.y + hb.max.y) / 2 - c.position.y + 0.05);
+      fp.yaw = c.rotation.y; fp.pitch = -0.08; c.visible = false; controls.enabled = false; camera.near = 0.05; camera.updateProjectionMatrix(); cam.back = false; home.active = false; }
+    else { const S = fp.saved || {}; c.visible = true; controls.enabled = true; camera.near = S.near ?? 0.1; camera.updateProjectionMatrix();
+      controls.target.set(c.position.x, S.tgtY ?? 1.2, c.position.z); camera.position.copy(controls.target).add(S.off || new THREE.Vector3(0, 9, 12)); if (!follow) setFollow(true); } };
+  fpb.addEventListener('click', () => setFp(!fp.on));
+  addEventListener('keydown', e => { if (e.target.closest?.('input,textarea') || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return; if (e.key.toLowerCase() === 'v') setFp(!fp.on); });
+  function fpCam(dt, t) { const moving = api.speed > 0 && !api.seat; fp.bob = moving ? fp.bob + dt * (api.speed > 3 ? 13 : 8.5) : fp.bob * Math.max(0, 1 - dt * 6);
+    const by = moving ? Math.abs(Math.sin(fp.bob)) * 0.045 : 0; if (moving) fp.yaw = c.rotation.y + Math.atan2(Math.sin(fp.yaw - c.rotation.y), Math.cos(fp.yaw - c.rotation.y)); // keep yaw continuous
+    fpDir.set(Math.sin(fp.yaw) * Math.cos(fp.pitch), Math.sin(fp.pitch), Math.cos(fp.yaw) * Math.cos(fp.pitch));
+    camera.position.set(c.position.x + Math.sin(fp.yaw) * 0.12, c.position.y + fp.eye + by, c.position.z + Math.cos(fp.yaw) * 0.12); controls.target.copy(camera.position).add(fpDir); camera.lookAt(controls.target); }
   freeb.addEventListener('click', () => setFree(!free)); backp.addEventListener('click', () => setFree(false));
   addEventListener('keydown', e => { if (e.target.closest?.('input,textarea') || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return; if (e.key.toLowerCase() === 'c') setFree(!free); });
   controls.domElement.addEventListener('contextmenu', e => e.preventDefault());
@@ -171,7 +199,7 @@ body.cardon #actb,body.cardon #imenu{display:none!important}
     camera.position.x += T.x - ox; camera.position.z += T.z - oz; camera.position.y += T.y - oy; if (camera.position.y < 0.6) camera.position.y = 0.6; }
 
   const fwd = new THREE.Vector3(), right = new THREE.Vector3(), mvv = new THREE.Vector3(), tmp = new THREE.Vector3();
-  const api = { chibi: c, cam, get free() { return free; }, setFree, get camYaw() { return getSph().theta; }, speed: 0, moved: false, get follow() { return follow; }, setFollow, joy, keys };
+  const api = { chibi: c, cam, get fp() { return fp.on; }, fpState: fp, setFp, get autoCam() { return autoCam; }, setAuto, get free() { return free; }, setFree, get camYaw() { return getSph().theta; }, speed: 0, moved: false, get follow() { return follow; }, setFollow, joy, keys };
   /* v20 wardrobe: rebuild Calvin's outfit in place (same root/parts/props, so every reference stays valid) and persist it.
      fit = { top, bottom, shoes, acc } labels from calvinCloset(); null = back to the daily OOTD. */
   api.fit = savedFit();
@@ -194,6 +222,8 @@ body.cardon #actb,body.cardon #imenu{display:none!important}
     if (speed) { mvv.copy(right).multiplyScalar(ix).addScaledVector(fwd, -iy).normalize(); if (!api.moved) { api.moved = true; setFollow(true); }
       const p = collide({ x: c.position.x + mvv.x * speed * dt, z: c.position.z + mvv.z * speed * dt }, bots.filter(b => Math.abs(b.position.y - c.position.y) < 1).map(b => [b.position.x, b.position.z, 0.45]), c.position);
       c.position.x = p.x; c.position.z = p.z; let dr = Math.atan2(mvv.x, mvv.z) - c.rotation.y; dr = Math.atan2(Math.sin(dr), Math.cos(dr)); c.rotation.y += dr * Math.min(1, dt * 10); }
+    if (!api.seat) { api.stuckT = !isFree(c.position.x, c.position.z) ? (api.stuckT || 0) + dt : 0;
+      if (api.stuckT > 0.6) { const f = findFree(c.position.x, c.position.z, heightAt(c.position.x, c.position.z)); if (f) { c.position.x = f.x; c.position.z = f.z; } api.stuckT = 0; } } // v24 safety net: still overlapping colliders after 0.6 s -> nearest free spot
     if (api.seat) { if (speed) api.stand(); else { const S = api.seat; c.position.set(S.pos[0], c.position.y + (S.y + heightAt(S.pos[0], S.pos[1]) - c.position.y) * Math.min(1, dt * 7), S.pos[1]); c.rotation.y = S.rot;
         applyPose(c, api.emote && api.emote.until > t ? api.emote.name : S.pose, t, dt, !S.standing, { cup: 0x6b4226 }); api.afterPose?.(t); followCam(dt, S.camDist); return; } }
     else { const gy = heightAt(c.position.x, c.position.z); c.position.y += (gy - c.position.y) * Math.min(1, dt * 14); }
@@ -201,14 +231,14 @@ body.cardon #actb,body.cardon #imenu{display:none!important}
     if (api.carry && !(api.emote && api.emote.until > t)) { const P = c.userData.parts; c.userData.props.cup.visible = true; P.armR.rotation.x = -1.3; P.armR.rotation.z = -0.25; }
     api.afterPose?.(t); followCam(dt);
   };
-  function followCam(dt, near) { if (free) { freeCam(dt); return; }
+  function followCam(dt, near) { if (free) { freeCam(dt); return; } if (fp.on) { fpCam(dt); return; }
     const CL = window.__camLock; if (CL) { camera.position.set(...CL[0]); controls.target.set(...CL[1]); return; } // test hook: fixed inspection camera
     // camera: follow with smoothing (shift target and camera by the same delta, so orbiting still works)
     if (cam.back && !cam.held) { cam.wait -= dt; if (cam.wait <= 0 && (!follow || api.seat || api.look)) { cam.back = false; if (!follow) home.active = true; } }
     const manual = cam.held || (cam.back && cam.wait > 0); // user owns the angle (held, or the short beat after release)
     if (manual && !follow) return;
     const SL = api.seat?.look; if (!manual && SL && !api.look) { const k = 1 - Math.exp(-dt * 1.6); controls.target.lerp(SL.tgt.clone().sub(SL.pos).setLength(6).add(SL.pos), k); camera.position.lerp(SL.pos, k); return; }
-    if (!manual && api.seat && api.seat.camYaw !== undefined && !api.look) { const S2 = api.seat, d = S2.camDist || 11, a = S2.rot + S2.camYaw; tmp.set(c.position.x, c.position.y + 1.0, c.position.z); const k = 1 - Math.exp(-dt * 2.4);
+    if (!manual && autoCam && api.seat && api.seat.camYaw !== undefined && !api.look) { const S2 = api.seat, d = S2.camDist || 11, a = S2.rot + S2.camYaw; tmp.set(c.position.x, c.position.y + 1.0, c.position.z); const k = 1 - Math.exp(-dt * 2.4);
       controls.target.lerp(tmp, k); camera.position.lerp(new THREE.Vector3(tmp.x + Math.sin(a) * d * 0.78, tmp.y + d * 0.55, tmp.z + Math.cos(a) * d * 0.78), k); return; }
     if (!manual && api.look) { const L = api.look; const k = 1 - Math.exp(-dt * 2); controls.target.lerp(L.tgt, k); camera.position.lerp(L.pos, k); return; }
     if (follow) { tmp.set(c.position.x, 1.2, c.position.z); const k = 1 - Math.exp(-dt * 3.2); const delta = tmp.sub(controls.target).multiplyScalar(k); controls.target.add(delta); camera.position.add(delta);
@@ -217,21 +247,21 @@ body.cardon #actb,body.cardon #imenu{display:none!important}
       if (cam.back && cam.wait <= 0) { const az = Math.atan2(off.x, off.z), h0 = off.length(), pol = Math.acos(Math.max(-1, Math.min(1, off.y / h0))), k2 = 1 - Math.exp(-dt * 3.2);
         const dy = Math.atan2(Math.sin(cam.yaw0 - az), Math.cos(cam.yaw0 - az)), dp = cam.pol0 - pol; // ease back to the pre-drag follow angle
         if (Math.abs(dy) < 0.004 && Math.abs(dp) < 0.004) { cam.back = false; offv.setFromSphericalCoords(h0, cam.pol0, cam.yaw0); } else offv.setFromSphericalCoords(h0, pol + dp * k2, az + dy * k2); off.copy(offv); }
-      else if (!manual && onHome(c.position.x, c.position.z) && c.position.z > HOUSE.z0 - 2.5) { // near the longhouse: swing round to its open (-z) front so the rooms aren't hidden behind the back wall
+      else if (!manual && autoCam && onHome(c.position.x, c.position.z) && c.position.z > HOUSE.z0 - 2.5) { // near the longhouse: swing round to its open (-z) front so the rooms aren't hidden behind the back wall
         const az = Math.atan2(off.x, off.z), lim = 0.55; let tgt = Math.PI - Math.sign(off.x || 1) * Math.min(lim, Math.abs(Math.atan2(Math.sin(az - Math.PI), Math.cos(az - Math.PI))));
         let d = Math.atan2(Math.sin(tgt - az), Math.cos(tgt - az)); const na = az + d * Math.min(1, dt * 1.8), h = Math.hypot(off.x, off.z); off.x = Math.sin(na) * h; off.z = Math.cos(na) * h; }
       camera.position.copy(controls.target).add(off); cam.lastLen = near ? 0 : off.length(); controls.minDistance = Math.min(8, off.length()); }
     else if (home.active) { const k = 1 - Math.exp(-dt * 3); controls.target.lerp(home.target, k); camera.position.lerp(home.pos, k); if (camera.position.distanceTo(home.pos) < 0.05) home.active = false; controls.minDistance = home.minD ?? 12; }
   }
   // seats: { pos:[x,z], rot, y, pose, camDist, onStand }
-  api.sitAt = s => { api.seat = s; c.position.set(s.pos[0], c.position.y, s.pos[1]); c.rotation.y = s.rot; /* snap to the seat's facing, not the walking direction */ api.carry = s.keepMug ? api.carry : api.carry; if (!follow) setFollow(true); };
+  api.sitAt = s => { api.seat = s; if (fp.on) { fp.yaw = s.rot; fp.pitch = -0.12; } c.position.set(s.pos[0], c.position.y, s.pos[1]); c.rotation.y = s.rot; /* snap to the seat's facing, not the walking direction */ api.carry = s.keepMug ? api.carry : api.carry; if (!follow) setFollow(true); };
   api.stand = () => { const s = api.seat; api.seat = null; if (!s) return; c.rotation.x = 0; c.userData.setSleepFace?.(false);
     // step off on the SAME level: try behind (pull the chair back), then in front, then the sides; accept the first walkable,
     // unobstructed spot whose floor height matches the seat's floor (never re-snap to the ground from the roof)
     const lv = heightAt(s.pos[0], s.pos[1]), fx = Math.sin(s.rot), fz = Math.cos(s.rot), from = { x: s.pos[0], z: s.pos[1] };
-    let P = null; for (const [a, b] of [[-0.9, 0], [0.8, 0], [0, 0.9], [0, -0.9], [-0.6, 0.6], [0.6, -0.6], [0.5, 0]]) { const q = { x: s.pos[0] + fx * a + fz * b, z: s.pos[1] + fz * a - fx * b }; const want = { ...q };
-      const r = collide(q, [], from); if (Math.hypot(r.x - want.x, r.z - want.z) < 0.12 && Math.abs(heightAt(r.x, r.z) - lv) < 0.05) { P = r; break; } }
-    if (!P) P = { x: s.pos[0], z: s.pos[1] };
+    let P = null; for (const [a, b] of [[-0.9, 0], [0.8, 0], [0, 0.9], [0, -0.9], [-0.6, 0.6], [0.6, -0.6], [0.5, 0]]) { const q = { x: s.pos[0] + fx * a + fz * b, z: s.pos[1] + fz * a - fx * b };
+      if (isFree(q.x, q.z, lv)) { P = q; break; } }
+    if (!P) P = findFree(s.pos[0], s.pos[1], lv) || { x: s.pos[0], z: s.pos[1] }; // v24: never stand up into furniture / walls
     c.position.x = P.x; c.position.z = P.z; c.position.y = heightAt(P.x, P.z); s.onStand?.(); };
   api.setEmote = (name, dur, t) => { api.emote = { name, until: t + dur }; };
   api.setHome = (pos, tgt) => { home.pos.copy(pos); home.target.copy(tgt); home.minD = Math.min(12, controls.minDistance); }; // ?tgt= debug framing may sit closer than 12

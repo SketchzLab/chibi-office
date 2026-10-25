@@ -87,7 +87,7 @@ function weatherUpdate(t, wt) { const ws = DAY(); wxNow = weatherAt(ws, ootdDay(
   const out = wxNow.rain < 0.3; home.flames.visible = out; calIsl.flames.visible = out; if (calIsl.fireLight) calIsl.fireLight.visible = out;
   // umbrellas over anyone (bots + Calvin) walking or waiting outdoors in the rain
   [calvin, ...chibis].forEach((c, i) => { let u = umbrellas.get(c); const want = wxNow.rain > 0.25 && !c.userData.brain?.state.asleep && !indoors(c.position.x, c.position.z) && !c.userData.pet;
-    if (!u && !want) return; if (!u) { u = umbrella(i); umbrellas.set(c, u); } u.visible = want; if (want) { const s = c === calvin ? CALVIN_S : BOT_S; u.position.set(c.position.x + 0.15, c.position.y + 2.55 * s / 1.5 + 0.85, c.position.z); u.rotation.z = -0.12; } });
+    if (!u && !want) return; if (!u) { u = umbrella(i); umbrellas.set(c, u); } u.visible = want; if (want) { const s = c === calvin ? CALVIN_S : BOT_S; u.position.set(c.position.x + 0.15, c.position.y + 2.55 * s / 1.5 + 0.85, c.position.z); u.rotation.z = -0.12; u.children[1].visible = !(c === calvin && player.fp); /* v24 FP: canopy overhead, no stick through the eye */ } });
   // rain starts: a heads-up in the office feed + someone says it out loud
   if (wxNow.wet && !wxWet) { const k = 'rain-' + ootdDay() + '-' + Math.round(wxNow.start || 0); if (wxNow.since < 300 || t < 3) { post(k, 'Mika', wxNow.storm > 0.5 ? 'Thunderstorm rolling in ⛈️ Everyone inside!' : 'Looks like rain, everyone inside! ☔', 25);
       if (t > wxSay) { wxSay = t + 60; const c = chibis.find(c => !c.userData.brain.state.asleep); if (c) { say(c.userData.name, wxNow.storm > 0.5 ? 'Whoa, thunder! ⛈️ Inside, everyone!' : 'Looks like rain, everyone inside! ☔', wt, 5); emoteBot(c.userData.name, 'look', 2); } } } }
@@ -456,11 +456,11 @@ function loop() { const t = clock.getElapsedTime(); toonUniforms.uTime.value = t
   if (selected) { const bs = selected.userData.brain.state; card.querySelector('.t').textContent = bs.label + (bs.override ? ' (live)' : ''); card.querySelector('.wt').textContent = selected.userData.task || '—'; card.classList.toggle('live', !!selected.userData.live); ring.position.set(selected.position.x, 0.04, selected.position.z); }
   sky.clouds.children.forEach(c => { c.position.y += Math.sin(t * 0.3 + c.userData.drift * 6) * 0.004; });
   nature.update(t);
-  { const d = camera.position.distanceTo(controls.target); toonUniforms.uFogRange.value.set(...weather.fog(d));
+  { const d = player.fp ? 14 : camera.position.distanceTo(controls.target); toonUniforms.uFogRange.value.set(...weather.fog(d));
     // v22 far LOD (free camera only): past 60 u the chibi outline hulls are ~1 px, so skip them (-60 draws, -45k tris at a wide zoom-out)
     const far = player.free && d > 60; if (far !== farLod) { farLod = far; scene.traverse(o => { if (o.isMesh && o.userData.hull && o.material?.type === 'MeshBasicMaterial') o.visible = !far; }); } }
-  { const want = OCC_MODE === '0' ? 0 : (OCC_MODE === '1' || (player.follow && !player.look && !player.free)) ? 1 : 0; // v22: off in free camera // v17 see-through: buildings/props between camera and Calvin dither to ~25%
+  { const want = OCC_MODE === '0' ? 0 : (OCC_MODE === '1' || (player.follow && !player.look && !player.free && !player.fp)) ? 1 : 0; // v24: off in first person // v22: off in free camera // v17 see-through: buildings/props between camera and Calvin dither to ~25%
     toonUniforms.uOccK.value += (want - toonUniforms.uOccK.value) * Math.min(1, dt * 3); toonUniforms.uOccP.value.set(calvin.position.x, calvin.position.y + 1.3, calvin.position.z); }
-  controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop); }
+  if (!player.fp) controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop); }
 loop();
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); if (!camP) { const off = camera.position.clone().sub(controls.target).setLength(fitDistance()); camera.position.copy(controls.target).add(off); } renderer.setSize(innerWidth, innerHeight); });

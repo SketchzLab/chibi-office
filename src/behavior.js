@@ -11,12 +11,12 @@ import { weatherAt } from './weatherplan.js';
 const HIP = 0.37 * (1.5 - BOT_S); export const SEAT_CHAIR = 0.07 + HIP, SEAT_SOFA = -0.06 + HIP, SEAT_STOOL = -0.05 + HIP;
 // v23 Sage's manager office (desk: 'office'): leave the office on the open east side, up the lawn to the executive wing, through
 // her door and round the west end of her desk to the chair behind it (faces the door, +z)
-const S_OFF = SAGE_OFF, sdx = (S_OFF.door[0] + S_OFF.door[1]) / 2, [sDx, sDz] = S_OFF.desk;
-export const TO_SAGE_OFF = [[9.2, -0.25], [12.2, -0.25], [12.2, -9.3], [12.3, -15.2], [sdx, -19.4], [sdx, S_OFF.z1 - 0.9], [S_OFF.x0 + 1.45, S_OFF.z1 - 1.3], [S_OFF.x0 + 1.45, sDz - 1.0]];
+const S_OFF = SAGE_OFF, SAX = 6.6, sdx = (S_OFF.door[0] + S_OFF.door[1]) / 2, [sDx, sDz] = S_OFF.desk;
+export const TO_SAGE_OFF = [[9.2, -0.25], [12.2, -0.25], [12.2, -9.3], [12.3, -15.2], [sdx, -19.4], [sdx, S_OFF.z1 - 0.9], [SAX, S_OFF.z1 - 1.6], [SAX, S_OFF.z0 + 1.55], [sDx, S_OFF.z0 + 1.55]]; // v24: west aisle past the shelf, then the aisle behind the desk (all collider-free for Calvin's head/body radii)
 function sageDesk() { return { pos: [sDx, sDz - 1.0], rot: 0, seat: SEAT_CHAIR, approach: [...TO_SAGE_OFF, [sDx, sDz - 1.0]] }; }
 export function deskPlace(i) { if (i === 'office') return sageDesk(); const [x, z] = DESKS[i]; const back = z < 0, sz = back ? z + 1.0 : z - 1.0, side = back ? 0.95 : -0.95, az = back ? -0.25 : 0.25;
   return { pos: [x, sz], rot: back ? Math.PI : 0, seat: SEAT_CHAIR, approach: [[x + side, az], [x + side, sz], [x, sz]] }; }
-export function deskAisle(i) { if (i === 'office') return { pos: [S_OFF.x0 + 1.45, sDz - 0.2], rot: Math.PI / 2, seat: null, approach: [...TO_SAGE_OFF.slice(0, -1), [S_OFF.x0 + 1.45, sDz - 0.2]] }; const [x, z] = DESKS[i]; const back = z < 0, side = back ? 0.95 : -0.95, az = back ? -0.25 : 0.25;
+export function deskAisle(i) { if (i === 'office') return { pos: [SAX, sDz - 0.2], rot: Math.PI / 2, seat: null, approach: [...TO_SAGE_OFF.slice(0, -2), [SAX, sDz - 0.2]] }; const [x, z] = DESKS[i]; const back = z < 0, side = back ? 0.95 : -0.95, az = back ? -0.25 : 0.25;
   return { pos: [x + side, back ? -0.7 : 0.7], rot: back ? Math.PI : 0, seat: null, approach: [[x + side, az], [x + side, back ? -0.7 : 0.7]] }; }
 function pantryPlace(slot) { const dx = Math.sin(PANTRY.ry), dz = Math.cos(PANTRY.ry), lx = Math.cos(PANTRY.ry), lz = -Math.sin(PANTRY.ry); const o = [-1.2, -0.4, 0.4, 1.2][slot];
   const p = [PANTRY.x + dx * 1.55 + lx * o, PANTRY.z + dz * 1.55 + lz * o];

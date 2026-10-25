@@ -110,7 +110,7 @@ export function makeExec(scene) {
     const sh = bookshelf(1.6, 2.2); sh.position.set(S.shelf[0], 0, S.shelf[1]); sh.rotation.y = Math.PI / 2; g.add(sh); cast(S.shelf[0] + 0.3, S.shelf[1], 1.2, 2.0, 0, 0.015, 0.4);
     const pl = plant(1.15); pl.position.set(S.plant[0], 0, S.plant[1]); g.add(pl); cast(S.plant[0], S.plant[1], 1.2, 1.2);
     // guest chair (faces her desk)
-    { const [gx, gz] = S.guest, c = new THREE.Group(); c.position.set(gx, 0, gz); c.rotation.y = Math.PI - 0.5;
+    { const [gx, gz] = S.guest, c = new THREE.Group(); c.position.set(gx, 0, gz); c.rotation.y = Math.PI + 0.2;
       const st = toonMesh(RB(0.7, 0.16, 0.66, 0.06), 0x8fbf9a); st.position.y = 0.48; c.add(st); const bk = toonMesh(RB(0.7, 0.6, 0.14, 0.06), 0x7aa886); bk.position.set(0, 0.82, -0.28); c.add(bk);
       [[-0.28, -0.25], [0.28, -0.25], [-0.28, 0.25], [0.28, 0.25]].forEach(([x, z]) => { const l = toonMesh(B(0.06, 0.42, 0.06), 0x8b6b4a, { outline: false }); l.position.set(x, 0.21, z); c.add(l); }); g.add(c); cast(gx, gz, 1.0, 1.0); }
     // wall art + chess set on a side table (her hobby)

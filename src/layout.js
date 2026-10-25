@@ -21,15 +21,15 @@ export const WALK_R = ISLAND_R - 1.4; // walkable lawn radius
 // ---- v23 executive wing: a second land lobe north-east of the office (merged into the main island) holding Sage's manager
 // office and Calvin's founder/CEO corner office on a shared wooden floor. Doors face south (+z) toward the office. ----
 export const LOBE = { cx: 12, cz: -19, r: 12 }; LOBE.walk = LOBE.r - 1.4;
-export const EXEC = { x0: 4.5, x1: 20.5, z0: -26.5, z1: -12.0, y: 0 }; // shared floor deck (v23b: reaches south to the corridor)
+export const EXEC = { x0: 4.5, x1: 20.5, z0: -27.3, z1: -12.0, y: 0 }; // shared floor deck (v23b: reaches south to the corridor)
 // v23b glass corridor joining the office's back-right corner to the wing deck: west wall continues the office back wall line north,
 // open to the office floor on its west side (z -7.9..-4) and to the deck at its north end; the bot/Calvin path x≈12.2 runs through it
 export const CORR = { x0: 11.0, x1: 13.8, z0: -12.0, z1: -4.0, wN: -10.45 }; // west wall only z0..wN: the gap wN..BACK_Z is the doorway to the roof stairs
 export const ROOM_H = 3.4, ROOM_T = 0.1; // wall height (clears the tallest chibi), wall half-thickness for colliders
-export const SAGE_OFF = { x0: 4.5, x1: 10.5, z0: -26.5, z1: -21.4, door: [6.9, 9.3], name: 'Sage', title: 'Manager' };
-export const CEO_OFF = { x0: 11.6, x1: 20.5, z0: -26.5, z1: -20.0, door: [12.7, 15.3], name: 'Calvin', title: 'Founder & CEO' }; // ~1.9x Sage's floor area
-SAGE_OFF.desk = [8.1, -24.3]; SAGE_OFF.shelf = [5.1, -24.4]; SAGE_OFF.plant = [9.8, -25.7]; SAGE_OFF.guest = [6.1, -23.0]; SAGE_OFF.chess = [9.85, -22.2];
-CEO_OFF.desk = [17.6, -24.4]; CEO_OFF.sofa = [12.55, -24.0]; CEO_OFF.table = [14.0, -23.9]; CEO_OFF.shelf = [15.0, -26.05]; CEO_OFF.plants = [[19.9, -25.9], [11.95, -21.0]]; CEO_OFF.arm = [16.2, -21.4]; CEO_OFF.lamp = [12.15, -25.95];
+export const SAGE_OFF = { x0: 4.5, x1: 10.5, z0: -27.3, z1: -21.4, door: [6.9, 9.3], name: 'Sage', title: 'Manager' };
+export const CEO_OFF = { x0: 11.6, x1: 20.5, z0: -27.3, z1: -20.0, door: [12.7, 15.3], name: 'Calvin', title: 'Founder & CEO' }; // ~1.9x Sage's floor area
+SAGE_OFF.desk = [8.4, -24.3]; SAGE_OFF.shelf = [5.1, -24.4]; SAGE_OFF.plant = [9.8, -26.5]; /* v24: rooms 0.8 deeper (north) so there is a walkable aisle behind both desks */ SAGE_OFF.guest = [8.7, -22.85]; SAGE_OFF.chess = [9.85, -22.2];
+CEO_OFF.desk = [17.6, -24.4]; CEO_OFF.sofa = [12.55, -24.0]; CEO_OFF.table = [14.0, -23.9]; CEO_OFF.shelf = [13.75, -26.85]; CEO_OFF.plants = [[19.9, -26.7], [11.95, -21.0]]; CEO_OFF.arm = [16.2, -21.4]; CEO_OFF.lamp = [12.15, -26.75];
 // colliders (player.js): body boxes/circles + head-high boxes (walls, shelves)
 // v23c exec terrace dressing on the deck (kept clear of door approaches, the deck runner z -17.9..-19.3 and the corridor -> Sage door diagonal)
 export const TERRACE = { planters: [[4.8, -21.3, 6.5, -20.8], [15.8, -19.95, 20.2, -19.45], [4.7, -19.6, 5.2, -13.4]],
@@ -38,7 +38,7 @@ export const TERRACE = { planters: [[4.8, -21.3, 6.5, -20.8], [15.8, -19.95, 20.
   stones: [[8.1, -19.75], [8.1, -20.45], [14.0, -19.6], [16.4, -17.4], [17.0, -16.6], [17.6, -15.9]] };
 export const EXEC_BOXES = [...TERRACE.planters, ...TERRACE.loungers.map(([x, z]) => [x - 0.38, z - 0.95, x + 0.38, z + 0.95]), [SAGE_OFF.desk[0] - 1.15, SAGE_OFF.desk[1] - 0.6, SAGE_OFF.desk[0] + 1.15, SAGE_OFF.desk[1] + 0.6], [CEO_OFF.desk[0] - 1.5, CEO_OFF.desk[1] - 0.68, CEO_OFF.desk[0] + 1.5, CEO_OFF.desk[1] + 0.68],
   [CEO_OFF.sofa[0] - 0.47, CEO_OFF.sofa[1] - 1.3, CEO_OFF.sofa[0] + 0.45, CEO_OFF.sofa[1] + 1.3], [CEO_OFF.table[0] - 0.6, CEO_OFF.table[1] - 0.38, CEO_OFF.table[0] + 0.6, CEO_OFF.table[1] + 0.38]];
-export const EXEC_CIRCLES = [[...TERRACE.table, 0.32], [...TERRACE.parasol, 0.15], ...TERRACE.pots.map(([x, z]) => [x, z, 0.4]), ...TERRACE.posts.map(([x, z]) => [x, z, 0.15]), [...SAGE_OFF.guest, 0.42], [...SAGE_OFF.chess, 0.34], [...SAGE_OFF.plant, 0.4], [CEO_OFF.desk[0], CEO_OFF.desk[1] - 1.15, 0.45], [...CEO_OFF.arm, 0.5], ...CEO_OFF.plants.map(([x, z]) => [x, z, 0.4]), [...CEO_OFF.lamp, 0.26]];
+export const EXEC_CIRCLES = [[...TERRACE.table, 0.32], [...TERRACE.parasol, 0.15], ...TERRACE.pots.map(([x, z]) => [x, z, 0.4]), ...TERRACE.posts.map(([x, z]) => [x, z, 0.15]), [...SAGE_OFF.guest, 0.42], [...SAGE_OFF.chess, 0.34], [...SAGE_OFF.plant, 0.4], [...CEO_OFF.arm, 0.5], ...CEO_OFF.plants.map(([x, z]) => [x, z, 0.4]), [...CEO_OFF.lamp, 0.26]];
 export const corrWalls = (t = ROOM_T) => [[CORR.x0 - t, CORR.z0, CORR.x0 + t, CORR.wN], [CORR.x1 - t, CORR.z0, CORR.x1 + t, CORR.z1 - 0.5]];
 export const EXEC_TALL = [...roomWalls(SAGE_OFF), ...roomWalls(CEO_OFF), ...corrWalls(), [SAGE_OFF.shelf[0] - 0.24, SAGE_OFF.shelf[1] - 0.8, SAGE_OFF.shelf[0] + 0.24, SAGE_OFF.shelf[1] + 0.8], [CEO_OFF.shelf[0] - 0.85, CEO_OFF.shelf[1] - 0.24, CEO_OFF.shelf[0] + 0.8, CEO_OFF.shelf[1] + 0.24]];
 export const onLobe = (x, z, m = 0) => Math.hypot(x - LOBE.cx, z - LOBE.cz) < LOBE.r + m;

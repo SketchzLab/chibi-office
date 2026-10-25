@@ -55,7 +55,7 @@ for (const [w, h] of SIZES.filter(([w, h]) => !process.env.SIZE || process.env.S
     await touch('touchEnd', [T(2, cx - 90, cy)]); await W(200); const y2 = await yaw(); // camera finger lifted, stick still down
     ok(Math.abs(wrap(y2 - y1)) < 0.05 && await p.evaluate(() => window.__player.speed > 0), `${nm} short beat after release, stick unaffected (moved ${wrap(y2 - y1).toFixed(3)} rad)`);
     for (let i = 0; i < 40 && await p.evaluate(() => window.__player.cam.back); i++) await W(200); const y3 = await yaw();
-    ok(Math.abs(wrap(y3 - y0)) < 0.06 && !(await p.evaluate(() => window.__player.cam.back)), `${nm} eased back to follow angle after release (off ${wrap(y3 - y0).toFixed(3)} rad)`);
+    ok(Math.abs(wrap(y3 - y2)) < 0.06 && !(await p.evaluate(() => window.__player.cam.back)), `${nm} v24 manual cam keeps the user's angle after release (moved ${wrap(y3 - y2).toFixed(3)} rad)`);
     await touch('touchEnd', []); await W(300);
     ok(await p.evaluate(() => window.__player.speed === 0 && !window.__player.cam.held), `${nm} all fingers up: stopped, camera free`);
     await p.evaluate(() => { if (window.__player.follow) window.__player.setFollow(false); }); await W(2500); // overview: bots in view

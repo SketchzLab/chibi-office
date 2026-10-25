@@ -38,7 +38,7 @@ async function run(tag, vp, mode) { if (process.env.ONLY && !tag.includes(proces
       for (let i = 1; i <= 10; i++) { await p.mouse.move(700 - 12 * i, 300); await W(30); } await W(300); const y1 = await yaw(), want = 2 * Math.PI * 120 / vp.height, d1 = Math.atan2(Math.sin(y1 - y0), Math.cos(y1 - y0));
       ok(Math.abs(Math.abs(d1) - want) < 0.12, `${tag}: mouse drag orbits one-to-one while walking (${d1.toFixed(3)} vs ${want.toFixed(3)} rad)`);
       await p.mouse.up(); await p.keyboard.up('w'); let y2 = await yaw(); for (let i = 0; i < 40 && await p.evaluate(() => !!window.__player.cam.back); i++) { await W(200); } y2 = await yaw(); // swiftshader frame rate varies: poll up to 8 s
-      ok(Math.abs(Math.atan2(Math.sin(y2 - y0), Math.cos(y2 - y0))) < 0.08 && !(await p.evaluate(() => window.__player.cam.back)), `${tag}: camera eased back to follow after release (off ${Math.atan2(Math.sin(y2 - y0), Math.cos(y2 - y0)).toFixed(3)} rad)`);
+      ok(Math.abs(Math.atan2(Math.sin(y2 - y1), Math.cos(y2 - y1))) < 0.08 && !(await p.evaluate(() => window.__player.cam.back)), `${tag}: v24 manual cam keeps the user's angle after release (moved ${Math.atan2(Math.sin(y2 - y1), Math.cos(y2 - y1)).toFixed(3)} rad)`);
       await walk(p, [[-38.4, -3.0]], steer, `${tag} re-centre`); }
     await W(500); good = await walk(p, BACK, steer, `${tag} back`);
     if (good) ok(true, `${tag}: walked back to the office desk`); }

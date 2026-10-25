@@ -61,4 +61,17 @@ if (at !== null) { await p.goto(BASE + `?t=12:00&q=low&at=${at}`, { waitUntil: '
   const want = [S.desk[0], S.desk[1] - 1.0];
   rep(r.act === 'work' && r.seated && Math.hypot(r.x - want[0], r.z - want[1]) < 0.15 && r.x > S.x0 && r.x < S.x1 && r.z > S.z0 && r.z < S.z1,
     `Sage works seated at her own desk in the manager office: act ${r.act}, seated ${r.seated}, at (${r.x.toFixed(2)}, ${r.z.toFixed(2)}) want (${want[0]}, ${want[1]}), yaw ${r.ry.toFixed(2)}`); }
+// ---------- 4. v24: walkable gaps behind the desks (Calvin + Sage's real route) ----------
+await p.goto(BASE + '?t=12:00&q=low', { waitUntil: 'networkidle0' }); await W(1500);
+await p.evaluate(async () => { const P = await import('/src/player.js'); const B = await import('/src/behavior.js'); window.__isFree = P.isFree; window.__sageAppr = B.deskPlace('office').approach; });
+{ const bad2 = await p.evaluate(() => { const A = window.__sageAppr, out = []; for (let i = 3; i < A.length - 1; i++) { const [a, b] = [A[i], A[i + 1]];
+    for (let t = 0; t <= 1; t += 0.04) { const x = a[0] + (b[0] - a[0]) * t, z = a[1] + (b[1] - a[1]) * t; if (!window.__isFree(x, z)) out.push(`(${x.toFixed(2)}, ${z.toFixed(2)})`); } } return out; });
+  rep(bad2.length === 0, `Sage's route to her chair is collider-free for a chibi body+head (${bad2.length ? 'blocked at ' + bad2.slice(0, 4).join(' ') : 'door -> west aisle -> behind the desk'})`); }
+async function walkTo(wps, tag, label) { await p.evaluate(() => { const P = window.__player; P.stand?.(); P.chibi.position.set(12.3, 0, -15.5); }); await W(200); const ok = await go(wps, tag); const s = await st();
+  const near = await p.evaluate(() => window.__near()); const lab = typeof near === 'function' ? near() : near; return { ok, s, lab }; }
+{ const sd = (S.door[0] + S.door[1]) / 2, cd = (C.door[0] + C.door[1]) / 2;
+  let r = await walkTo([[sd, -19.8], [sd, -22.3], [6.6, -23.0], [6.6, S.z0 + 1.55], [S.desk[0], S.z0 + 1.55], [S.desk[0], S.desk[1] - 1.0]], 'Calvin -> Sage chair');
+  rep(r.ok, `Calvin walks behind Sage's desk to her chair (${r.s.x.toFixed(2)}, ${r.s.z.toFixed(2)})`);
+  r = await walkTo([[cd, -19.4], [cd, -22.6], [15.0, -23.0], [15.0, C.z0 + 1.6], [C.desk[0], C.z0 + 1.6], [C.desk[0], C.desk[1] - 1.12]], 'Calvin -> CEO chair');
+  rep(r.ok && /CEO chair/.test(r.lab || ''), `Calvin walks behind the CEO desk to the chair (${r.s.x.toFixed(2)}, ${r.s.z.toFixed(2)}), prompt "${r.lab}"`); }
 await b.close(); console.log(bad ? `${bad} FAILED` : 'ALL OK'); process.exit(bad ? 1 : 0);
