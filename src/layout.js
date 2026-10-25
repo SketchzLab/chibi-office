@@ -18,7 +18,35 @@ export const BALCONY = { x0: 15.2, x1: 19.2, z0: -1.8, z1: 2.2, y: 0.12 };
 export const PARK = { cx: 7.4, cz: 10.8, r: 2.7 };
 { const b = (a, r) => [PARK.cx + Math.cos(a) * r, PARK.cz + Math.sin(a) * r, Math.atan2(-Math.cos(a), -Math.sin(a))]; PARK.benches = [b(2.6, 3.5), b(-0.55, 3.5)]; PARK.blanket = [PARK.cx + Math.cos(0.75) * 3.6, PARK.cz + Math.sin(0.75) * 3.6]; }
 export const WALK_R = ISLAND_R - 1.4; // walkable lawn radius
-export const TREES = [[-15.6, -4.2, 1.5], [-15.1, 4.6, 1.3], [-11.4, -12.2, 1.4], [-2.4, -15.5, 1.1], [10.3, -12.7, 1.5], [15.4, -5.3, 1.3], [-13.9, 10.7, 1.2], [-11.0, 13.2, 0.9], [14.2, -9.1, 1.0],
+// ---- v23 executive wing: a second land lobe north-east of the office (merged into the main island) holding Sage's manager
+// office and Calvin's founder/CEO corner office on a shared wooden floor. Doors face south (+z) toward the office. ----
+export const LOBE = { cx: 12, cz: -19, r: 12 }; LOBE.walk = LOBE.r - 1.4;
+export const EXEC = { x0: 4.5, x1: 20.5, z0: -26.5, z1: -12.0, y: 0 }; // shared floor deck (v23b: reaches south to the corridor)
+// v23b glass corridor joining the office's back-right corner to the wing deck: west wall continues the office back wall line north,
+// open to the office floor on its west side (z -7.9..-4) and to the deck at its north end; the bot/Calvin path x≈12.2 runs through it
+export const CORR = { x0: 11.0, x1: 13.8, z0: -12.0, z1: -4.0, wN: -10.45 }; // west wall only z0..wN: the gap wN..BACK_Z is the doorway to the roof stairs
+export const ROOM_H = 3.4, ROOM_T = 0.1; // wall height (clears the tallest chibi), wall half-thickness for colliders
+export const SAGE_OFF = { x0: 4.5, x1: 10.5, z0: -26.5, z1: -21.4, door: [6.9, 9.3], name: 'Sage', title: 'Manager' };
+export const CEO_OFF = { x0: 11.6, x1: 20.5, z0: -26.5, z1: -20.0, door: [12.7, 15.3], name: 'Calvin', title: 'Founder & CEO' }; // ~1.9x Sage's floor area
+SAGE_OFF.desk = [8.1, -24.3]; SAGE_OFF.shelf = [5.1, -24.4]; SAGE_OFF.plant = [9.8, -25.7]; SAGE_OFF.guest = [6.1, -23.0]; SAGE_OFF.chess = [9.85, -22.2];
+CEO_OFF.desk = [17.6, -24.4]; CEO_OFF.sofa = [12.55, -24.0]; CEO_OFF.table = [14.0, -23.9]; CEO_OFF.shelf = [15.0, -26.05]; CEO_OFF.plants = [[19.9, -25.9], [11.95, -21.0]]; CEO_OFF.arm = [16.2, -21.4]; CEO_OFF.lamp = [12.15, -25.95];
+// colliders (player.js): body boxes/circles + head-high boxes (walls, shelves)
+// v23c exec terrace dressing on the deck (kept clear of door approaches, the deck runner z -17.9..-19.3 and the corridor -> Sage door diagonal)
+export const TERRACE = { planters: [[4.8, -21.3, 6.5, -20.8], [15.8, -19.95, 20.2, -19.45], [4.7, -19.6, 5.2, -13.4]],
+  loungers: [[17.4, -14.6], [19.4, -14.6]], table: [18.4, -15.1], parasol: [18.4, -13.3], pots: [[5.6, -12.7, 1.2], [9.9, -12.7, 1.0], [20.0, -12.7, 1.1]],
+  posts: [[10.6, -12.4], [14.2, -12.4], [5.3, -17.2], [20.0, -17.4]], wall: [[6.6, -21.32], [9.6, -21.32], [12.4, -19.92], [15.6, -19.92]],
+  stones: [[8.1, -19.75], [8.1, -20.45], [14.0, -19.6], [16.4, -17.4], [17.0, -16.6], [17.6, -15.9]] };
+export const EXEC_BOXES = [...TERRACE.planters, ...TERRACE.loungers.map(([x, z]) => [x - 0.38, z - 0.95, x + 0.38, z + 0.95]), [SAGE_OFF.desk[0] - 1.15, SAGE_OFF.desk[1] - 0.6, SAGE_OFF.desk[0] + 1.15, SAGE_OFF.desk[1] + 0.6], [CEO_OFF.desk[0] - 1.5, CEO_OFF.desk[1] - 0.68, CEO_OFF.desk[0] + 1.5, CEO_OFF.desk[1] + 0.68],
+  [CEO_OFF.sofa[0] - 0.47, CEO_OFF.sofa[1] - 1.3, CEO_OFF.sofa[0] + 0.45, CEO_OFF.sofa[1] + 1.3], [CEO_OFF.table[0] - 0.6, CEO_OFF.table[1] - 0.38, CEO_OFF.table[0] + 0.6, CEO_OFF.table[1] + 0.38]];
+export const EXEC_CIRCLES = [[...TERRACE.table, 0.32], [...TERRACE.parasol, 0.15], ...TERRACE.pots.map(([x, z]) => [x, z, 0.4]), ...TERRACE.posts.map(([x, z]) => [x, z, 0.15]), [...SAGE_OFF.guest, 0.42], [...SAGE_OFF.chess, 0.34], [...SAGE_OFF.plant, 0.4], [CEO_OFF.desk[0], CEO_OFF.desk[1] - 1.15, 0.45], [...CEO_OFF.arm, 0.5], ...CEO_OFF.plants.map(([x, z]) => [x, z, 0.4]), [...CEO_OFF.lamp, 0.26]];
+export const corrWalls = (t = ROOM_T) => [[CORR.x0 - t, CORR.z0, CORR.x0 + t, CORR.wN], [CORR.x1 - t, CORR.z0, CORR.x1 + t, CORR.z1 - 0.5]];
+export const EXEC_TALL = [...roomWalls(SAGE_OFF), ...roomWalls(CEO_OFF), ...corrWalls(), [SAGE_OFF.shelf[0] - 0.24, SAGE_OFF.shelf[1] - 0.8, SAGE_OFF.shelf[0] + 0.24, SAGE_OFF.shelf[1] + 0.8], [CEO_OFF.shelf[0] - 0.85, CEO_OFF.shelf[1] - 0.24, CEO_OFF.shelf[0] + 0.8, CEO_OFF.shelf[1] + 0.24]];
+export const onLobe = (x, z, m = 0) => Math.hypot(x - LOBE.cx, z - LOBE.cz) < LOBE.r + m;
+// rooms' walls as [x0,z0,x1,z1] boxes (door gap in the south wall)
+export function roomWalls(R, t = ROOM_T) { return [[R.x0, R.z0 - t, R.x1, R.z0 + t], [R.x0 - t, R.z0, R.x0 + t, R.z1], [R.x1 - t, R.z0, R.x1 + t, R.z1],
+  [R.x0, R.z1 - t, R.door[0], R.z1 + t], [R.door[1], R.z1 - t, R.x1, R.z1 + t]]; }
+// v23 trees 4 + 8 moved off the new path to the executive wing (were (10.3,-12.7) and (14.2,-9.1))
+export const TREES = [[-15.6, -4.2, 1.5], [-15.1, 4.6, 1.3], [-11.4, -12.2, 1.4], [-2.4, -15.5, 1.1], [1.6, -20.6, 1.4], [16.6, -6.0, 1.3], [-13.9, 10.7, 1.2], [-11.0, 13.2, 0.9], [21.6, -14.6, 1.0],
   [12.9, 3.6, 0.9], [14.0, 5.8, 1.0], [12.3, 7.4, 0.8], // park grove
   [9.6, 29.4, 0.85], [-4.6, 28.6, 0.8]]; // home island (last two)
 // ---- home island (+z), joined by a rope-and-plank bridge ----
@@ -98,8 +126,9 @@ export const onHome = (x, z, m = 0) => Math.hypot(x - HOME.cx, z - HOME.cz) < HO
 // walkable regions: main lawn circle OR bridge corridor OR home lawn circle; anything else snaps to the nearest one
 export function walkClamp(p, W) { const B = BRIDGE, hx = p.x - HOME.cx, hz = p.z - HOME.cz, r = Math.hypot(p.x, p.z), rh = Math.hypot(hx, hz);
   const B2 = BRIDGE2, sx = p.x - SHOP.cx, sz = p.z - SHOP.cz, rs = Math.hypot(sx, sz);
-  if (r <= W || rh <= HOME.walk || rs <= SHOP.walk || (Math.abs(p.x - B.x) <= B.walkHalf && p.z >= B.z0 && p.z <= B.z1) || (Math.abs(p.z - B2.z) <= B2.walkHalf && p.x >= B2.x0 && p.x <= B2.x1) || B2.mouths.some(([mx, mz, mr]) => Math.hypot(p.x - mx, p.z - mz) <= mr) || inCalWalk(p.x, p.z)) return p;
-  const c = [[SHOP.cx + sx * SHOP.walk / rs, SHOP.cz + sz * SHOP.walk / rs], [Math.max(B2.x0, Math.min(B2.x1, p.x)), Math.max(B2.z - B2.walkHalf, Math.min(B2.z + B2.walkHalf, p.z))], [p.x * W / r, p.z * W / r], [HOME.cx + hx * HOME.walk / rh, HOME.cz + hz * HOME.walk / rh], [Math.max(B.x - B.walkHalf, Math.min(B.x + B.walkHalf, p.x)), Math.max(B.z0, Math.min(B.z1, p.z))], ...calNearest(p.x, p.z)];
+  const lx = p.x - LOBE.cx, lz = p.z - LOBE.cz, rl = Math.hypot(lx, lz);
+  if (r <= W || rl <= LOBE.walk || rh <= HOME.walk || rs <= SHOP.walk || (Math.abs(p.x - B.x) <= B.walkHalf && p.z >= B.z0 && p.z <= B.z1) || (Math.abs(p.z - B2.z) <= B2.walkHalf && p.x >= B2.x0 && p.x <= B2.x1) || B2.mouths.some(([mx, mz, mr]) => Math.hypot(p.x - mx, p.z - mz) <= mr) || inCalWalk(p.x, p.z)) return p;
+  const c = [[LOBE.cx + lx * LOBE.walk / rl, LOBE.cz + lz * LOBE.walk / rl], [SHOP.cx + sx * SHOP.walk / rs, SHOP.cz + sz * SHOP.walk / rs], [Math.max(B2.x0, Math.min(B2.x1, p.x)), Math.max(B2.z - B2.walkHalf, Math.min(B2.z + B2.walkHalf, p.z))], [p.x * W / r, p.z * W / r], [HOME.cx + hx * HOME.walk / rh, HOME.cz + hz * HOME.walk / rh], [Math.max(B.x - B.walkHalf, Math.min(B.x + B.walkHalf, p.x)), Math.max(B.z0, Math.min(B.z1, p.z))], ...calNearest(p.x, p.z)];
   let best = c[0], bd = Infinity; for (const q of c) { const d = Math.hypot(q[0] - p.x, q[1] - p.z); if (d < bd) { bd = d; best = q; } } p.x = best[0]; p.z = best[1]; return p; }
 // bridge deck height: sags in the middle of the rope span
 export function bridgeY(z) { const B = BRIDGE, u = Math.max(0, Math.min(1, (z - B.s0) / (B.s1 - B.s0))); return 0.1 - 0.3 * Math.sin(Math.PI * u); }

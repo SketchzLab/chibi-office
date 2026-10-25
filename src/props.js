@@ -17,7 +17,7 @@ const B = (w, h, d) => new THREE.BoxGeometry(w, h, d);
 // soft rounded boxes for hero furniture (2 segments keeps triangles low)
 const RB = (w, h, d, r = 0.06, seg = 1) => new RoundedBoxGeometry(w, h, d, seg, Math.min(r, w / 2.1, h / 2.1, d / 2.1));
 export const glows = [];
-function desk() {
+export function desk() {
   const g = new THREE.Group();
   const top = toonMesh(RB(2.2, 0.1, 1.1, 0.04), 0xe9c38e); top.position.y = 0.9; g.add(top);
   [[-1, -0.45], [1, -0.45], [-1, 0.45], [1, 0.45]].forEach(([x, z]) => { const l = toonMesh(B(0.08, 0.9, 0.08), 0xf4f1ea, { outline: false }); l.position.set(x, 0.45, z); g.add(l); });
@@ -38,12 +38,12 @@ function desk() {
   const ch = new THREE.Group(); ch.position.set(0, 0, 1.2);
   const seat = toonMesh(RB(0.7, 0.14, 0.7, 0.06), 0x4fb3a9); seat.position.y = 0.55; ch.add(seat);
   const back = toonMesh(RB(0.7, 0.72, 0.12, 0.06), 0x4fb3a9); back.position.set(0, 0.95, 0.32); ch.add(back);
-  const pole = toonMesh(new THREE.CylinderGeometry(0.05, 0.05, 0.5), 0x333344, { outline: false }); pole.position.y = 0.27; ch.add(pole);
+  const pole = toonMesh(new THREE.CylinderGeometry(0.05, 0.05, 0.5, 6), 0x333344, { outline: false }); pole.position.y = 0.27; ch.add(pole);
   const base = toonMesh(new THREE.CylinderGeometry(0.35, 0.35, 0.05, 10), 0x333344, { outline: false }); base.position.y = 0.03; ch.add(base);
   g.add(ch);
   return g;
 }
-function plant(scale = 1) {
+export function plant(scale = 1) {
   const g = new THREE.Group();
   const pot = toonMesh(new THREE.CylinderGeometry(0.3, 0.22, 0.45, 10), 0xe8d6c0); pot.position.y = 0.22; g.add(pot);
   PLANT_SPHERES.forEach(([x, y, z, r]) => { const f = toonMesh(new THREE.IcosahedronGeometry(r, 1), 0x5fae5a); f.position.set(x, y, z); g.add(f); });
@@ -51,7 +51,7 @@ function plant(scale = 1) {
 }
 function lamp() {
   const g = new THREE.Group();
-  const pole = toonMesh(new THREE.CylinderGeometry(0.04, 0.04, 2.2), 0x3a3340, { outline: false }); pole.position.y = 1.1; g.add(pole);
+  const pole = toonMesh(new THREE.CylinderGeometry(0.04, 0.04, 2.2, 6), 0x3a3340, { outline: false }); pole.position.y = 1.1; g.add(pole);
   const base = toonMesh(new THREE.CylinderGeometry(0.25, 0.3, 0.08, 10), 0x3a3340); g.add(base);
   const shade = toonMesh(new THREE.ConeGeometry(0.4, 0.45, 12, 1, true), 0xffe2b0, { emissive: 0x553311 }); shade.position.y = 2.25; g.add(shade);
   const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.12, 8, 6), new THREE.MeshBasicMaterial({ color: 0xfff0c0 })); bulb.position.y = 2.1; g.add(bulb);
@@ -91,7 +91,7 @@ function shell(g) {
   const wb = toonMesh(B(2.2, 1.1, 0.05), 0xffffff); wb.position.set(2.9, 1.6, BACK_Z + 0.13); g.add(wb);
   [[2.3, 1.75, 0xff9b7a], [3.0, 1.5, 0x7ac8a0], [3.5, 1.8, 0x9aa8ff]].forEach(([x, y, c]) => { const n = toonMesh(B(0.3, 0.3, 0.02), c, { outline: false }); n.position.set(x, y, BACK_Z + 0.17); g.add(n); });
 }
-function bookshelf(w = 1.6, h = 2.0) {
+export function bookshelf(w = 1.6, h = 2.0) {
   const g = new THREE.Group(); const fr = toonMesh(RB(w, h, 0.45, 0.05), 0xc98d55); fr.position.y = h / 2; g.add(fr);
   const cols = [0xff8a7a, 0xffd36a, 0x7ac8a0, 0x9aa8ff, 0xf4f1ea, 0x4fb3a9];
   for (let r = 0; r < 4; r++) { let x = -w / 2 + 0.12; let k = r * 3;
@@ -134,7 +134,7 @@ function lounge(g) {
   sofa(3.2, cx, cz + 2.0, Math.PI); sofa(2.4, cx - 2.2, cz - 0.1, Math.PI / 2);
   cast(cx, cz + 2.0, 4.0, 1.8); cast(cx - 2.2, cz - 0.1, 1.8, 3.2); cast(cx + 0.1, cz - 0.1, 1.8, 1.8); cast(cx + 2.1, cz - 0.9, 1.6, 1.6);
   const ct = toonMesh(new THREE.CylinderGeometry(0.65, 0.65, 0.1, 18), 0xe9c38e); ct.position.set(cx + 0.1, 0.42, cz - 0.1); g.add(ct);
-  const cl = toonMesh(new THREE.CylinderGeometry(0.06, 0.06, 0.4), 0xf4f1ea, { outline: false }); cl.position.set(cx + 0.1, 0.2, cz - 0.1); g.add(cl);
+  const cl = toonMesh(new THREE.CylinderGeometry(0.06, 0.06, 0.4, 6), 0xf4f1ea, { outline: false }); cl.position.set(cx + 0.1, 0.2, cz - 0.1); g.add(cl);
   const book = toonMesh(B(0.3, 0.05, 0.22), 0xff8a7a, { outline: false }); book.position.set(cx + 0.2, 0.5, cz - 0.1); g.add(book);
   const ac = new THREE.Group(); ac.position.set(cx + 2.1, 0, cz - 0.9); ac.rotation.y = -1.1;
   const ab = toonMesh(RB(0.9, 0.45, 0.85, 0.12, 2), 0xf08a5a); ab.position.y = 0.25; ac.add(ab);

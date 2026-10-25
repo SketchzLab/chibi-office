@@ -3,17 +3,18 @@ import { dayUniforms } from './daycycle.js';
 import { toonMesh, toonMat } from './toon.js';
 import { bake } from './bake.js';
 import { cast } from './shadows.js';
-import { ISLAND_R as R, FLOOR, POOL as PL, BACK_Z, TREES, ROOF, STAIRS, BALCONY, PARK, inR, TREE_LIFT, TREE_SPHERES, treeRot } from './layout.js';
+import { ISLAND_R as R, FLOOR, POOL as PL, BACK_Z, TREES, ROOF, STAIRS, BALCONY, PARK, inR, TREE_LIFT, TREE_SPHERES, treeRot, LOBE, CORR, EXEC } from './layout.js';
+const inLobe = (x, z) => Math.hypot(x - LOBE.cx, z - LOBE.cz) < LOBE.r - 0.3; // v23: main-rim bushes/vines that would sit on the executive lobe lawn
 let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 const POOL = new THREE.Vector3(PL.x, 0, PL.z);
-function onGrassRing(x, z) { const r = Math.hypot(x, z); return r < R - 0.7 && (x < FLOOR.x0 - 0.3 || x > FLOOR.x1 + 0.3 || z < FLOOR.z0 - 0.3 || z > FLOOR.z1 + 0.3) && !inR(ROOF, x, z, 0.2) && !inR(STAIRS, x, z, 0.2) && !inR(BALCONY, x, z, 0.1) && Math.abs(Math.hypot(x - PARK.cx, z - PARK.cz) - PARK.r) > 0.5 && Math.hypot(x - PARK.cx, z - PARK.cz) > 1.3; }
+function onGrassRing(x, z) { const r = Math.hypot(x, z); return r < R - 0.7 && !inR(CORR, x, z, 0.2) && !inR(EXEC, x, z, 0.2) && (x < FLOOR.x0 - 0.3 || x > FLOOR.x1 + 0.3 || z < FLOOR.z0 - 0.3 || z > FLOOR.z1 + 0.3) && !inR(ROOF, x, z, 0.2) && !inR(STAIRS, x, z, 0.2) && !inR(BALCONY, x, z, 0.1) && Math.abs(Math.hypot(x - PARK.cx, z - PARK.cz) - PARK.r) > 0.5 && Math.hypot(x - PARK.cx, z - PARK.cz) > 1.3; }
 // canopy spheres [x, y, z, r] (scaled by s); lifted 0.35 so the lowest foliage sits higher. Shared with collision (canopyRadius).
 export function tree(s = 1, rot = null) {
   const g = new THREE.Group();
   const trunk = toonMesh(new THREE.CylinderGeometry(0.16, 0.24, 1.6 + TREE_LIFT, 6), 0x9a6a44); trunk.position.y = (1.6 + TREE_LIFT) / 2; g.add(trunk);
   const greens = [0x5fb550, 0x6cc45a, 0x4fa548];
   TREE_SPHERES.forEach(([x, y, z, r], i) => {
-    const m = toonMesh(new THREE.SphereGeometry(r, 8, 6), greens[i % 3]); m.position.set(x, y, z); g.add(m); });
+    const m = toonMesh(new THREE.SphereGeometry(r, 6, 5), greens[i % 3]); m.position.set(x, y, z); g.add(m); });
   g.scale.setScalar(s); const rr = rnd() * 6.28; g.rotation.y = rot ?? rr; return g;
 }
 export function makeNature(scene) {
@@ -51,7 +52,7 @@ export function makeNature(scene) {
   const fall = new THREE.Mesh(fallGeo, fallMat); fall.position.set(POOL.x, -10.0, Math.sqrt(R * R - PL.x * PL.x) - 0.1); g.add(fall);
   // mist puffs at the bottom
   const mistMat = toonMat(0xf4fbff); const mist = new THREE.Group(); mist.userData.dynamic = true; mist.position.set(POOL.x, -20.2, Math.sqrt(R * R - PL.x * PL.x) + 2.0);
-  for (let i = 0; i < 5; i++) { const m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.7 + rnd() * 0.6, 2), mistMat); m.position.set((rnd() - 0.5) * 2.5, rnd() * 0.6, (rnd() - 0.5) * 1.2); mist.add(m); }
+  for (let i = 0; i < 5; i++) { const m = new THREE.Mesh(new THREE.IcosahedronGeometry(0.7 + rnd() * 0.6, 1), mistMat); m.position.set((rnd() - 0.5) * 2.5, rnd() * 0.6, (rnd() - 0.5) * 1.2); mist.add(m); }
   g.add(mist);
   updates.push(t => { waterMat.uniforms.uT.value = t; fallMat.uniforms.uT.value = t; mist.children.forEach((m, i) => m.scale.setScalar(1 + Math.sin(t * 2 + i) * 0.08)); });
   // foam lip where the stream tips over the edge
@@ -80,20 +81,20 @@ export function makeNature(scene) {
   TREES.forEach(([x, z, s], i) => { const t = tree(s, treeRot(i)); t.position.set(x, 0, z); cast(x, z, 3.4 * s, 3.0 * s, 0, -0.03, 1.6); g.add(t); });
   // ---- grass detail (instanced, no outlines: cheap) ----
   const tuftGeo = new THREE.ConeGeometry(0.08, 0.38, 3, 1, true); tuftGeo.translate(0, 0.17, 0);
-  const NT = 950; const tufts = new THREE.InstancedMesh(tuftGeo, toonMat(0x63b852), NT); tufts.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(NT * 3).map((_, i) => 0.85 + ((i * 7919) % 100) / 100 * 0.3), 3);
+  const NT = 820; const tufts = new THREE.InstancedMesh(tuftGeo, toonMat(0x63b852), NT); tufts.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(NT * 3).map((_, i) => 0.85 + ((i * 7919) % 100) / 100 * 0.3), 3);
   let n = 0; while (n < NT) { const x = (rnd() - 0.5) * 2 * R, z = (rnd() - 0.5) * 2 * R; if (!onGrassRing(x, z) || Math.hypot((x - POOL.x) / (PL.rx + 0.6), (z - POOL.z) / (PL.rz + 0.6)) < 1 || (Math.abs(x - POOL.x) < 1 && z > POOL.z) || [[4.6, 11.0, 2.4, 1.5], [8.2, 10.0, 2.1, 1.4], [-8.6, 9.6, 1.8, 1.2]].some(([bx, bz, bw, bd]) => Math.hypot((x - bx) / bw, (z - bz) / bd) < 1)) continue;
     e.set((rnd() - 0.5) * 0.5, 0, (rnd() - 0.5) * 0.5); q.setFromEuler(e); M.compose(new THREE.Vector3(x, -0.05, z), q, new THREE.Vector3(1.3, 0.45 + rnd() * 0.5, 1.3)); tufts.setMatrixAt(n++, M); }
   g.add(tufts);
   const flowerGeo = new THREE.OctahedronGeometry(0.1, 0); const flowerCols = [0xffffff, 0xffd36a, 0xff9bb8, 0xb7a2ff];
-  flowerCols.forEach(col => { const f = new THREE.InstancedMesh(flowerGeo, toonMat(col), 90); let k = 0;
-    while (k < 90) { const x = (rnd() - 0.5) * 2 * R, z = (rnd() - 0.5) * 2 * R; if (!onGrassRing(x, z) || Math.hypot(x - POOL.x, z - POOL.z) < PL.rx + 0.8) continue; M.makeTranslation(x, 0.2, z); f.setMatrixAt(k++, M); } g.add(f); });
+  flowerCols.forEach(col => { const f = new THREE.InstancedMesh(flowerGeo, toonMat(col), 78); let k = 0;
+    while (k < 78) { const x = (rnd() - 0.5) * 2 * R, z = (rnd() - 0.5) * 2 * R; if (!onGrassRing(x, z) || Math.hypot(x - POOL.x, z - POOL.z) < PL.rx + 0.8) continue; M.makeTranslation(x, 0.2, z); f.setMatrixAt(k++, M); } g.add(f); });
   // bushes on the rim
   for (let i = 0; i < 26; i++) { const a = rnd() * 6.28, r = R - 1.0 + rnd() * 0.5; const x = Math.cos(a) * r, z = Math.sin(a) * r; if (Math.abs(x - POOL.x) < 2.2 && z > 0) continue; if (Math.abs(x - 2) < 2.4 && z > 12) continue; // bridge mouth
-    const b = toonMesh(new THREE.SphereGeometry(0.5 + rnd() * 0.4, 7, 5), rnd() > 0.5 ? 0x6cc45a : 0x57ad4b); b.position.set(x, 0.1, z); b.scale.y = 0.8; g.add(b); }
+    const br = 0.5 + rnd() * 0.4, bc = rnd() > 0.5 ? 0x6cc45a : 0x57ad4b; if (inLobe(x, z)) continue; const b = toonMesh(new THREE.SphereGeometry(br, 7, 5), bc); b.position.set(x, 0.1, z); b.scale.y = 0.8; g.add(b); }
   // hanging vines over the cliff edge
   const vineGeo = new THREE.BoxGeometry(0.22, 1, 0.05); vineGeo.translate(0, -0.5, 0);
   const vines = new THREE.InstancedMesh(vineGeo, toonMat(0x3f8f45), 72); for (let i = 0; i < 72; i++) { const a = i / 72 * 6.28 + rnd() * 0.06; const x = Math.cos(a) * (R - 0.32), z = Math.sin(a) * (R - 0.32); e.set(0, -a + Math.PI / 2, 0.08 * (rnd() - 0.5)); q.setFromEuler(e);
-    if (Math.abs(x - POOL.x) < 1.4 && z > 0) { M.makeScale(0, 0, 0); } else M.compose(new THREE.Vector3(x, -0.45, z), q, new THREE.Vector3(0.8 + rnd() * 0.6, 0.5 + rnd() * 1.4, 1)); vines.setMatrixAt(i, M); }
+    if ((Math.abs(x - POOL.x) < 1.4 && z > 0) || inLobe(x, z)) { M.makeScale(0, 0, 0); } else M.compose(new THREE.Vector3(x, -0.45, z), q, new THREE.Vector3(0.8 + rnd() * 0.6, 0.5 + rnd() * 1.4, 1)); vines.setMatrixAt(i, M); }
   g.add(vines);
   // (rooftop + stairs + balcony + park live in world.js)
   scene.add(g); bake(g);

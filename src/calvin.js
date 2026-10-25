@@ -179,6 +179,6 @@ export function makeCalvinIsland(scene, waterMat) {
   { const m = new THREE.MeshBasicMaterial({ map: tex }); const f = new THREE.Mesh(sg, m); f.position.set(0, 1.25, 0.04); const bk = new THREE.Mesh(sb, m); bk.position.set(0, 1.25, -0.04); sign.add(f, bk); } scene.add(sign);
   add(toonMesh(B3(0.1, 1.0, 0.1), 0x8a5a36), SIGN[0], 0.5, SIGN[1]);
   scene.add(g); bake(g);
-  return { group: g, swing, flames, halo, flies, panes, lanterns, water, rays,
+  return { group: g, swing, flames, fireLight, halo, flies, panes, lanterns, water, rays,
     update(t, aur = 0) { const day = Math.max(0, Math.min(1, (0.75 - dayUniforms.uNight.value) / 0.6)) * (1 - aur); rays.visible = day > 0.01; rays.material.opacity = day * (0.85 + 0.15 * Math.sin(t * 0.7)); flameMat.uniforms.uTime.value = t; fireLight.material.uniforms.uTime.value = t; halo.material.uniforms.uTime.value = t; } };
 }

@@ -25,7 +25,7 @@ export const PERSONAS = {
     schedule: [['work', 80], ['pantry', 25], ['work', 70], ['sketch', 30], ['work', 60], ['park', 40], ['shop', 55]], parkPose: 'sketch',
   },
   Sage: {
-    role: 'General Advisor', desk: 0, slot: 2,
+    role: 'General Advisor · Manager', desk: 'office', slot: 2, // v23: her own manager office in the executive wing
     look: { hair: 0xd9dde6, shirt: 0x8fbf9a, pants: 0xcdb89a, hairStyle: 'bun' },
     traits: ['Calm', 'Bookish', 'Big-picture thinker'],
     hobbies: ['Reading strategy books in the lounge', 'Chess puzzles', 'Long walks to think'],

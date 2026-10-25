@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { makeChibi } from './chibi.js';
 import { applyPose } from './behavior.js';
-import { CALVIN_S, DESKS, BOSS_DESK, GLASS, LOUNGE, PANTRY, BACK_Z, FLOOR, LEFT_X, ROOF, STAIRS, BALCONY, PARK, TREES, POOL, WALK_R, inR, heightAt, canopyRadius, headReach, HEAD_R, HEAD_M, PLANTS, PLANT_SPHERES, HOUSE, FIRE, GARDEN, BRIDGE, walkClamp, inBridge, onHome, inBridge2, onShop, SHOP_BLDG, SHOP_SIDE, STREET_TREE, shopBox, STREET_PROPS, SHOP, shopFront, CAL, CAL_TREE, CAL_SWING, CAL_FIRE, CAL_HOUSE, CAL_POOL, CAL_DECK, CAL_SIGN, CAL_LANTERNS, BRIDGE3, onCal, inBridge3, calPoolQ } from './layout.js';
+import { CALVIN_S, DESKS, BOSS_DESK, GLASS, LOUNGE, PANTRY, BACK_Z, FLOOR, LEFT_X, ROOF, STAIRS, BALCONY, PARK, TREES, POOL, WALK_R, inR, heightAt, canopyRadius, headReach, HEAD_R, HEAD_M, PLANTS, PLANT_SPHERES, HOUSE, FIRE, GARDEN, BRIDGE, walkClamp, inBridge, onHome, inBridge2, onShop, SHOP_BLDG, SHOP_SIDE, STREET_TREE, shopBox, STREET_PROPS, SHOP, shopFront, CAL, CAL_TREE, CAL_SWING, CAL_FIRE, CAL_HOUSE, CAL_POOL, CAL_DECK, CAL_SIGN, CAL_LANTERNS, BRIDGE3, onCal, inBridge3, calPoolQ, EXEC_BOXES, EXEC_CIRCLES, EXEC_TALL, onLobe, LOBE } from './layout.js';
 
 const R = 0.42; // body radius (legs/torso vs low furniture, railings)
 const RH = HEAD_R + HEAD_M; // head radius + margin vs anything head-high (walls, glass, panels, foliage)
@@ -36,13 +36,13 @@ export const CAL_TALL = [[CH.x0, CH.z0 - 0.08, CH.x1, CH.z0 + 0.08], [CH.x0 - 0.
 export const CAL_CIRCLES = [[CAL_TREE.x, CAL_TREE.z, 1.4], [CAL_FIRE.x, CAL_FIRE.z, 0.82], ...CAL_FIRE.logs.flatMap(L => [-0.55, 0, 0.55].map(k => [L.x + Math.cos(L.ry) * k, L.z - Math.sin(L.ry) * k, 0.34])),
   ...[...CAL_LANTERNS, [CHd[1] + 0.45, CH.z1 + 0.9], CAL_SIGN].map(([x, z]) => [x, z, 0.12]), [CAL_SWING.x, CAL_SWING.z, 0.4], [CAL_DECK.table.x, CAL_DECK.table.z, 0.34],
   ...[-1, 1].flatMap(sd => [BRIDGE3.s0 - 0.6, BRIDGE3.s1 + 0.6].map(x => [x, BRIDGE3.z + sd * BRIDGE3.half, 0.14])), [CH.x0 + 0.35, CH.z1 - 0.4, 0.3]];
-const BOXES = [...BOXES0, ...HOME_BOXES, ...SHOP_BOXES, ...CAL_BOXES], CIRCLES = [...CIRCLES0, ...HOME_CIRCLES, ...SHOP_CIRCLES, ...CAL_CIRCLES];
+const BOXES = [...BOXES0, ...HOME_BOXES, ...SHOP_BOXES, ...CAL_BOXES, ...EXEC_BOXES], CIRCLES = [...CIRCLES0, ...HOME_CIRCLES, ...SHOP_CIRCLES, ...CAL_CIRCLES, ...EXEC_CIRCLES];
 // ---- two-level collision: ground (office + lawn), stairs (ramp, side-clamped), rooftop ----
 const P = PARK;
 // head-high thin walls/panels: pushed with the HEAD radius so the big round head never pokes through
 const TALL_BOXES = [[FLOOR.x0, BACK_Z - 0.12, FLOOR.x1, BACK_Z + 0.1], [LEFT_X - 0.12, FLOOR.z0, LEFT_X + 0.12, FLOOR.z1], // back wall, left wall
   [GLASS.x0, GLASS.z1 - 0.06, GLASS.door0, GLASS.z1 + 0.06], [GLASS.x1 - 0.06, GLASS.z0, GLASS.x1 + 0.06, GLASS.z1 + 0.06], // glass room panes (door gap)
-  [ROOF.x0, ROOF.z0, ROOF.x1, ROOF.z1], ...HOUSE_TALL, ...SHOP_BLDG.map(b => shopBox(b, 0)), ...SHOP_SIDE, ...CAL_TALL]; // annex block walls (roof only reachable from above), home longhouse
+  [ROOF.x0, ROOF.z0, ROOF.x1, ROOF.z1], ...HOUSE_TALL, ...SHOP_BLDG.map(b => shopBox(b, 0)), ...SHOP_SIDE, ...CAL_TALL, ...EXEC_TALL]; // annex block walls (roof only reachable from above), home longhouse
 // trees: trunk is a body circle; foliage is a head circle sized from the real canopy spheres (3D head-vs-sphere clearance)
 const TALL_CIRCLES = [...TREES.map(([x, z, s], i) => [x, z, canopyRadius(s) - RH + (i === 0 ? 0.07 : 0)]), // tree 0 sits by the island-3 bridge landing: a hair more margin
   ...PLANTS.map(([x, z, s]) => [x, z, headReach(PLANT_SPHERES, s) - RH]), ...HOME_CIRCLES.filter(c => c[2] === 0.1).map(([x, z]) => [x, z, 0.16]), ...STREET_PROPS.filter(p => p[3] === 'tree').map(([x, z]) => [x, z, STREET_TREE.canopyR + HEAD_R + 0.05 - RH]), ...STREET_PROPS.filter(p => p[3] === 'lamp').map(([x, z]) => [x, z, 0.1])]; // + lamp posts (head vs pole) // + street-tree canopies (3D: canopy above the head line) // + lantern posts // pushOut adds RH back
@@ -61,7 +61,7 @@ function pushOut(p, boxes, circles) {
   for (const [x, z, r] of circles) { const dx = p.x - x, dz = p.z - z, d = Math.hypot(dx, dz), m = r + RR; if (d < m && d > 1e-4) { p.x = x + dx / d * m; p.z = z + dz / d * m; } } }
 // p = proposed {x,z}; from = current position (decides which level we're on)
 // rim trees: when the island edge and a canopy circle squeeze him, slide along the rim to where the circle meets it
-function rimSlide(p) { const W = WALK_R, r = Math.hypot(p.x, p.z); if (r < W - 0.02 || inR(BALCONY, p.x, p.z, -0.05) || inBridge(p.x, p.z, 0.2) || onHome(p.x, p.z, 1) || inBridge2(p.x, p.z, 0.2) || onShop(p.x, p.z, 1) || inBridge3(p.x, p.z, 0.2) || onCal(p.x, p.z, 1)) return;
+function rimSlide(p) { const W = WALK_R, r = Math.hypot(p.x, p.z); if (r < W - 0.02 || inR(BALCONY, p.x, p.z, -0.05) || inBridge(p.x, p.z, 0.2) || onHome(p.x, p.z, 1) || inBridge2(p.x, p.z, 0.2) || onShop(p.x, p.z, 1) || inBridge3(p.x, p.z, 0.2) || onCal(p.x, p.z, 1) || Math.hypot(p.x - LOBE.cx, p.z - LOBE.cz) < LOBE.walk + 0.3) return;
   for (const [cx, cz, cr] of TALL_CIRCLES) { const m = cr + RH, d = Math.hypot(p.x - cx, p.z - cz); if (d >= m) continue; const C = Math.hypot(cx, cz), ca = (W * W + C * C - m * m) / (2 * W * C);
     if (Math.abs(ca) >= 1) continue; const al = Math.acos(ca), th = Math.atan2(p.z, p.x), tc = Math.atan2(cz, cx), wr = a => Math.atan2(Math.sin(a), Math.cos(a));
     const t = Math.abs(wr(tc + al - th)) < Math.abs(wr(tc - al - th)) ? tc + al : tc - al; const q = 1 - 0.005; p.x = Math.cos(t) * W * q; p.z = Math.sin(t) * W * q; } }

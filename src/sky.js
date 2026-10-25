@@ -48,7 +48,7 @@ export function makeSky(scene) {
         float b2 = smoothstep(0.0, 0.015, y - base - 0.13) * exp(-max(y - base - 0.13, 0.0)*6.0) * wA * 0.35 * (0.5+0.5*sin(az*24.0 + uTime*0.3)); // faint second band
         c += (col*a2*0.9 + vec3(0.4,0.95,0.7)*b2*0.6)*uAurora; c += vec3(0.05,0.18,0.12)*wA*smoothstep(0.35, 0.0, y)*smoothstep(-0.02, 0.05, y)*uAurora; }
       gl_FragColor=vec4(c,1.0);} `});
-  const dome = new THREE.Mesh(new THREE.SphereGeometry(400, 32, 16), mat); dome.renderOrder = -1; scene.add(dome);
+  const dome = new THREE.Mesh(new THREE.SphereGeometry(400, 20, 10), mat); dome.renderOrder = -1; scene.add(dome);
   // puffy 3D clouds: clusters of soft-toon spheres, no outline
   const cloudMat = toonMat(0xffffff); const sph = new THREE.SphereGeometry(1, 10, 7);
   const clouds = new THREE.Group(); let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
@@ -74,10 +74,10 @@ export function makeSky(scene) {
   }
   scene.add(isl); bake(isl); clouds.children.forEach(c => bake(c));
   // depth layers: far horizon cloud bank + soft cloud sea far below the island (each baked to 1 fill + 1 outline-free batch)
-  const bank = new THREE.Group(), sea = new THREE.Group(); const bankMat = toonMat(0xf3f8ff);
-  for (let i = 0; i < 46; i++) { const a = i / 46 * 6.28 + rnd() * 0.1, r = 230 + rnd() * 30; const m = new THREE.Mesh(sph, bankMat); const s = 12 + rnd() * 12;
+  const bank = new THREE.Group(), sea = new THREE.Group(); const bankMat = toonMat(0xf3f8ff); const sphLo = new THREE.SphereGeometry(1, 8, 4); // v23 perf: flat, far blobs need few segments
+  for (let i = 0; i < 46; i++) { const a = i / 46 * 6.28 + rnd() * 0.1, r = 230 + rnd() * 30; const m = new THREE.Mesh(sphLo, bankMat); const s = 12 + rnd() * 12;
     m.scale.set(s * 1.7, s * 0.4, s); m.position.set(Math.cos(a) * r, -34 + rnd() * 10, Math.sin(a) * r); bank.add(m); }
-  for (let i = 0; i < 34; i++) { const a = rnd() * 6.28, r = 70 + rnd() * 150; const m = new THREE.Mesh(sph, bankMat); const s = 8 + rnd() * 10;
+  for (let i = 0; i < 34; i++) { const a = rnd() * 6.28, r = 70 + rnd() * 150; const m = new THREE.Mesh(sphLo, bankMat); const s = 8 + rnd() * 10;
     m.scale.set(s * 1.5, s * 0.4, s * 1.2); m.position.set(Math.cos(a) * r, -95 - rnd() * 14, Math.sin(a) * r); sea.add(m); }
   scene.add(bank, sea); bake(bank); bake(sea);
   return { clouds, mat };

@@ -8,6 +8,7 @@ import { chatLink } from './agents.js';
 import { PERSONAS } from './personas.js';
 import { makeBrain, actEmoji, applyPose, seatPlaces, setDayClock, breath } from './behavior.js';
 import { buildShadows, chibiShadow } from './shadows.js';
+import { makeExec } from './exec.js';
 import { makeIsland } from './island.js';
 import { makeNature } from './nature.js';
 import { makeOffice, glows } from './props.js';
@@ -17,12 +18,17 @@ import { makeHome } from './home.js';
 import { makeShops } from './shops.js';
 import { makeNPCs } from './npcs.js';
 import { makeClosets } from './wardrobe.js';
-import { makeChibi, calvinCloset } from './chibi.js';
+import { makeChibi, calvinCloset, ootdDay } from './chibi.js';
+import { makeWeather } from './weather.js';
+import { weatherAt } from './weatherplan.js';
+import { toonMesh } from './toon.js';
+import { FLOOR, HOUSE, SAGE_OFF, CORR, inR } from './layout.js';
 import { makeCalvinIsland } from './calvin.js';
 import { skyEvents, AURORA } from './skyevents.js';
 import { SWING_W, SLEEP_Y } from './behavior.js';
 import { makePlayer } from './player.js';
 import { pickTier, makeAtmosphere, lightPools, steam, radial } from './fx.js';
+import { CEO_OFF } from './layout.js';
 import { DESKS, BOSS_DESK, BOT_S, CALVIN_S, LOUNGE, GLASS, PANTRY, ROOF, BALCONY, PARK, heightAt, CAL, CAL_SWING, CAL_FIRE, CAL_HOUSE, CAL_POOL, CAL_DECK, onCal } from './layout.js';
 import { makeDayClock, makeDayCycle, fireflies, glowPoints, dayUniforms } from './daycycle.js';
 import { speechAt, GREET, HI_BACK, ZONE } from './dialogue.js';
@@ -51,7 +57,7 @@ controls.minDistance = tgtP ? 3 : 12; controls.maxDistance = 110; controls.minPo
 const sky = makeSky(scene);
 const island = makeIsland(scene);
 const nature = makeNature(scene);
-makeOffice(scene); makeWorld(scene, nature.waterMat); const home = makeHome(scene); window.__home = home; const calIsl = makeCalvinIsland(scene, nature.waterMat); window.__calIsl = calIsl; window.__shops = makeShops(scene); const npcs = makeNPCs(scene, window.__shops.userData.keepers); window.__npcs = npcs; window.__closets = makeClosets(scene);
+makeOffice(scene); window.__exec = makeExec(scene); makeWorld(scene, nature.waterMat); const home = makeHome(scene); window.__home = home; const calIsl = makeCalvinIsland(scene, nature.waterMat); window.__calIsl = calIsl; window.__shops = makeShops(scene); const npcs = makeNPCs(scene, window.__shops.userData.keepers); window.__npcs = npcs; window.__closets = makeClosets(scene);
 // ---- Bots: look + persona + clock-driven brain ----
 const chibis = [], brains = [];
 for (const [name, per] of Object.entries(PERSONAS)) {
@@ -68,6 +74,24 @@ const steamFx = tier === 'low' ? null : steam(scene, [...DESKS, BOSS_DESK].map((
 const pools = lightPools(scene, [[-3.9, 7.3, 2.6, 0xffc070, 0.55], [9.6, 3.2, 2.6, 0xffc070, 0.55], [-7.8, 4.6, 3.4, 0xffb060, 0.28], [8.2, -5.2, 3.0, 0xffd090, 0.3], [5.2, 2.0, 2.2, 0xffc890, 0.3], [-7.9, -5.1, 3.0, 0xfff0c0, 0.22]]);
 // ---- day / night (Calvin's local UTC+8 clock; ?t=HH:MM preview) ----
 const dayClock = makeDayClock(); setDayClock(wt => ((dayClock() + wt - wallTime()) % 86400 + 86400) % 86400); setTalkClock(() => dayClock() / 3600); const day = makeDayCycle({ skyMat: sky.mat, atmoEl: atmo, raysEl: atmos.rays });
+// ---- v23 weather (deterministic per day, ?weather= preview): rain/overcast/fog/storm visuals + umbrellas, feed line, campfires out
+const weather = makeWeather(scene, { tier, roofGeo: window.__exec.userData.roofGeo, rays: atmos.rays }); let wxNow = { cloud: 0, rain: 0, storm: 0, fog: 0, kind: 'clear', wet: false };
+window.__lightning = hold => { if (hold != null) weather.state.hold = hold; else weather.state.force = clock.getElapsedTime(); }; // screenshot hook: __lightning(0.8) holds a flash
+window.__weather = () => ({ ...wxNow, flash: weather.state.flash, rainVisible: weather.rain.visible, drops: weather.rain.geometry.drawRange.count / 2, count: weather.count });
+const UMB_C = [0xe07a6a, 0x6aa7d8, 0xe8c25a, 0x8fbf9a, 0xb39ad8]; const umbrellas = new Map();
+function umbrella(i) { const u = new THREE.Group(); const can = toonMesh(new THREE.ConeGeometry(0.85, 0.36, 8, 1, true), UMB_C[i % UMB_C.length]); can.material.side = THREE.DoubleSide; can.position.y = 0.6; u.add(can);
+  const st = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.3, 5), new THREE.MeshBasicMaterial({ color: 0x3a3340 })); u.add(st); u.visible = false; u.userData.dynamic = true; scene.add(u); return u; }
+const indoors = (x, z) => inR(FLOOR, x, z) || inR(CORR, x, z) || inR(SAGE_OFF, x, z) || inR(CEO_OFF, x, z) || inR(HOUSE, x, z) || (Math.abs(x - CAL_HOUSE.cx) < CAL_HOUSE.w / 2 && Math.abs(z - CAL_HOUSE.cz) < CAL_HOUSE.d / 2);
+let wxWet = false, wxSay = 0;
+function weatherUpdate(t, wt) { const ws = DAY(); wxNow = weatherAt(ws, ootdDay()); weather.update(t, wxNow, { center: controls.target, skyMat: sky.mat, cam: camera.position });
+  const out = wxNow.rain < 0.3; home.flames.visible = out; calIsl.flames.visible = out; if (calIsl.fireLight) calIsl.fireLight.visible = out;
+  // umbrellas over anyone (bots + Calvin) walking or waiting outdoors in the rain
+  [calvin, ...chibis].forEach((c, i) => { let u = umbrellas.get(c); const want = wxNow.rain > 0.25 && !c.userData.brain?.state.asleep && !indoors(c.position.x, c.position.z) && !c.userData.pet;
+    if (!u && !want) return; if (!u) { u = umbrella(i); umbrellas.set(c, u); } u.visible = want; if (want) { const s = c === calvin ? CALVIN_S : BOT_S; u.position.set(c.position.x + 0.15, c.position.y + 2.55 * s / 1.5 + 0.85, c.position.z); u.rotation.z = -0.12; } });
+  // rain starts: a heads-up in the office feed + someone says it out loud
+  if (wxNow.wet && !wxWet) { const k = 'rain-' + ootdDay() + '-' + Math.round(wxNow.start || 0); if (wxNow.since < 300 || t < 3) { post(k, 'Mika', wxNow.storm > 0.5 ? 'Thunderstorm rolling in ⛈️ Everyone inside!' : 'Looks like rain, everyone inside! ☔', 25);
+      if (t > wxSay) { wxSay = t + 60; const c = chibis.find(c => !c.userData.brain.state.asleep); if (c) { say(c.userData.name, wxNow.storm > 0.5 ? 'Whoa, thunder! ⛈️ Inside, everyone!' : 'Looks like rain, everyone inside! ☔', wt, 5); emoteBot(c.userData.name, 'look', 2); } } } }
+  wxWet = wxNow.wet; }
 const flies = [fireflies(scene, { cx: PARK.cx, cz: PARK.cz, r: PARK.r + 0.6, n: 34, seed: 11 }), home.flies, calIsl.flies];
 const lampGlow = glowPoints(scene, [[-3.9, 2.1, 7.3, 1.6], [9.6, 2.1, 3.2, 1.6]], { size: 70, color: 0xffc070 });
 window.__day = () => ({ ...day.state, sec: dayClock() });
@@ -204,6 +228,9 @@ const RAIL_LEAN = 0.5; // stand this far from the balcony top rail so forearms r
 const seat = (kind, pos, rot, y, pose, label, extra = {}) => ({ label, seatDef: { kind, pos, rot }, x: pos[0], z: pos[1], y: extra.y0 || 0, r: 1.4, run: () => { player.sitAt({ kind, pos, rot, y, pose, ...extra }); closeTalk(); onSit(kind); } });
 const OBJS = [
   seat('desk', [BOSS_DESK[0], BOSS_DESK[1] - 1.0], 0, 0.07 + HIPC, 'type', '💼 Sit & work', { camDist: 8.5, camYaw: Math.PI - 0.7, onStand: () => { bossGlow.visible = false; } }),
+  // v23 founder/CEO office: executive chair (reached from beside the big desk, hence the wider prompt radius) + office sofa
+  { ...seat('ceo', [CEO_OFF.desk[0], CEO_OFF.desk[1] - 1.12], 0, 0.1 + HIPC, 'type', '💼 Sit in the CEO chair', { camDist: 8.5, camYaw: Math.PI - 0.6 }), r: 2.3 },
+  seat('ceosofa', [CEO_OFF.sofa[0] + 0.22, CEO_OFF.sofa[1] + 0.5], Math.PI / 2, -0.06 + HIPC, 'stand', '🛋️ Relax on the office sofa', { camDist: 9, camYaw: 0.6 }),
   seat('sofa', [LX - 1.95, LZ + 0.5], Math.PI / 2, -0.06 + HIPC, 'stand', '🛋️ Sit on sofa', { camDist: 11, camYaw: 0.55 }),
   seat('sofa', [LX + 2.1, LZ - 0.9], -1.1, /* armchair group ry (back at local -z) -> sit facing its front */ -0.04 + HIPC, 'stand', '🪑 Sit in armchair', { camDist: 11, camYaw: 0.5 }),
   seat('meeting', [(GLASS.x0 + GLASS.x1) / 2 - 1.95 /* head clears the left wall */, (GLASS.z0 + GLASS.z1) / 2], Math.PI / 2, -0.05 + HIPC, 'stand', '🪑 Sit at meeting table', { camDist: 10, camYaw: -0.6 }),
@@ -392,7 +419,7 @@ const sparkles = new THREE.Points(spkGeo, new THREE.ShaderMaterial({ transparent
 sparkles.frustumCulled = false; sparkles.visible = false; sparkles.renderOrder = 4; scene.add(sparkles);
 let skyNow = { rainbow: 0, aurora: 0 }, rbReact = 0, aurSay = 0, sageNote = 0;
 window.__sky = () => ({ ...skyNow, sec: DAY() });
-function skyUpdate(t, wt) { const ev = skyEvents(DAY()); skyNow = ev; const U = sky.mat.uniforms; U.uRainbow.value = ev.rainbow; U.uAurora.value = ev.aurora;
+function skyUpdate(t, wt) { const ev = skyEvents(DAY()); skyNow = ev; const U = sky.mat.uniforms; U.uRainbow.value = ev.rainbow * (1 - wxNow.rain); U.uAurora.value = ev.aurora * (1 - 0.9 * wxNow.cloud);
   if (ev.headsUp) { post('aurora-' + ev.auroraDay, 'Sage', AUR_POST); if (t > sageNote && t > 2 && !ev.gather && ev.aurora < 0.05) { /* daytime heads-up only; during the viewing the bots use AUR_LINES */ sageNote = t + 150; const sg = botBy('Sage'); if (sg && !sg.userData.brain.state.asleep) { say('Sage', 'Heads-up: aurora tonight ~21:00. Viewing on the balcony deck! 🌌', wt, 12); emoteBot('Sage', 'wave', 2); } } }
   else if (ev.rainbow > 0.3) post('rainbow', 'Pixel', 'RAINBOW over the western sea right now!! 🌈 Go look!', 20);
   else if (feedKey && feedHide && performance.now() > feedHide) feed.classList.remove('on');
@@ -419,7 +446,7 @@ function loop() { const t = clock.getElapsedTime(); toonUniforms.uTime.value = t
     home.covers[n].visible = !!bs.asleep; if (bs.asleep) home.covers[n].scale.y = 1 + (breath(c, t) * 0.5 + 0.5) * 0.07; });
   flies.forEach(f => { f.visible = ds.fireflies > 0.01; f.material.uniforms.uA.value = ds.fireflies; f.material.uniforms.uTime.value = t; });
   frames++; const now=performance.now(); if(now-last>1000){window.__info=renderer.info.render; window.__fps=frames*1000/(now-last); autoTier(window.__fps, t); fpsEl.textContent=window.__fps.toFixed(0)+' fps'; frames=0; last=now;}
-  calvinUpdate(t, wt, dt); skyUpdate(t, wt); player.update(dt, t); petsys.update(dt, t, wt); npcs.update(dt, t, dayClock() / 3600, camera); interact(wt, t, dt);
+  weatherUpdate(t, wt); calvinUpdate(t, wt, dt); skyUpdate(t, wt); player.update(dt, t); petsys.update(dt, t, wt); npcs.update(dt, t, dayClock() / 3600, camera); interact(wt, t, dt);
   const sp = speechAt(wt, talkers);
   talkersAll.forEach((c, i) => { const nm = c.userData.name, bs = c.userData.brain?.state; const loc = localSay[nm]; let text = loc && loc.until > wt ? loc.text : (sp && sp.name === nm ? sp.text : '');
     drawBubble(bubbles[i], bs ? (bs.walking ? '🚶' : actEmoji(bs.act)) : '', text); const bb = bubbles[i]; bb.sp.visible = bb.big || !!bs;
@@ -429,7 +456,7 @@ function loop() { const t = clock.getElapsedTime(); toonUniforms.uTime.value = t
   if (selected) { const bs = selected.userData.brain.state; card.querySelector('.t').textContent = bs.label + (bs.override ? ' (live)' : ''); card.querySelector('.wt').textContent = selected.userData.task || '—'; card.classList.toggle('live', !!selected.userData.live); ring.position.set(selected.position.x, 0.04, selected.position.z); }
   sky.clouds.children.forEach(c => { c.position.y += Math.sin(t * 0.3 + c.userData.drift * 6) * 0.004; });
   nature.update(t);
-  { const d = camera.position.distanceTo(controls.target); toonUniforms.uFogRange.value.set(d + 15, d + 170);
+  { const d = camera.position.distanceTo(controls.target); toonUniforms.uFogRange.value.set(...weather.fog(d));
     // v22 far LOD (free camera only): past 60 u the chibi outline hulls are ~1 px, so skip them (-60 draws, -45k tris at a wide zoom-out)
     const far = player.free && d > 60; if (far !== farLod) { farLod = far; scene.traverse(o => { if (o.isMesh && o.userData.hull && o.material?.type === 'MeshBasicMaterial') o.visible = !far; }); } }
   { const want = OCC_MODE === '0' ? 0 : (OCC_MODE === '1' || (player.follow && !player.look && !player.free)) ? 1 : 0; // v22: off in free camera // v17 see-through: buildings/props between camera and Calvin dither to ~25%

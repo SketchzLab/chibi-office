@@ -40,7 +40,7 @@ export function makeWorld(scene, waterMat) {
   for (let i = 0; i < 9; i++) { const v = toonMesh(new THREE.IcosahedronGeometry(0.22, 0), i % 2 ? 0x6cc45a : 0x57ad4b, { outline: false }); v.position.set(px - 1.3 + i * 0.33, Y + PG_H + 0.24, pz + (i % 3 - 1) * 0.5); g.add(v); }
   bench(g, px, Y, pz - 0.35, 0); [[-0.5, 0xff9b7a], [0.5, 0xfff1d8]].forEach(([dx, c]) => { const cu = toonMesh(RB(0.45, 0.4, 0.14, 0.07), c); cu.position.set(px + dx, Y + 0.75, pz - 0.55); cu.rotation.x = 0.2; g.add(cu); });
   // parasol table + stools
-  const tx = 0.2, tz = -10.0; const pole = toonMesh(new THREE.CylinderGeometry(0.04, 0.04, PS_H), 0xf4f1ea, { outline: false }); pole.position.set(tx, Y + PS_H / 2, tz); g.add(pole);
+  const tx = 0.2, tz = -10.0; const pole = toonMesh(new THREE.CylinderGeometry(0.04, 0.04, PS_H, 6), 0xf4f1ea, { outline: false }); pole.position.set(tx, Y + PS_H / 2, tz); g.add(pole);
   const can = toonMesh(new THREE.ConeGeometry(1.4, 0.55, 12, 1, true), 0xff8a7a); can.position.set(tx, Y + PS_H - 0.05, tz); g.add(can);
   const can2 = toonMesh(new THREE.ConeGeometry(1.41, 0.55, 12, 1, true, 0, Math.PI / 6), 0xfff1d8, { outline: false }); for (let k = 0; k < 6; k++) { const c2 = can2.clone(); c2.rotation.y = k * Math.PI / 3; c2.position.set(tx, Y + PS_H - 0.049, tz); g.add(c2); }
   const top = toonMesh(new THREE.CylinderGeometry(0.6, 0.6, 0.06, 16), WOOD); top.position.set(tx, Y + 0.75, tz); g.add(top);
@@ -52,9 +52,9 @@ export function makeWorld(scene, waterMat) {
     const b = toonMesh(new THREE.SphereGeometry(0.42, 8, 6), 0x6cc45a); b.position.set(x, Y + 0.6, z); g.add(b); [0xff9bb8, 0xffd36a].forEach((c, i) => { const f = toonMesh(new THREE.SphereGeometry(0.1, 6, 4), c, { outline: false }); f.position.set(x - 0.2 + i * 0.4, Y + 0.85, z + 0.1); g.add(f); }); });
   const rt = tree(0.7, 0); rt.position.set(-5.3, Y, -9.7); g.add(rt);
   const tel = new THREE.Group(); tel.position.set(2.6, Y, -11.0);
-  [0, 2.1, 4.2].forEach(a => { const l = toonMesh(new THREE.CylinderGeometry(0.03, 0.03, 1.3), 0x8b5a3c, { outline: false }); l.position.set(Math.cos(a) * 0.25, 0.6, Math.sin(a) * 0.25); l.rotation.set(Math.sin(a) * 0.4, 0, -Math.cos(a) * 0.4); tel.add(l); });
+  [0, 2.1, 4.2].forEach(a => { const l = toonMesh(new THREE.CylinderGeometry(0.03, 0.03, 1.3, 6), 0x8b5a3c, { outline: false }); l.position.set(Math.cos(a) * 0.25, 0.6, Math.sin(a) * 0.25); l.rotation.set(Math.sin(a) * 0.4, 0, -Math.cos(a) * 0.4); tel.add(l); });
   const tube = toonMesh(new THREE.CylinderGeometry(0.1, 0.15, 1.2, 12), 0xd9b35a); tube.rotation.x = -1.1; tube.position.set(0, 1.4, -0.15); tel.add(tube); g.add(tel);
-  const fp = toonMesh(new THREE.CylinderGeometry(0.03, 0.03, 1.8), 0x8b5a3c, { outline: false }); fp.position.set(4.4, Y + 0.9, -8.5); g.add(fp);
+  const fp = toonMesh(new THREE.CylinderGeometry(0.03, 0.03, 1.8, 6), 0x8b5a3c, { outline: false }); fp.position.set(4.4, Y + 0.9, -8.5); g.add(fp);
   // ---- staircase (12 solid steps) + side rails ----
   const N = 12, run = (STAIRS.x1 - STAIRS.x0) / N, sz = (STAIRS.z0 + STAIRS.z1) / 2, sw = STAIRS.z1 - STAIRS.z0;
   for (let i = 0; i < N; i++) { const h = Y * (i + 1) / N, x = STAIRS.x1 - (i + 0.5) * run; const st = toonMesh(B(run + 0.02, h, sw), i % 2 ? 0xd9a46a : 0xe2b07a); st.position.set(x, h / 2, sz); g.add(st);

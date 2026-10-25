@@ -1,16 +1,22 @@
 import * as THREE from 'three';
-import { DESKS, PANTRY, LOUNGE, GLASS, ROOF, STAIRS, BALCONY, PARK, HOUSE, FIRE, GARDEN, heightAt } from './layout.js';
+import { DESKS, PANTRY, LOUNGE, GLASS, ROOF, STAIRS, BALCONY, PARK, HOUSE, FIRE, GARDEN, heightAt, SAGE_OFF } from './layout.js';
 // ---------- Places ----------
 // Each place: pos [x,z], rot (facing), seat (root y when seated, null = standing), approach: waypoints from the main aisle (z≈0).
 import { BOT_S, SHOP_BLDG, SHOP_X, STREET, STREET_PROPS, TERRACE_Z, AWN, shopFront } from './layout.js';
 import { shopsOn, ootdDay } from './chibi.js';
 import { CAL, CAL_SWING, CAL_FIRE, CAL_DECK, CAL_POOL } from './layout.js';
 import { isAuroraDay, AURORA } from './skyevents.js';
+import { weatherAt } from './weatherplan.js';
 // seat root heights scale with chibi size (hip ~0.37 local units)
 const HIP = 0.37 * (1.5 - BOT_S); export const SEAT_CHAIR = 0.07 + HIP, SEAT_SOFA = -0.06 + HIP, SEAT_STOOL = -0.05 + HIP;
-export function deskPlace(i) { const [x, z] = DESKS[i]; const back = z < 0, sz = back ? z + 1.0 : z - 1.0, side = back ? 0.95 : -0.95, az = back ? -0.25 : 0.25;
+// v23 Sage's manager office (desk: 'office'): leave the office on the open east side, up the lawn to the executive wing, through
+// her door and round the west end of her desk to the chair behind it (faces the door, +z)
+const S_OFF = SAGE_OFF, sdx = (S_OFF.door[0] + S_OFF.door[1]) / 2, [sDx, sDz] = S_OFF.desk;
+export const TO_SAGE_OFF = [[9.2, -0.25], [12.2, -0.25], [12.2, -9.3], [12.3, -15.2], [sdx, -19.4], [sdx, S_OFF.z1 - 0.9], [S_OFF.x0 + 1.45, S_OFF.z1 - 1.3], [S_OFF.x0 + 1.45, sDz - 1.0]];
+function sageDesk() { return { pos: [sDx, sDz - 1.0], rot: 0, seat: SEAT_CHAIR, approach: [...TO_SAGE_OFF, [sDx, sDz - 1.0]] }; }
+export function deskPlace(i) { if (i === 'office') return sageDesk(); const [x, z] = DESKS[i]; const back = z < 0, sz = back ? z + 1.0 : z - 1.0, side = back ? 0.95 : -0.95, az = back ? -0.25 : 0.25;
   return { pos: [x, sz], rot: back ? Math.PI : 0, seat: SEAT_CHAIR, approach: [[x + side, az], [x + side, sz], [x, sz]] }; }
-export function deskAisle(i) { const [x, z] = DESKS[i]; const back = z < 0, side = back ? 0.95 : -0.95, az = back ? -0.25 : 0.25;
+export function deskAisle(i) { if (i === 'office') return { pos: [S_OFF.x0 + 1.45, sDz - 0.2], rot: Math.PI / 2, seat: null, approach: [...TO_SAGE_OFF.slice(0, -1), [S_OFF.x0 + 1.45, sDz - 0.2]] }; const [x, z] = DESKS[i]; const back = z < 0, side = back ? 0.95 : -0.95, az = back ? -0.25 : 0.25;
   return { pos: [x + side, back ? -0.7 : 0.7], rot: back ? Math.PI : 0, seat: null, approach: [[x + side, az], [x + side, back ? -0.7 : 0.7]] }; }
 function pantryPlace(slot) { const dx = Math.sin(PANTRY.ry), dz = Math.cos(PANTRY.ry), lx = Math.cos(PANTRY.ry), lz = -Math.sin(PANTRY.ry); const o = [-1.2, -0.4, 0.4, 1.2][slot];
   const p = [PANTRY.x + dx * 1.55 + lx * o, PANTRY.z + dz * 1.55 + lz * o];
@@ -40,7 +46,7 @@ function parkPlace(i) { const [x, z, r, kind] = parkSpots()[i % 4]; const fx = x
 function viewPlace(i) { const x = [BALCONY.x1 - 0.6, BALCONY.x1 - 2.3][i % 2], z = BALCONY.z0 + 0.5; return { pos: [x, z], rot: Math.PI, seat: null, pose: 'lean', approach: [[9.2, 0.25], [12.2, 0.25], [BALCONY.x0 + 0.4, 0.2], [x, 0.2], [x, z]] }; } // v18: lean on the north rail (open sea), not the east one (shop street)
 // every seated spot a bot can use (for the facing audit)
 export function seatPlaces() { const out = [];
-  DESKS.forEach((_, i) => out.push({ name: 'desk ' + i, ...deskPlace(i) })); loungeSeats.forEach((_, i) => out.push({ name: 'lounge ' + i, ...loungePlace(i) }));
+  DESKS.forEach((_, i) => out.push({ name: 'desk ' + i, ...deskPlace(i) })); out.push({ name: 'sage office desk', ...deskPlace('office') }); loungeSeats.forEach((_, i) => out.push({ name: 'lounge ' + i, ...loungePlace(i) }));
   stools.forEach((_, i) => out.push({ name: 'meeting stool ' + i, ...meetingPlace(i) })); roofSpots.forEach((r, i) => r[3] && out.push({ name: 'roof ' + i, ...roofPlace(i) }));
   parkSpots().forEach((_, i) => out.push({ name: 'park ' + i, ...parkPlace(i) })); return out; }
 // ---------- Activities ----------
@@ -76,13 +82,16 @@ export const CAL_SPOTS = { // per-bot hangout spot: [x, z, rot, seat y, pose(nig
   Sage: { name: 'campfire', pos: [CAL_FIRE.x + 0.6, CAL_FIRE.z + 1.45], rot: Math.PI, seat: SEAT_STOOL + 0.06, pose: n => n ? 'warm' : 'read', via: [[CX + 3.0, CZ + 4.9], [CAL_FIRE.x + 0.6, CAL_FIRE.z + 2.35]] },
   Jun: { name: 'coffee', pos: [CAL_DECK.bench.x - 0.05, CAL_DECK.bench.z + 0.45], rot: -Math.PI / 2, seat: SEAT_STOOL, pose: () => 'sip', via: [[CX + 3.0, CZ + 4.9], [CX - 3.6, CZ + 5.6], [CX - 8.0, CZ + 1.0], [CAL_DECK.bench.x + 0.9, CAL_DECK.bench.z + 0.45]] },
   Mika: { name: 'pool', pos: [CAL_POOL.x, CAL_POOL.z + CAL_POOL.rz + 0.32], rot: Math.PI, seat: -0.28, pose: () => 'dangle', via: [[CAL_POOL.x, CAL_POOL.z + CAL_POOL.rz + 1.4]] } };
-function calvinPlace(b) { const s = CAL_SPOTS[b.name] || CAL_SPOTS[['Pixel', 'Jun', 'Sage', 'Mika'][b.slot % 4]]; return { pos: s.pos, rot: s.rot, seat: s.seat, spot: s.name, approach: [...TO_CAL, ...s.via, s.pos] }; }
+// v23 weather: while it rains the outdoor seats (swing, campfire, pool edge, bench) are skipped - they wait under an umbrella at the last waypoint
+let wetNow = false;
+function calvinPlace(b) { const s = CAL_SPOTS[b.name] || CAL_SPOTS[['Pixel', 'Jun', 'Sage', 'Mika'][b.slot % 4]];
+  if (wetNow) { const p = s.via.at(-1); return { pos: p, rot: s.rot, seat: null, spot: 'rain', approach: [...TO_CAL, ...s.via.slice(0, -1), p] }; } return { pos: s.pos, rot: s.rot, seat: s.seat, spot: s.name, approach: [...TO_CAL, ...s.via, s.pos] }; }
 // aurora night: everyone on the balcony deck facing the north sky (Calvin's lean spot at x1-1.4 stays free)
 const AUR_SPOTS = { Pixel: [BALCONY.x1 - 2.3, BALCONY.z0 + 0.5], Jun: [BALCONY.x1 - 0.6, BALCONY.z0 + 0.5], Sage: [BALCONY.x1 - 1.9, BALCONY.z0 + 1.6], Mika: [BALCONY.x1 - 0.7, BALCONY.z0 + 1.6] };
 function auroraPlace(b) { const [x, z] = AUR_SPOTS[b.name] || AUR_SPOTS.Pixel; return { pos: [x, z], rot: Math.PI, seat: null, approach: [[9.2, 0.25], [12.2, 0.25], [BALCONY.x0 + 0.4, 0.2], [x, 0.2], [x, z]] }; }
 const isNight = () => { const d = dayOf ? dayOf(Date.now() / 1000) : 12 * H; return d >= 18.5 * H || d < 6.5 * H; };
 const ACTS = {
-  calvin: { place: b => calvinPlace(b), pose: b => (CAL_SPOTS[b.name] || CAL_SPOTS.Pixel).pose(isNight()), emoji: '🏝️' },
+  calvin: { place: b => calvinPlace(b), pose: b => wetNow ? 'stand' : (CAL_SPOTS[b.name] || CAL_SPOTS.Pixel).pose(isNight()), emoji: '🏝️' },
   aurora: { place: b => auroraPlace(b), pose: () => 'skywatch', emoji: '🌌' },
   shop: { place: b => shopPlace(b), pose: b => { const v = shopVenue(b); return v === 'cafe' || v === 'bistro' ? 'sip' : 'stand'; }, emoji: '🛍️' },
   home: { place: b => homePlace(b), pose: b => (homeSpot[b.name] ?? b.slot) < 3 ? 'warm' : 'water', emoji: '🔥' },
@@ -119,7 +128,14 @@ export function makeBrain(chibi, persona) {
   chibi.rotation.order = 'YXZ';
   const st = { act: 'work', label: '', walking: false, seated: false, override: null };
   function segmentAt(t) { let c = ((t % cycle) + cycle) % cycle, i = 0; while (c >= sched[i][1]) { c -= sched[i][1]; i++; } return { i, elapsed: c }; }
-  function resolve(t) {
+  // v23 rain: outdoor activities swap to an indoor one (walking in from where they were when it started, and back out after)
+  const RAIN_SWAP = { roof: 'pantry', park: 'pantry', view: 'pantry', home: 'sleep' };
+  function resolve(t) { wetNow = false; if (!dayOf) return resolve0(t); const w = weatherAt(dayOf(t), ootdDay()); wetNow = w.wet; const r = resolve0(t); st.wet = w.wet;
+    if (w.wet) { if (RAIN_SWAP[r.act]) { const sw = RAIN_SWAP[r.act]; return w.since < r.elapsed ? { act: sw, fromAct: r.act, from: ACTS[r.act].place(b), elapsed: w.since } : { act: sw, fromAct: RAIN_SWAP[r.fromAct] || r.fromAct, from: ACTS[RAIN_SWAP[r.fromAct] || r.fromAct].place(b), elapsed: r.elapsed }; }
+      if (RAIN_SWAP[r.fromAct]) return { ...r, fromAct: RAIN_SWAP[r.fromAct], from: ACTS[RAIN_SWAP[r.fromAct]].place(b) }; return r; }
+    if (RAIN_SWAP[r.act] && w.since < r.elapsed && w.since < 600) return { act: r.act, fromAct: RAIN_SWAP[r.act], from: ACTS[RAIN_SWAP[r.act]].place(b), elapsed: w.since }; // shower over: back out
+    return r; }
+  function resolve0(t) {
     const lo = st.local; // device-local activity (e.g. Calvin invited them for coffee); wins while active
     if (lo && t < lo.until) { const fromAct = lo.fromAct || 'work'; return { act: lo.act, fromAct, from: ACTS[fromAct].place(b), elapsed: Math.max(0, t - lo.since) }; }
     if (lo && t >= lo.until && t < lo.until + 0.05) st.local = null;
