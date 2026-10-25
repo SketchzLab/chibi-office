@@ -41,12 +41,36 @@ export const EXEC_BOXES = [...TERRACE.planters, ...TERRACE.loungers.map(([x, z])
 export const EXEC_CIRCLES = [[...TERRACE.table, 0.32], [...TERRACE.parasol, 0.15], ...TERRACE.pots.map(([x, z]) => [x, z, 0.4]), ...TERRACE.posts.map(([x, z]) => [x, z, 0.15]), [...SAGE_OFF.guest, 0.42], [...SAGE_OFF.chess, 0.34], [...SAGE_OFF.plant, 0.4], [...CEO_OFF.arm, 0.5], ...CEO_OFF.plants.map(([x, z]) => [x, z, 0.4]), [...CEO_OFF.lamp, 0.26]];
 export const corrWalls = (t = ROOM_T) => [[CORR.x0 - t, CORR.z0, CORR.x0 + t, CORR.wN], [CORR.x1 - t, CORR.z0, CORR.x1 + t, CORR.z1 - 0.5]];
 export const EXEC_TALL = [...roomWalls(SAGE_OFF), ...roomWalls(CEO_OFF), ...corrWalls(), [SAGE_OFF.shelf[0] - 0.24, SAGE_OFF.shelf[1] - 0.8, SAGE_OFF.shelf[0] + 0.24, SAGE_OFF.shelf[1] + 0.8], [CEO_OFF.shelf[0] - 0.85, CEO_OFF.shelf[1] - 0.24, CEO_OFF.shelf[0] + 0.8, CEO_OFF.shelf[1] + 0.24]];
+// ---- v26 cozy café: a third lobe north-west of the office (merged into the main island). Wooden café with a serving
+// counter + barista on the north wall, tables inside, a string-lit patio facing south toward the office. ----
+export const CAFE_LOBE = { cx: -12.5, cz: -19.5, r: 10 }; CAFE_LOBE.walk = CAFE_LOBE.r - 1.4;
+export const CAFE = { x0: -18.4, x1: -8.4, z0: -26.2, z1: -19.6, door: [-14.6, -12.2], h: 3.45, t: 0.12,
+  counter: [-17.6, -25.0, -12.6, -24.3], counterH: 1.05, barista: [-15.4, -25.6], shelf: [-17.9, -26.15, -12.9, -25.85],
+  t4: [-11.0, -22.6], booth: { table: [-17.05, -22.7], bench: [-17.95, -22.7], chair: [-16.15, -22.7] }, t2: [-15.7, -20.75],
+  plants: [[-9.0, -25.6], [-9.0, -20.2], [-18.0, -20.15]],
+  patio: { z0: -19.45, z1: -15.6, x0: -18.0, x1: -9.0, tables: [[-16.4, -17.4], [-10.6, -17.4]], posts: [[-18.0, -19.3], [-9.0, -19.3], [-18.0, -15.7], [-9.0, -15.7]],
+    canopy: { y: 3.72, h: 0.42, r: 1.65 }, postH: 3.6 } }; // v26.1: canopy rim (y - h/2) clears seated heads; seated chibi hair tops reach ~3.05 m
+// seats: [x, z, rotY (facing), kind]; kind: chair | bench; patio flags outdoor
+CAFE.seats = [
+  { id: 't4w', x: CAFE.t4[0] - 0.85, z: CAFE.t4[1], rot: Math.PI / 2, kind: 'chair' }, { id: 't4e', x: CAFE.t4[0] + 0.85, z: CAFE.t4[1], rot: -Math.PI / 2, kind: 'chair' },
+  { id: 't4n', x: CAFE.t4[0], z: CAFE.t4[1] - 0.85, rot: 0, kind: 'chair' }, { id: 't4s', x: CAFE.t4[0], z: CAFE.t4[1] + 0.85, rot: Math.PI, kind: 'chair' },
+  { id: 'booth', x: CAFE.booth.bench[0], z: CAFE.booth.bench[1], rot: Math.PI / 2, kind: 'bench' }, { id: 'boothc', x: CAFE.booth.chair[0], z: CAFE.booth.chair[1], rot: -Math.PI / 2, kind: 'chair' },
+  { id: 't2w', x: CAFE.t2[0] - 0.8, z: CAFE.t2[1], rot: Math.PI / 2, kind: 'chair' }, { id: 't2e', x: CAFE.t2[0] + 0.8, z: CAFE.t2[1], rot: -Math.PI / 2, kind: 'chair' },
+  ...CAFE.patio.tables.flatMap(([x, z], i) => [{ id: 'p' + i + 'w', x: x - 0.8, z, rot: Math.PI / 2, kind: 'chair', out: true }, { id: 'p' + i + 'e', x: x + 0.8, z, rot: -Math.PI / 2, kind: 'chair', out: true }])];
+export const onCafeLobe = (x, z, m = 0) => Math.hypot(x - CAFE_LOBE.cx, z - CAFE_LOBE.cz) < CAFE_LOBE.r + m;
+export const CAFE_TALL = roomWallsT(CAFE).concat([CAFE.shelf]);
+function roomWallsT(R) { return roomWalls(R, R.t); }
+const _cs = (s, w, d) => (Math.abs(Math.sin(s.rot)) > 0.5 ? [s.x - d, s.z - w, s.x + d, s.z + w] : [s.x - w, s.z - d, s.x + w, s.z + d]);
+export const CAFE_BOXES = [CAFE.counter, [CAFE.booth.bench[0] - 0.35, CAFE.booth.bench[1] - 0.75, CAFE.booth.bench[0] + 0.3, CAFE.booth.bench[1] + 0.75],
+  ...CAFE.seats.filter(s => s.kind === 'chair').map(s => _cs(s, 0.24, 0.22)),
+  [CAFE.t4[0] - 0.55, CAFE.t4[1] - 0.55, CAFE.t4[0] + 0.55, CAFE.t4[1] + 0.55], [CAFE.booth.table[0] - 0.35, CAFE.booth.table[1] - 0.45, CAFE.booth.table[0] + 0.35, CAFE.booth.table[1] + 0.45]];
+export const CAFE_CIRCLES = [[...CAFE.t2, 0.4], ...CAFE.patio.tables.map(([x, z]) => [x, z, 0.4]), ...CAFE.plants.map(([x, z]) => [x, z, 0.32]), ...CAFE.patio.posts.map(([x, z]) => [x, z, 0.1])];
 export const onLobe = (x, z, m = 0) => Math.hypot(x - LOBE.cx, z - LOBE.cz) < LOBE.r + m;
 // rooms' walls as [x0,z0,x1,z1] boxes (door gap in the south wall)
 export function roomWalls(R, t = ROOM_T) { return [[R.x0, R.z0 - t, R.x1, R.z0 + t], [R.x0 - t, R.z0, R.x0 + t, R.z1], [R.x1 - t, R.z0, R.x1 + t, R.z1],
   [R.x0, R.z1 - t, R.door[0], R.z1 + t], [R.door[1], R.z1 - t, R.x1, R.z1 + t]]; }
 // v23 trees 4 + 8 moved off the new path to the executive wing (were (10.3,-12.7) and (14.2,-9.1))
-export const TREES = [[-15.6, -4.2, 1.5], [-15.1, 4.6, 1.3], [-11.4, -12.2, 1.4], [-2.4, -15.5, 1.1], [1.6, -20.6, 1.4], [16.6, -6.0, 1.3], [-13.9, 10.7, 1.2], [-11.0, 13.2, 0.9], [21.6, -14.6, 1.0],
+export const TREES = [[-15.6, -4.2, 1.5], [-15.1, 4.6, 1.3], [-6.8, -14.6, 1.4], [-2.4, -15.5, 1.1], [1.6, -20.6, 1.4], [16.6, -6.0, 1.3], [-13.9, 10.7, 1.2], [-11.0, 13.2, 0.9], [21.6, -14.6, 1.0],
   [12.9, 3.6, 0.9], [14.0, 5.8, 1.0], [12.3, 7.4, 0.8], // park grove
   [9.6, 29.4, 0.85], [-4.6, 28.6, 0.8]]; // home island (last two)
 // ---- home island (+z), joined by a rope-and-plank bridge ----
@@ -126,9 +150,9 @@ export const onHome = (x, z, m = 0) => Math.hypot(x - HOME.cx, z - HOME.cz) < HO
 // walkable regions: main lawn circle OR bridge corridor OR home lawn circle; anything else snaps to the nearest one
 export function walkClamp(p, W) { const B = BRIDGE, hx = p.x - HOME.cx, hz = p.z - HOME.cz, r = Math.hypot(p.x, p.z), rh = Math.hypot(hx, hz);
   const B2 = BRIDGE2, sx = p.x - SHOP.cx, sz = p.z - SHOP.cz, rs = Math.hypot(sx, sz);
-  const lx = p.x - LOBE.cx, lz = p.z - LOBE.cz, rl = Math.hypot(lx, lz);
-  if (r <= W || rl <= LOBE.walk || rh <= HOME.walk || rs <= SHOP.walk || (Math.abs(p.x - B.x) <= B.walkHalf && p.z >= B.z0 && p.z <= B.z1) || (Math.abs(p.z - B2.z) <= B2.walkHalf && p.x >= B2.x0 && p.x <= B2.x1) || B2.mouths.some(([mx, mz, mr]) => Math.hypot(p.x - mx, p.z - mz) <= mr) || inCalWalk(p.x, p.z)) return p;
-  const c = [[LOBE.cx + lx * LOBE.walk / rl, LOBE.cz + lz * LOBE.walk / rl], [SHOP.cx + sx * SHOP.walk / rs, SHOP.cz + sz * SHOP.walk / rs], [Math.max(B2.x0, Math.min(B2.x1, p.x)), Math.max(B2.z - B2.walkHalf, Math.min(B2.z + B2.walkHalf, p.z))], [p.x * W / r, p.z * W / r], [HOME.cx + hx * HOME.walk / rh, HOME.cz + hz * HOME.walk / rh], [Math.max(B.x - B.walkHalf, Math.min(B.x + B.walkHalf, p.x)), Math.max(B.z0, Math.min(B.z1, p.z))], ...calNearest(p.x, p.z)];
+  const lx = p.x - LOBE.cx, lz = p.z - LOBE.cz, rl = Math.hypot(lx, lz), cx = p.x - CAFE_LOBE.cx, cz = p.z - CAFE_LOBE.cz, rc = Math.hypot(cx, cz);
+  if (r <= W || rl <= LOBE.walk || rc <= CAFE_LOBE.walk || rh <= HOME.walk || rs <= SHOP.walk || (Math.abs(p.x - B.x) <= B.walkHalf && p.z >= B.z0 && p.z <= B.z1) || (Math.abs(p.z - B2.z) <= B2.walkHalf && p.x >= B2.x0 && p.x <= B2.x1) || B2.mouths.some(([mx, mz, mr]) => Math.hypot(p.x - mx, p.z - mz) <= mr) || inCalWalk(p.x, p.z)) return p;
+  const c = [[LOBE.cx + lx * LOBE.walk / rl, LOBE.cz + lz * LOBE.walk / rl], [CAFE_LOBE.cx + cx * CAFE_LOBE.walk / rc, CAFE_LOBE.cz + cz * CAFE_LOBE.walk / rc], [SHOP.cx + sx * SHOP.walk / rs, SHOP.cz + sz * SHOP.walk / rs], [Math.max(B2.x0, Math.min(B2.x1, p.x)), Math.max(B2.z - B2.walkHalf, Math.min(B2.z + B2.walkHalf, p.z))], [p.x * W / r, p.z * W / r], [HOME.cx + hx * HOME.walk / rh, HOME.cz + hz * HOME.walk / rh], [Math.max(B.x - B.walkHalf, Math.min(B.x + B.walkHalf, p.x)), Math.max(B.z0, Math.min(B.z1, p.z))], ...calNearest(p.x, p.z)];
   let best = c[0], bd = Infinity; for (const q of c) { const d = Math.hypot(q[0] - p.x, q[1] - p.z); if (d < bd) { bd = d; best = q; } } p.x = best[0]; p.z = best[1]; return p; }
 // bridge deck height: sags in the middle of the rope span
 export function bridgeY(z) { const B = BRIDGE, u = Math.max(0, Math.min(1, (z - B.s0) / (B.s1 - B.s0))); return 0.1 - 0.3 * Math.sin(Math.PI * u); }

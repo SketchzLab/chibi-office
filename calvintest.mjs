@@ -44,9 +44,9 @@ async function sim(url) { await p.goto(url, { waitUntil: 'networkidle0' }); awai
 for (const [lab, url] of [['normal day', BASE + '?q=low&sky=none'], ['aurora day', BASE + '?q=low&sky=aurora'], ['rainbow day', BASE + '?q=low&sky=rainbow']]) { const r = await sim(url);
   rep(r.bad.length === 0, `privacy (${lab}): ${r.n} bot samples over 25 h, westmost x ${r.minX.toFixed(1)}, never on bridge/island ${r.bad.length ? JSON.stringify(r.bad) : ''}`); }
 { await p.goto(BASE + '?q=low&t=19:30', { waitUntil: 'networkidle0' }); await W(1000);
-  const n = await p.evaluate(() => { const L = window.__npcs.npcs; const pts = L.flatMap(o => [...(o.loop || []), ...(o.pos ? [o.pos] : [])]); return { pts, n: L.length }; });
+  const n = await p.evaluate(() => { const L = window.__npcs.npcs.filter(o => o.role !== 'barista'); /* v26: café barista stays behind its own counter */ const pts = L.flatMap(o => [...(o.loop || []), ...(o.pos ? [o.pos] : [])]); return { pts, n: L.length }; });
   const badP = n.pts.filter(([x, z]) => x < -16.1 || onCal(x, z) || inBridge3(x, z, 0.5)); rep(badP.length === 0, `NPCs: ${n.n} NPCs, ${n.pts.length} loop/spot points, none on the bridge/island`);
-  let worst = 1e9; for (let i = 0; i < 25; i++) { await W(400); const xs = await p.evaluate(() => [...window.__npcs.npcs.map(o => o.c.position.x), ...window.__pets.pets.map(q => q.x)]); worst = Math.min(worst, ...xs); }
+  let worst = 1e9; for (let i = 0; i < 25; i++) { await W(400); const xs = await p.evaluate(() => [...window.__npcs.npcs.filter(o => o.role !== 'barista').map(o => o.c.position.x), ...window.__pets.pets.map(q => q.x)]); worst = Math.min(worst, ...xs); }
   rep(worst > -16.1, `NPCs + pets live for 10 s: westmost x ${worst.toFixed(1)}`); }
 // ---------- 3. invite ----------
 await p.goto(BASE + '?q=low&t=12:00', { waitUntil: 'networkidle0' }); await p.evaluate(() => localStorage.removeItem('calvinGuests')); await p.reload({ waitUntil: 'networkidle0' }); await W(1200);

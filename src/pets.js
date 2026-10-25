@@ -7,7 +7,7 @@ import { bake } from './bake.js';
 import { collide } from './player.js';
 import { heightAt, LOUNGE, PARK, POOL } from './layout.js';
 // blocky chamfered voxels to match the chibi style-ref
-const S = (r, c) => toonMesh(new RoundedBoxGeometry(2 * r, 2 * r, 2 * r, 2, r * 0.25), c);
+const S = (r, c) => toonMesh(new RoundedBoxGeometry(2 * r, 2 * r, 2 * r, 1, r * 0.25), c); // v26 perf: 1 bevel segment (was 2)
 function makeCat() { const g = new THREE.Group(); const body = new THREE.Group(); g.add(body); const O = 0xf2a05a, D = 0xe08a44;
   const torso = S(0.26, O); torso.scale.set(0.85, 0.75, 1.3); torso.position.y = 0.32; body.add(torso);
   [[-0.12, 0.2], [0.12, 0.2], [-0.12, -0.2], [0.12, -0.2]].forEach(([x, z]) => { const l = toonMesh(new THREE.CylinderGeometry(0.05, 0.05, 0.22, 6), O, { outline: false }); l.position.set(x, 0.11, z); body.add(l); });

@@ -13,6 +13,7 @@ function prep(geo, mat4, color) {
   else if (g.attributes.color) g.deleteAttribute('color');
   return g;
 }
+export const HULL_MIN = 0.1;
 export function bake(root) {
   root.updateMatrixWorld(true); const inv = root.matrixWorld.clone().invert();
   const fills = [], hulls = [], kill = [], basics = [];
@@ -21,7 +22,9 @@ export function bake(root) {
       const m = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld);
       const col = o.material.uniforms.uColor.value.clone().add(o.material.uniforms.uEmissive.value);
       fills.push(prep(o.geometry, m, col)); kill.push(o);
-      o.children.forEach(c => { if (c.material === getOutlineMat()) hulls.push(prep(c.geometry, m.clone().multiply(c.matrix), null)); });
+      // v26 perf: tiny props (world bounding radius < HULL_MIN) drop their outline shell — sub-pixel at overview, barely visible close up
+      if (!o.geometry.boundingSphere) o.geometry.computeBoundingSphere(); const ws = o.geometry.boundingSphere.radius * new THREE.Vector3().setFromMatrixScale(o.matrixWorld).x;
+      if (ws >= HULL_MIN) o.children.forEach(c => { if (c.material === getOutlineMat()) hulls.push(prep(c.geometry, m.clone().multiply(c.matrix), null)); });
     }
     else if (o.isMesh && !o.isInstancedMesh && o.material.type === 'MeshBasicMaterial' && !o.material.transparent && !o.material.map && !o.material.vertexColors && o.material.visible !== false) {
       const m = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld); basics.push(prep(o.geometry, m, o.material.color.clone())); kill.push(o); }

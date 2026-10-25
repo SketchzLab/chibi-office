@@ -7,6 +7,7 @@ import { shopsOn, ootdDay } from './chibi.js';
 import { CAL, CAL_SWING, CAL_FIRE, CAL_DECK, CAL_POOL } from './layout.js';
 import { isAuroraDay, AURORA } from './skyevents.js';
 import { weatherAt } from './weatherplan.js';
+import { CAFE } from './layout.js';
 // seat root heights scale with chibi size (hip ~0.37 local units)
 const HIP = 0.37 * (1.5 - BOT_S); export const SEAT_CHAIR = 0.07 + HIP, SEAT_SOFA = -0.06 + HIP, SEAT_STOOL = -0.05 + HIP;
 // v23 Sage's manager office (desk: 'office'): leave the office on the open east side, up the lawn to the executive wing, through
@@ -48,7 +49,7 @@ function viewPlace(i) { const x = [BALCONY.x1 - 0.6, BALCONY.x1 - 2.3][i % 2], z
 export function seatPlaces() { const out = [];
   DESKS.forEach((_, i) => out.push({ name: 'desk ' + i, ...deskPlace(i) })); out.push({ name: 'sage office desk', ...deskPlace('office') }); loungeSeats.forEach((_, i) => out.push({ name: 'lounge ' + i, ...loungePlace(i) }));
   stools.forEach((_, i) => out.push({ name: 'meeting stool ' + i, ...meetingPlace(i) })); roofSpots.forEach((r, i) => r[3] && out.push({ name: 'roof ' + i, ...roofPlace(i) }));
-  parkSpots().forEach((_, i) => out.push({ name: 'park ' + i, ...parkPlace(i) })); return out; }
+  parkSpots().forEach((_, i) => out.push({ name: 'park ' + i, ...parkPlace(i) })); CAFE.seats.forEach(sd => out.push({ name: 'cafe ' + sd.id, ...cafePlace(sd.id) })); return out; }
 // ---------- Activities ----------
 // pose: what the body does once arrived. emoji for the status bubble.
 // ---------- Home island: evening by the campfire, bed at night ----------
@@ -68,7 +69,7 @@ const TO_SHOP = [[2.7, 0.25], [2.7, 8.4], [3.4, 13.9], [6.4, 14.6], [9.2, 13.9],
 // Thread & Co.; otherwise it drops by the café, bistro, gadget, computer or stationery shop (rotates by day + slot).
 const VENUE_LABEL = { clothes: 'Shopping for a new top at Thread & Co.', cafe: 'Coffee break at Bean There café', bistro: 'Grabbing a bite at Little Bistro', gadgets: 'Window-shopping gadgets at Gizmo Hub', stationery: 'Picking up pens at Paper Plane', computers: 'Browsing PC parts at Byte Works' };
 const actLabel = (b, a) => a === 'shop' ? VENUE_LABEL[shopVenue(b)] : (b.labels[a] || EXTRA_LABEL[a] || a);
-const EXTRA_LABEL = { calvin: "Hanging out on Calvin's island (invited)", aurora: 'Watching the aurora from the balcony 🌌' };
+const EXTRA_LABEL = { lunch: 'Lunch with the team at Cozy Corner Café', lunchP: 'Quick lunch at the pantry', cafe: 'Coffee on the café patio', cafeIn: 'Coffee break inside the café (rain outside)', calvin: "Hanging out on Calvin's island (invited)", aurora: 'Watching the aurora from the balcony 🌌' };
 export function shopVenue(b, day = ootdDay()) { return shopsOn(b.name, day) ? 'clothes' : ['cafe', 'gadgets', 'bistro', 'stationery', 'computers'][(day + b.slot * 2) % 5]; }
 function shopPlace(b) { const v = shopVenue(b), sb = SHOP_BLDG.find(s => s.kind === v);
   if (v === 'cafe' || v === 'bistro') { const T = STREET_PROPS.filter(p => p[3] === 'table' && (v === 'cafe' ? p[0] < SHOP_X[1] : p[0] > SHOP_X[1]))[b.slot % 2], x = T[0] + (b.slot >= 2 ? 0.3 : -0.3), z = TERRACE_Z - 1.1; // stands by a terrace table (NPC townsfolk sit at them)
@@ -89,6 +90,23 @@ function calvinPlace(b) { const s = CAL_SPOTS[b.name] || CAL_SPOTS[['Pixel', 'Ju
 // aurora night: everyone on the balcony deck facing the north sky (Calvin's lean spot at x1-1.4 stays free)
 const AUR_SPOTS = { Pixel: [BALCONY.x1 - 2.3, BALCONY.z0 + 0.5], Jun: [BALCONY.x1 - 0.6, BALCONY.z0 + 0.5], Sage: [BALCONY.x1 - 1.9, BALCONY.z0 + 1.6], Mika: [BALCONY.x1 - 0.7, BALCONY.z0 + 1.6] };
 function auroraPlace(b) { const [x, z] = AUR_SPOTS[b.name] || AUR_SPOTS.Pixel; return { pos: [x, z], rot: Math.PI, seat: null, approach: [[9.2, 0.25], [12.2, 0.25], [BALCONY.x0 + 0.4, 0.2], [x, 0.2], [x, z]] }; }
+// ---------- v26 café (north-west lobe): lunch at the big 4-top, coffee breaks on the patio (indoor booth/2-top when wet) ----------
+// route: out the office's south front (as to Calvin's island), up the west lawn clear of the wall/trees, through the patio to the door
+export const TO_CAFE = [[-4.65, 0.25], [-4.65, 8.0], [-9.8, 8.0], [-10.5, 9.1], [-11.9, 9.0], [-12.1, 8.0], [-12.3, 0.3], [-12.6, -8.5], [-13.2, -13.5], [-13.4, -16.2]];
+const IN_CAFE = [...TO_CAFE, [-13.4, -19.0], [-13.4, -20.4]];
+const cs = id => CAFE.seats.find(s => s.id === id);
+const CAFE_VIA = { t4w: [[-13.0, -22.6]], t4s: [[-12.4, -21.2], [-11.0, -20.9]], t4n: [[-13.0, -22.6], [-12.0, -23.8], [-12.0, -24.3], [-11.0, -24.3]], t4e: [[-12.4, -20.8], [-9.5, -21.4], [-9.5, -22.6]],
+  booth: [[-14.3, -21.8], [-17.15, -21.8]], boothc: [[-14.5, -22.7]], t2w: [[-14.3, -21.8], [-16.5, -21.8]], t2e: [[-14.0, -20.75]],
+  p0w: [[-15.0, -16.3], [-17.2, -16.3]], p0e: [[-14.8, -17.4]], p1w: [[-12.2, -17.4]], p1e: [[-11.9, -16.3], [-9.8, -16.3]] };
+export function cafePlace(id) { const s = cs(id); return { pos: [s.x, s.z], rot: s.rot, seat: s.kind === 'bench' ? SEAT_CHAIR + 0.05 : SEAT_CHAIR, out: !!s.out, approach: [...(s.out ? TO_CAFE : IN_CAFE), ...CAFE_VIA[id], [s.x, s.z]] }; }
+const cafeSpot = b => homeSpot[b.name] ?? (b.slot % 4);
+const LUNCH_SEAT = ['t4w', 't4n', 't4e', 't4s'], BREAK_OUT = ['p0w', 'p0e', 'p1w', 'p1e'], BREAK_IN = ['boothc', 'booth', 't2w', 't2e'];
+// personality: how much each bot likes the café over the pantry (lunch adds +0.25; coffee break x0.6)
+export const CAFE_PREF = { Pixel: 0.35, Jun: 0.85, Sage: 0.6, Mika: 0.75 };
+const hash01 = (name, d, k) => { let x = (Math.imul(d + 1, 2654435761) ^ Math.imul([...name].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7) + k * 97, 40503)) >>> 0; x = Math.imul(x ^ (x >>> 15), 2246822507) >>> 0; x = Math.imul(x ^ (x >>> 13), 3266489909) >>> 0; return ((x ^ (x >>> 16)) >>> 0) / 4294967296; };
+export const cafeLunch = (b, day = ootdDay()) => hash01(b.name, day, 1) < Math.min(0.95, (CAFE_PREF[b.name] ?? 0.5) + 0.25);
+export const cafeBreak = (b, day = ootdDay()) => hash01(b.name, day, 2) < (CAFE_PREF[b.name] ?? 0.5) * 0.6;
+export const LUNCH = { t0: 12.25 * 3600, t1: 13.25 * 3600, back: 150 }, BREAK = { t0: 15.5 * 3600, t1: 15.5 * 3600 + 25 * 60 }; // lunch 12:15–13:15 (tests pinned at 12:00 are untouched)
 const isNight = () => { const d = dayOf ? dayOf(Date.now() / 1000) : 12 * H; return d >= 18.5 * H || d < 6.5 * H; };
 const ACTS = {
   calvin: { place: b => calvinPlace(b), pose: b => wetNow ? 'stand' : (CAL_SPOTS[b.name] || CAL_SPOTS.Pixel).pose(isNight()), emoji: '🏝️' },
@@ -109,6 +127,10 @@ const ACTS = {
   roof: { place: b => roofPlace(b.roofSpot ?? b.slot), pose: b => roofSpots[(b.roofSpot ?? b.slot) % 4][4] || (b.roofPose || 'read'), emoji: '☁️' },
   park: { place: b => parkPlace(b.slot), pose: b => b.parkPose || 'stand', emoji: '🌳' },
   view: { place: b => viewPlace(b.slot), pose: b => b.viewPose || 'lean', emoji: '🌅' },
+  lunch: { place: b => cafePlace(LUNCH_SEAT[cafeSpot(b)]), pose: () => 'eat', emoji: '🍝' },
+  lunchP: { place: b => pantryPlace(b.slot), pose: () => 'sip', emoji: '🥪' },
+  cafe: { place: b => cafePlace(BREAK_OUT[cafeSpot(b)]), pose: () => 'sip', emoji: '☕' },
+  cafeIn: { place: b => cafePlace(BREAK_IN[cafeSpot(b)]), pose: () => 'sip', emoji: '☕' },
 };
 export const actEmoji = a => ACTS[a]?.emoji ?? '💻';
 const SPEED = 1.9; export const SWING_W = 2 * Math.PI / 2.9; // swing period ~2.9 s (rope ~3 m)
@@ -129,7 +151,7 @@ export function makeBrain(chibi, persona) {
   const st = { act: 'work', label: '', walking: false, seated: false, override: null };
   function segmentAt(t) { let c = ((t % cycle) + cycle) % cycle, i = 0; while (c >= sched[i][1]) { c -= sched[i][1]; i++; } return { i, elapsed: c }; }
   // v23 rain: outdoor activities swap to an indoor one (walking in from where they were when it started, and back out after)
-  const RAIN_SWAP = { roof: 'pantry', park: 'pantry', view: 'pantry', home: 'sleep' };
+  const RAIN_SWAP = { roof: 'pantry', park: 'pantry', view: 'pantry', home: 'sleep', cafe: 'cafeIn' }; // v26: patio seats -> indoor café seats
   function resolve(t) { wetNow = false; if (!dayOf) return resolve0(t); const w = weatherAt(dayOf(t), ootdDay()); wetNow = w.wet; const r = resolve0(t); st.wet = w.wet;
     if (w.wet) { if (RAIN_SWAP[r.act]) { const sw = RAIN_SWAP[r.act]; return w.since < r.elapsed ? { act: sw, fromAct: r.act, from: ACTS[r.act].place(b), elapsed: w.since } : { act: sw, fromAct: RAIN_SWAP[r.fromAct] || r.fromAct, from: ACTS[RAIN_SWAP[r.fromAct] || r.fromAct].place(b), elapsed: r.elapsed }; }
       if (RAIN_SWAP[r.fromAct]) return { ...r, fromAct: RAIN_SWAP[r.fromAct], from: ACTS[RAIN_SWAP[r.fromAct]].place(b) }; return r; }
@@ -148,7 +170,15 @@ export function makeBrain(chibi, persona) {
       if (aur && d >= g1) return { act: 'sleep', fromAct: 'aurora', from: auroraPlace(b), elapsed: d - g1 };
       if (d >= 18 * H + stg && d < 22 * H) return { act: 'home', fromAct: 'work', from: deskPlace(b.desk), elapsed: d - 18 * H - stg };
       if (d >= 22 * H || d < 7 * H + stg) return { act: 'sleep', fromAct: 'home', from: homePlace(b), elapsed: (d - 22 * H + 86400) % 86400 };
-      if (d < 9 * H) return { act: 'work', fromAct: 'sleep', from: bedPlace(b), elapsed: d - 7 * H - stg }; }
+      if (d < 9 * H) return { act: 'work', fromAct: 'sleep', from: bedPlace(b), elapsed: d - 7 * H - stg };
+      // v26 lunch (12:15–13:15, staggered): café with the team, or the pantry, by personality; then back to the routine
+      const ls = LUNCH.t0 + cafeSpot(b) * 75, la = cafeLunch(b) ? 'lunch' : 'lunchP';
+      if (d >= ls && d < LUNCH.t1) return { act: la, fromAct: 'work', from: deskPlace(b.desk), elapsed: d - ls };
+      if (d >= LUNCH.t1 && d < LUNCH.t1 + LUNCH.back) { const { i } = segmentAt(t); return { act: sched[i][0], fromAct: la, from: ACTS[la].place(b), elapsed: d - LUNCH.t1 }; }
+      // v26 afternoon coffee break at the café (some days, more likely for café-lovers)
+      if (cafeBreak(b)) { const bs = BREAK.t0 + cafeSpot(b) * 40;
+        if (d >= bs && d < BREAK.t1) return { act: 'cafe', fromAct: 'work', from: deskPlace(b.desk), elapsed: d - bs };
+        if (d >= BREAK.t1 && d < BREAK.t1 + LUNCH.back) { const { i } = segmentAt(t); return { act: sched[i][0], fromAct: 'cafe', from: ACTS.cafe.place(b), elapsed: d - BREAK.t1 }; } } }
     const { i, elapsed } = segmentAt(t); const prev = sched[(i - 1 + sched.length) % sched.length][0], act = sched[i][0];
     return { act, fromAct: prev, from: ACTS[prev].place(b), elapsed };
   }
@@ -192,7 +222,7 @@ export function applyPose(c, pose, t, dt, seated, b) {
   const tgt = { legL: [0, 0], legR: [0, 0], armL: [0, -0.1], armR: [0, 0.1], bodyY: 0, bodyX: 0, bodyZ: 0, headX: 0, headZ: Math.sin(t * 1.1) * 0.05, headY: 0 };
   const s = Math.sin(t * 2.2);
   if (seated) { tgt.legL = [-1.25, -0.06]; tgt.legR = [-1.25, 0.06]; }
-  pr.cup.visible = pose === 'sip'; pr.spinner.visible = pose === 'fidget'; pr.pencil.visible = pose === 'sketch'; pr.pad.visible = pose === 'sketch'; pr.book.visible = pose === 'read'; pr.ctrl.visible = pose === 'game';
+  pr.cup.visible = pose === 'sip'; pr.spinner.visible = pose === 'fidget'; pr.pencil.visible = pose === 'sketch' || pose === 'eat'; pr.pad.visible = pose === 'sketch'; pr.book.visible = pose === 'read'; pr.ctrl.visible = pose === 'game';
   if (pose === 'sip') pr.liq.material.uniforms.uColor.value.set(b.cup);
   switch (pose) {
     case 'sleep': { const ph = sleepPhase(c), P = 20 + (ph * 977 % 40), seg = Math.floor((t + ph * P) / P), turn = Math.floor(Math.abs(Math.sin(seg * 12.9898 + ph * 78.233)) * 43758.5) % 3; // shift / turn every 20–60s
@@ -209,6 +239,8 @@ export function applyPose(c, pose, t, dt, seated, b) {
     case 'sip': { const ph = ((t + sleepPhase(c) * 3) % 7) / 7, sm = THREE.MathUtils.smoothstep; // hold at chest, every ~7s raise to the mouth, tilt, lower
       const l = c.userData.mask ? 0 : c.userData.forceSip ?? sm(ph, 0.5, 0.62) * (1 - sm(ph, 0.8, 0.92)); c.userData.sipL = l; // masked bots skip the sip (cup stays at chest)
       tgt.armR = [-1.15 - l * 1.0, -0.22 - l * 0.36]; tgt.armL = [0, -0.12]; tgt.headX = -0.1 * l; tgt.bodyY = s * 0.02; break; }
+    case 'eat': { const ph = ((t + sleepPhase(c) * 2) % 3.2) / 3.2, sm = THREE.MathUtils.smoothstep, l = c.userData.mask ? 0 : sm(ph, 0.35, 0.5) * (1 - sm(ph, 0.62, 0.8)); // fork from plate to mouth every ~3 s
+      tgt.armL = [-0.95, 0.3]; tgt.armR = [-1.05 - l * 1.05, -0.25 - l * 0.3]; tgt.headX = 0.2 - 0.25 * l; tgt.bodyY = s * 0.015; break; }
     case 'read': { tgt.armL = [-1.15, 0.35]; tgt.armR = [-1.15, -0.35]; tgt.headX = 0.22; tgt.headZ = Math.sin(t * 0.5) * 0.04; break; }
     case 'game': { const a = Math.sin(t * 18) * 0.05; tgt.armL = [-1.15 + a, 0.35]; tgt.armR = [-1.15 - a, -0.35]; tgt.headX = 0.12; tgt.bodyY = Math.abs(Math.sin(t * 3)) * 0.02; tgt.headZ = Math.sin(t * 2.6) * 0.08; break; }
     case 'sketch': { tgt.armL = [-1.1, 0.35]; tgt.armR = [-1.2 + Math.sin(t * 6) * 0.08, -0.3 + Math.cos(t * 6) * 0.08]; tgt.headX = 0.25; break; }

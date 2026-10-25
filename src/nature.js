@@ -3,8 +3,8 @@ import { dayUniforms } from './daycycle.js';
 import { toonMesh, toonMat } from './toon.js';
 import { bake } from './bake.js';
 import { cast } from './shadows.js';
-import { ISLAND_R as R, FLOOR, POOL as PL, BACK_Z, TREES, ROOF, STAIRS, BALCONY, PARK, inR, TREE_LIFT, TREE_SPHERES, treeRot, LOBE, CORR, EXEC } from './layout.js';
-const inLobe = (x, z) => Math.hypot(x - LOBE.cx, z - LOBE.cz) < LOBE.r - 0.3; // v23: main-rim bushes/vines that would sit on the executive lobe lawn
+import { ISLAND_R as R, FLOOR, POOL as PL, BACK_Z, TREES, ROOF, STAIRS, BALCONY, PARK, inR, TREE_LIFT, TREE_SPHERES, treeRot, LOBE, CORR, EXEC, CAFE_LOBE } from './layout.js';
+const inLobe = (x, z) => Math.hypot(x - LOBE.cx, z - LOBE.cz) < LOBE.r - 0.3 || Math.hypot(x - CAFE_LOBE.cx, z - CAFE_LOBE.cz) < CAFE_LOBE.r - 0.3; // v23: main-rim bushes/vines that would sit on the executive lobe lawn
 let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 const POOL = new THREE.Vector3(PL.x, 0, PL.z);
 function onGrassRing(x, z) { const r = Math.hypot(x, z); return r < R - 0.7 && !inR(CORR, x, z, 0.2) && !inR(EXEC, x, z, 0.2) && (x < FLOOR.x0 - 0.3 || x > FLOOR.x1 + 0.3 || z < FLOOR.z0 - 0.3 || z > FLOOR.z1 + 0.3) && !inR(ROOF, x, z, 0.2) && !inR(STAIRS, x, z, 0.2) && !inR(BALCONY, x, z, 0.1) && Math.abs(Math.hypot(x - PARK.cx, z - PARK.cz) - PARK.r) > 0.5 && Math.hypot(x - PARK.cx, z - PARK.cz) > 1.3; }

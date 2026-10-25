@@ -34,7 +34,7 @@ for (const [lab, sx, sz, dx, dz] of runs.filter(r => !process.env.ONLY || r[0].i
 // ---- 3. paths ----
 const boxes = [...SHOP_BLDG.map(s => shopBox(s)), ...SHOP_SIDE], circles = STREET_PROPS.map(([x, z, r]) => [x, z, r]);
 const clear = (x, z) => Math.min(...boxes.map(([x0, z0, x1, z1]) => Math.hypot(Math.max(x0 - x, 0, x - x1), Math.max(z0 - z, 0, z - z1))), ...circles.map(([cx, cz, r]) => Math.hypot(x - cx, z - cz) - r), SHOP.walk - Math.hypot(x - SHOP.cx, z - SHOP.cz)) - BODY;
-const npc = await p.evaluate(() => ({ loops: window.__npcs.npcs.filter(o => o.loop).map(o => o.loop), spots: window.__npcs.npcs.filter(o => o.role === 'browser').map(o => o.pos) }));
+const npc = await p.evaluate(() => ({ loops: window.__npcs.npcs.filter(o => o.loop && o.role !== 'barista').map(o => o.loop), spots: window.__npcs.npcs.filter(o => o.role === 'browser').map(o => o.pos) }));
 npc.loops.forEach((L, i) => { let w = 1e9; L.forEach((a, k) => { const q = L[(k + 1) % L.length]; for (let u = 0; u <= 1; u += 0.02) w = Math.min(w, clear(a[0] + (q[0] - a[0]) * u, a[1] + (q[1] - a[1]) * u)); }); rep(w > -0.001, `NPC stroller loop ${i} (${L.length} waypoints) min body clearance ${w.toFixed(2)}`); });
 npc.spots.forEach(([x, z], i) => rep(clear(x, z) > -0.001, `NPC window-shopper ${i} (${x.toFixed(1)},${z.toFixed(1)}) clearance ${clear(x, z).toFixed(2)}`));
 for (const s of SHOP_BLDG.filter(s => s.kind !== 'cafe' && s.kind !== 'bistro')) for (const o of [-0.3, 0.6, -0.75, 0.3]) { const [x, z] = shopFront(s, s.d / 2 + AWN.out + 0.55, o); rep(clear(x, z) > -0.001, `bot spot ${s.name} offset ${o}: clearance ${clear(x, z).toFixed(2)}`); }

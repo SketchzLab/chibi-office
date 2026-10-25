@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { makeChibi } from './chibi.js';
 import { applyPose } from './behavior.js';
+import { CAFE_BOXES, CAFE_CIRCLES, CAFE_TALL, onCafeLobe } from './layout.js';
 import { CALVIN_S, DESKS, BOSS_DESK, GLASS, LOUNGE, PANTRY, BACK_Z, FLOOR, LEFT_X, ROOF, STAIRS, BALCONY, PARK, TREES, POOL, WALK_R, inR, heightAt, canopyRadius, headReach, HEAD_R, HEAD_M, PLANTS, PLANT_SPHERES, HOUSE, FIRE, GARDEN, BRIDGE, walkClamp, inBridge, onHome, inBridge2, onShop, SHOP_BLDG, SHOP_SIDE, STREET_TREE, shopBox, STREET_PROPS, SHOP, shopFront, CAL, CAL_TREE, CAL_SWING, CAL_FIRE, CAL_HOUSE, CAL_POOL, CAL_DECK, CAL_SIGN, CAL_LANTERNS, BRIDGE3, onCal, inBridge3, calPoolQ, EXEC_BOXES, EXEC_CIRCLES, EXEC_TALL, onLobe, LOBE } from './layout.js';
 
 const R = 0.42; // body radius (legs/torso vs low furniture, railings)
@@ -36,13 +37,13 @@ export const CAL_TALL = [[CH.x0, CH.z0 - 0.08, CH.x1, CH.z0 + 0.08], [CH.x0 - 0.
 export const CAL_CIRCLES = [[CAL_TREE.x, CAL_TREE.z, 1.4], [CAL_FIRE.x, CAL_FIRE.z, 0.82], ...CAL_FIRE.logs.flatMap(L => [-0.55, 0, 0.55].map(k => [L.x + Math.cos(L.ry) * k, L.z - Math.sin(L.ry) * k, 0.34])),
   ...[...CAL_LANTERNS, [CHd[1] + 0.45, CH.z1 + 0.9], CAL_SIGN].map(([x, z]) => [x, z, 0.12]), [CAL_SWING.x, CAL_SWING.z, 0.4], [CAL_DECK.table.x, CAL_DECK.table.z, 0.34],
   ...[-1, 1].flatMap(sd => [BRIDGE3.s0 - 0.6, BRIDGE3.s1 + 0.6].map(x => [x, BRIDGE3.z + sd * BRIDGE3.half, 0.14])), [CH.x0 + 0.35, CH.z1 - 0.4, 0.3]];
-const BOXES = [...BOXES0, ...HOME_BOXES, ...SHOP_BOXES, ...CAL_BOXES, ...EXEC_BOXES], CIRCLES = [...CIRCLES0, ...HOME_CIRCLES, ...SHOP_CIRCLES, ...CAL_CIRCLES, ...EXEC_CIRCLES];
+const BOXES = [...BOXES0, ...HOME_BOXES, ...SHOP_BOXES, ...CAL_BOXES, ...EXEC_BOXES, ...CAFE_BOXES], CIRCLES = [...CIRCLES0, ...HOME_CIRCLES, ...SHOP_CIRCLES, ...CAL_CIRCLES, ...EXEC_CIRCLES, ...CAFE_CIRCLES];
 // ---- two-level collision: ground (office + lawn), stairs (ramp, side-clamped), rooftop ----
 const P = PARK;
 // head-high thin walls/panels: pushed with the HEAD radius so the big round head never pokes through
 const TALL_BOXES = [[FLOOR.x0, BACK_Z - 0.12, FLOOR.x1, BACK_Z + 0.1], [LEFT_X - 0.12, FLOOR.z0, LEFT_X + 0.12, FLOOR.z1], // back wall, left wall
   [GLASS.x0, GLASS.z1 - 0.06, GLASS.door0, GLASS.z1 + 0.06], [GLASS.x1 - 0.06, GLASS.z0, GLASS.x1 + 0.06, GLASS.z1 + 0.06], // glass room panes (door gap)
-  [ROOF.x0, ROOF.z0, ROOF.x1, ROOF.z1], ...HOUSE_TALL, ...SHOP_BLDG.map(b => shopBox(b, 0)), ...SHOP_SIDE, ...CAL_TALL, ...EXEC_TALL]; // annex block walls (roof only reachable from above), home longhouse
+  [ROOF.x0, ROOF.z0, ROOF.x1, ROOF.z1], ...HOUSE_TALL, ...SHOP_BLDG.map(b => shopBox(b, 0)), ...SHOP_SIDE, ...CAL_TALL, ...EXEC_TALL, ...CAFE_TALL]; // annex block walls (roof only reachable from above), home longhouse
 // trees: trunk is a body circle; foliage is a head circle sized from the real canopy spheres (3D head-vs-sphere clearance)
 const TALL_CIRCLES = [...TREES.map(([x, z, s], i) => [x, z, canopyRadius(s) - RH + (i === 0 ? 0.07 : 0)]), // tree 0 sits by the island-3 bridge landing: a hair more margin
   ...PLANTS.map(([x, z, s]) => [x, z, headReach(PLANT_SPHERES, s) - RH]), ...HOME_CIRCLES.filter(c => c[2] === 0.1).map(([x, z]) => [x, z, 0.16]), ...STREET_PROPS.filter(p => p[3] === 'tree').map(([x, z]) => [x, z, STREET_TREE.canopyR + HEAD_R + 0.05 - RH]), ...STREET_PROPS.filter(p => p[3] === 'lamp').map(([x, z]) => [x, z, 0.1])]; // + lamp posts (head vs pole) // + street-tree canopies (3D: canopy above the head line) // + lantern posts // pushOut adds RH back
@@ -61,7 +62,7 @@ function pushOut(p, boxes, circles) {
   for (const [x, z, r] of circles) { const dx = p.x - x, dz = p.z - z, d = Math.hypot(dx, dz), m = r + RR; if (d < m && d > 1e-4) { p.x = x + dx / d * m; p.z = z + dz / d * m; } } }
 // p = proposed {x,z}; from = current position (decides which level we're on)
 // rim trees: when the island edge and a canopy circle squeeze him, slide along the rim to where the circle meets it
-function rimSlide(p) { const W = WALK_R, r = Math.hypot(p.x, p.z); if (r < W - 0.02 || inR(BALCONY, p.x, p.z, -0.05) || inBridge(p.x, p.z, 0.2) || onHome(p.x, p.z, 1) || inBridge2(p.x, p.z, 0.2) || onShop(p.x, p.z, 1) || inBridge3(p.x, p.z, 0.2) || onCal(p.x, p.z, 1) || Math.hypot(p.x - LOBE.cx, p.z - LOBE.cz) < LOBE.walk + 0.3) return;
+function rimSlide(p) { const W = WALK_R, r = Math.hypot(p.x, p.z); if (r < W - 0.02 || inR(BALCONY, p.x, p.z, -0.05) || inBridge(p.x, p.z, 0.2) || onHome(p.x, p.z, 1) || inBridge2(p.x, p.z, 0.2) || onShop(p.x, p.z, 1) || inBridge3(p.x, p.z, 0.2) || onCal(p.x, p.z, 1) || Math.hypot(p.x - LOBE.cx, p.z - LOBE.cz) < LOBE.walk + 0.3 || onCafeLobe(p.x, p.z, -1.1)) return;
   for (const [cx, cz, cr] of TALL_CIRCLES) { const m = cr + RH, d = Math.hypot(p.x - cx, p.z - cz); if (d >= m) continue; const C = Math.hypot(cx, cz), ca = (W * W + C * C - m * m) / (2 * W * C);
     if (Math.abs(ca) >= 1) continue; const al = Math.acos(ca), th = Math.atan2(p.z, p.x), tc = Math.atan2(cz, cx), wr = a => Math.atan2(Math.sin(a), Math.cos(a));
     const t = Math.abs(wr(tc + al - th)) < Math.abs(wr(tc - al - th)) ? tc + al : tc - al; const q = 1 - 0.005; p.x = Math.cos(t) * W * q; p.z = Math.sin(t) * W * q; } }
@@ -136,7 +137,7 @@ body.cardon #actb,body.cardon #imenu{display:none!important}
     cam.id = e.pointerId; cam.x = e.clientX; cam.y = e.clientY; cam.moved = 0; cam.held = true; cam.back = false; home.active = false; }, true);
   addEventListener('pointermove', e => { if (e.pointerId !== cam.id) return; const dx = e.clientX - cam.x, dy = e.clientY - cam.y; cam.x = e.clientX; cam.y = e.clientY;
     if (cam.pinch) return; // two camera fingers = pinch zoom, no orbit
-    cam.moved += Math.abs(dx) + Math.abs(dy); if (fp.on) { const k = 2.2 / controls.domElement.clientHeight; fp.yaw -= dx * k; fp.pitch = Math.max(-1.2, Math.min(1.2, fp.pitch - dy * k)); return; } const S = getSph(), k = 2 * Math.PI / controls.domElement.clientHeight; setSph(S.theta - dx * k, S.phi - dy * k); }, true);
+    cam.moved += Math.abs(dx) + Math.abs(dy); if (fp.on) { const k = 2.2 / controls.domElement.clientHeight; fp.yaw -= dx * k; fp.pitch = Math.max(-FP_PITCH, Math.min(FP_PITCH, fp.pitch - dy * k)); return; } const S = getSph(), k = 2 * Math.PI / controls.domElement.clientHeight; setSph(S.theta - dx * k, S.phi - dy * k); }, true);
   const camUp = e => { cam.fingers.delete(e.pointerId); if (e.pointerId !== cam.id) return; cam.id = null; cam.held = false;
     if (cam.moved > 6 && autoCam) { cam.back = true; cam.wait = 0.45; } }; addEventListener('pointerup', camUp, true); addEventListener('pointercancel', camUp, true);
   Object.defineProperty(cam, 'pinch', { get: () => { let n = 0; for (const f of cam.fingers) if (f !== cam.id) n++; return n > 0; } });
@@ -150,7 +151,7 @@ body.cardon #actb,body.cardon #imenu{display:none!important}
   /* v22 free camera (📷 button or C): detaches from Calvin. OrbitControls does the work: mouse left = rotate, right / middle /
      Shift+left = pan on the ground plane, wheel = zoom to cursor; touch 1 finger = pan, 2 fingers = pinch zoom + drag/twist rotate.
      WASD / arrows pan the camera (Calvin stands still). Leaving (button, C, 'Back to me') eases back to the default follow. */
-  let free = false; const FREE = { minD: 2.2, maxD: 125, minP: 0.12, maxP: 1.45, box: [-50, 42, -24, 47] };
+  let free = false; const FREE = { minD: 2.2, maxD: 125, minP: 0.12, maxP: 2.2, /* v25: past the horizon -> look up at the sky (target lifts, see postCam) */ box: [-50, 42, -24, 47] };
   const freeb = document.createElement('button'); freeb.id = 'freeb'; freeb.className = 'hudb'; freeb.type = 'button'; freeb.textContent = '📷'; freeb.title = 'Free camera (C)'; freeb.setAttribute('aria-label', 'Free camera (C)'); document.body.appendChild(freeb);
   const backp = document.createElement('button'); backp.id = 'backp'; backp.className = 'hudb'; backp.type = 'button'; backp.textContent = '↩ Back to me'; document.body.appendChild(backp);
   const saved = {};
@@ -167,21 +168,26 @@ body.cardon #actb,body.cardon #imenu{display:none!important}
   /* v24 first-person view (👁️ button or V): camera at Calvin's eyes, his body hidden; drag / right-half finger looks around,
      stick / WASD move relative to the look direction. Mutually exclusive with the free camera; leaving restores the previous view. */
   const fp = { on: false, yaw: 0, pitch: 0, eye: 1.75, bob: 0, saved: null };
+  /* v25: FP field of view from a ~90 deg HORIZONTAL target (the 40 deg vertical third-person fov was ~16 deg wide on a folded phone),
+     vertical derived from the aspect and clamped 55..100 deg so landscape and tall portrait both feel natural. Pitch +/-85 deg. */
+  const FP_PITCH = 1.48, FP_HFOV = 90;
+  const fpFov = () => { const a = camera.aspect || 1; return Math.max(55, Math.min(100, 2 * THREE.MathUtils.radToDeg(Math.atan(Math.tan(THREE.MathUtils.degToRad(FP_HFOV / 2)) / a)))); };
+  addEventListener('resize', () => { if (fp.on) { camera.fov = fpFov(); camera.updateProjectionMatrix(); } });
   const fpb = document.createElement('button'); fpb.id = 'fpb'; fpb.className = 'hudb'; fpb.type = 'button'; fpb.textContent = '👁️'; fpb.title = 'First-person view (V)'; fpb.setAttribute('aria-label', 'First-person view (V)'); document.body.appendChild(fpb);
   const fpDir = new THREE.Vector3();
   const setFp = on => { on = !!on; if (on === fp.on) return; if (on && free) setFree(false);
     fp.on = on; document.body.classList.toggle('fpv', on); camb.textContent = on ? '🧍 Third person' : follow ? '🗺️ Overview' : '🎥 Follow Calvin'; fpb.classList.toggle('on', on); fpb.setAttribute('aria-pressed', on);
-    if (on) { fp.saved = { off: camera.position.clone().sub(controls.target), tgtY: controls.target.y, follow, near: camera.near };
+    if (on) { fp.saved = { off: camera.position.clone().sub(controls.target), tgtY: controls.target.y, follow, near: camera.near, fov: camera.fov };
       c.updateMatrixWorld(true); const hb = new THREE.Box3().setFromObject(c.userData.parts.head); fp.eye = Math.max(1.2, (hb.min.y + hb.max.y) / 2 - c.position.y + 0.05);
-      fp.yaw = c.rotation.y; fp.pitch = -0.08; c.visible = false; controls.enabled = false; camera.near = 0.05; camera.updateProjectionMatrix(); cam.back = false; home.active = false; }
-    else { const S = fp.saved || {}; c.visible = true; controls.enabled = true; camera.near = S.near ?? 0.1; camera.updateProjectionMatrix();
+      fp.yaw = c.rotation.y; fp.pitch = -0.08; c.visible = false; controls.enabled = false; camera.near = 0.05; camera.fov = fpFov(); camera.updateProjectionMatrix(); cam.back = false; home.active = false; }
+    else { const S = fp.saved || {}; c.visible = true; controls.enabled = true; camera.near = S.near ?? 0.1; camera.fov = S.fov ?? 40; camera.updateProjectionMatrix();
       controls.target.set(c.position.x, S.tgtY ?? 1.2, c.position.z); camera.position.copy(controls.target).add(S.off || new THREE.Vector3(0, 9, 12)); if (!follow) setFollow(true); } };
   fpb.addEventListener('click', () => setFp(!fp.on));
   addEventListener('keydown', e => { if (e.target.closest?.('input,textarea') || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return; if (e.key.toLowerCase() === 'v') setFp(!fp.on); });
   function fpCam(dt, t) { const moving = api.speed > 0 && !api.seat; fp.bob = moving ? fp.bob + dt * (api.speed > 3 ? 13 : 8.5) : fp.bob * Math.max(0, 1 - dt * 6);
     const by = moving ? Math.abs(Math.sin(fp.bob)) * 0.045 : 0; if (moving) fp.yaw = c.rotation.y + Math.atan2(Math.sin(fp.yaw - c.rotation.y), Math.cos(fp.yaw - c.rotation.y)); // keep yaw continuous
     fpDir.set(Math.sin(fp.yaw) * Math.cos(fp.pitch), Math.sin(fp.pitch), Math.cos(fp.yaw) * Math.cos(fp.pitch));
-    camera.position.set(c.position.x + Math.sin(fp.yaw) * 0.12, c.position.y + fp.eye + by, c.position.z + Math.cos(fp.yaw) * 0.12); controls.target.copy(camera.position).add(fpDir); camera.lookAt(controls.target); }
+    camera.position.set(c.position.x - Math.sin(fp.yaw) * 0.1, c.position.y + fp.eye + by, c.position.z - Math.cos(fp.yaw) * 0.1); /* v25: eye a touch behind the head centre (was 0.12 in front), so nearby things aren't right in the face */ controls.target.copy(camera.position).add(fpDir); camera.lookAt(controls.target); }
   freeb.addEventListener('click', () => setFree(!free)); backp.addEventListener('click', () => setFree(false));
   addEventListener('keydown', e => { if (e.target.closest?.('input,textarea') || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return; if (e.key.toLowerCase() === 'c') setFree(!free); });
   controls.domElement.addEventListener('contextmenu', e => e.preventDefault());
@@ -195,8 +201,9 @@ body.cardon #actb,body.cardon #imenu{display:none!important}
   function freeCam(dt) { let px = 0, pz = 0; if (keys.has('a') || keys.has('arrowleft')) px -= 1; if (keys.has('d') || keys.has('arrowright')) px += 1; if (keys.has('w') || keys.has('arrowup')) pz += 1; if (keys.has('s') || keys.has('arrowdown')) pz -= 1;
     if (px || pz) { camera.getWorldDirection(ff); ff.y = 0; ff.normalize(); const sp = Math.max(3, camera.position.distanceTo(controls.target) * 0.9) * (keys.has('shift') ? 2 : 1) * dt / Math.hypot(px, pz);
       fpan.set(-ff.z, 0, ff.x).multiplyScalar(px * sp).addScaledVector(ff, pz * sp); controls.target.add(fpan); camera.position.add(fpan); }
-    const T = controls.target, B = FREE.box, ox = T.x, oz = T.z, oy = T.y; T.x = Math.max(B[0], Math.min(B[1], T.x)); T.z = Math.max(B[2], Math.min(B[3], T.z)); T.y = Math.max(-1, Math.min(4, T.y));
-    camera.position.x += T.x - ox; camera.position.z += T.z - oz; camera.position.y += T.y - oy; if (camera.position.y < 0.6) camera.position.y = 0.6; }
+    const T = controls.target, B = FREE.box, ox = T.x, oz = T.z, oy = T.y; T.x = Math.max(B[0], Math.min(B[1], T.x)); T.z = Math.max(B[2], Math.min(B[3], T.z)); T.y = Math.max(-1, Math.min(40, T.y));
+    camera.position.x += T.x - ox; camera.position.z += T.z - oz; camera.position.y += T.y - oy; if (camera.position.y < 0.6) camera.position.y = 0.6;
+    if (T.y > 4 && camera.position.y > T.y) { const dd = Math.min(T.y - 4, camera.position.y - 0.6) * Math.min(1, dt * 3); T.y -= dd; camera.position.y -= dd; } } // v25: looking back down, the lifted target settles to the ground again
 
   const fwd = new THREE.Vector3(), right = new THREE.Vector3(), mvv = new THREE.Vector3(), tmp = new THREE.Vector3();
   const api = { chibi: c, cam, get fp() { return fp.on; }, fpState: fp, setFp, get autoCam() { return autoCam; }, setAuto, get free() { return free; }, setFree, get camYaw() { return getSph().theta; }, speed: 0, moved: false, get follow() { return follow; }, setFollow, joy, keys };
@@ -231,7 +238,17 @@ body.cardon #actb,body.cardon #imenu{display:none!important}
     if (api.carry && !(api.emote && api.emote.until > t)) { const P = c.userData.parts; c.userData.props.cup.visible = true; P.armR.rotation.x = -1.3; P.armR.rotation.z = -0.25; }
     api.afterPose?.(t); followCam(dt);
   };
-  function followCam(dt, near) { if (free) { freeCam(dt); return; } if (fp.on) { fpCam(dt); return; }
+  /* v25: wider third-person pitch. Following, the camera may orbit below the target (phi up to 2.5 rad -> looking ~53 deg up at the sky);
+     postCam() (after controls.update) keeps it above the floor by pulling it in toward Calvin, so it goes low behind him and looks up. */
+  const OVP = [controls.minPolarAngle, controls.maxPolarAngle], FOLP = [0.12, 2.5], CAM_MIN_H = 0.35;
+  const floorY = (x, z) => { const h = heightAt(x, z); return Number.isFinite(h) ? h : 0; };
+  api.postCam = () => { if (fp.on || window.__camLock) return; const P = camera.position, T = controls.target;
+    if (free) { const m = floorY(P.x, P.z) + 0.6; if (P.y < m) { const d = m - P.y; P.y += d; T.y += d; } return; } // free: lift the look-at point instead of digging in
+    const m = Math.max(floorY(P.x, P.z), follow ? c.position.y : -Infinity) + CAM_MIN_H; if (P.y >= m) return;
+    const off = P.clone().sub(T); if (off.y < -1e-4 && T.y > m) { const k = Math.max(0.05, Math.min(1, (m - T.y) / off.y)); P.copy(T).addScaledVector(off, k); controls.minDistance = Math.min(controls.minDistance, off.length() * k); if (cam.lastLen) cam.lastLen = off.length() * k; /* not a user zoom */ }
+    else P.y = m; };
+  function followCam(dt, near) { if (free) { freeCam(dt); return; }
+    if (!fp.on) { controls.minPolarAngle = follow ? FOLP[0] : OVP[0]; controls.maxPolarAngle = follow ? FOLP[1] : OVP[1]; } if (fp.on) { fpCam(dt); return; }
     const CL = window.__camLock; if (CL) { camera.position.set(...CL[0]); controls.target.set(...CL[1]); return; } // test hook: fixed inspection camera
     // camera: follow with smoothing (shift target and camera by the same delta, so orbiting still works)
     if (cam.back && !cam.held) { cam.wait -= dt; if (cam.wait <= 0 && (!follow || api.seat || api.look)) { cam.back = false; if (!follow) home.active = true; } }
@@ -241,7 +258,7 @@ body.cardon #actb,body.cardon #imenu{display:none!important}
     if (!manual && autoCam && api.seat && api.seat.camYaw !== undefined && !api.look) { const S2 = api.seat, d = S2.camDist || 11, a = S2.rot + S2.camYaw; tmp.set(c.position.x, c.position.y + 1.0, c.position.z); const k = 1 - Math.exp(-dt * 2.4);
       controls.target.lerp(tmp, k); camera.position.lerp(new THREE.Vector3(tmp.x + Math.sin(a) * d * 0.78, tmp.y + d * 0.55, tmp.z + Math.cos(a) * d * 0.78), k); return; }
     if (!manual && api.look) { const L = api.look; const k = 1 - Math.exp(-dt * 2); controls.target.lerp(L.tgt, k); camera.position.lerp(L.pos, k); return; }
-    if (follow) { tmp.set(c.position.x, 1.2, c.position.z); const k = 1 - Math.exp(-dt * 3.2); const delta = tmp.sub(controls.target).multiplyScalar(k); controls.target.add(delta); camera.position.add(delta);
+    if (follow) { const o0 = camera.position.clone().sub(controls.target), ph0 = Math.acos(Math.max(-1, Math.min(1, o0.y / (o0.length() || 1)))); tmp.set(c.position.x, 1.2 + Math.max(0, ph0 - Math.PI / 2) * 2.2, c.position.z); /* v25: looking up lifts the look-at point toward his head so he stays in frame */ const k = 1 - Math.exp(-dt * 3.2); const delta = tmp.sub(controls.target).multiplyScalar(k); controls.target.add(delta); camera.position.add(delta);
       const off = camera.position.clone().sub(controls.target); if (!near && cam.lastLen && Math.abs(off.length() - cam.lastLen) > 0.05) cam.zoom = Math.max(8, Math.min(40, off.length())); // pinch / wheel while following sticks
       const want = near || cam.zoom || (innerWidth < innerHeight ? 17 : 13); off.setLength(off.length() + (want - off.length()) * Math.min(1, dt * 1.5));
       if (cam.back && cam.wait <= 0) { const az = Math.atan2(off.x, off.z), h0 = off.length(), pol = Math.acos(Math.max(-1, Math.min(1, off.y / h0))), k2 = 1 - Math.exp(-dt * 3.2);

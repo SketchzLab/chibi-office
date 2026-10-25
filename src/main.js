@@ -9,6 +9,8 @@ import { PERSONAS } from './personas.js';
 import { makeBrain, actEmoji, applyPose, seatPlaces, setDayClock, breath } from './behavior.js';
 import { buildShadows, chibiShadow } from './shadows.js';
 import { makeExec } from './exec.js';
+import { makeCafe } from './cafe.js';
+import { mergeGeometries as mergeG } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { makeIsland } from './island.js';
 import { makeNature } from './nature.js';
 import { makeOffice, glows } from './props.js';
@@ -28,7 +30,7 @@ import { skyEvents, AURORA } from './skyevents.js';
 import { SWING_W, SLEEP_Y } from './behavior.js';
 import { makePlayer } from './player.js';
 import { pickTier, makeAtmosphere, lightPools, steam, radial } from './fx.js';
-import { CEO_OFF } from './layout.js';
+import { CEO_OFF, CAFE } from './layout.js';
 import { DESKS, BOSS_DESK, BOT_S, CALVIN_S, LOUNGE, GLASS, PANTRY, ROOF, BALCONY, PARK, heightAt, CAL, CAL_SWING, CAL_FIRE, CAL_HOUSE, CAL_POOL, CAL_DECK, onCal } from './layout.js';
 import { makeDayClock, makeDayCycle, fireflies, glowPoints, dayUniforms } from './daycycle.js';
 import { speechAt, GREET, HI_BACK, ZONE } from './dialogue.js';
@@ -57,7 +59,7 @@ controls.minDistance = tgtP ? 3 : 12; controls.maxDistance = 110; controls.minPo
 const sky = makeSky(scene);
 const island = makeIsland(scene);
 const nature = makeNature(scene);
-makeOffice(scene); window.__exec = makeExec(scene); makeWorld(scene, nature.waterMat); const home = makeHome(scene); window.__home = home; const calIsl = makeCalvinIsland(scene, nature.waterMat); window.__calIsl = calIsl; window.__shops = makeShops(scene); const npcs = makeNPCs(scene, window.__shops.userData.keepers); window.__npcs = npcs; window.__closets = makeClosets(scene);
+makeOffice(scene); window.__exec = makeExec(scene); window.__cafe = makeCafe(scene); makeWorld(scene, nature.waterMat); const home = makeHome(scene); window.__home = home; const calIsl = makeCalvinIsland(scene, nature.waterMat); window.__calIsl = calIsl; window.__shops = makeShops(scene); const npcs = makeNPCs(scene, window.__shops.userData.keepers); window.__npcs = npcs; window.__closets = makeClosets(scene);
 // ---- Bots: look + persona + clock-driven brain ----
 const chibis = [], brains = [];
 for (const [name, per] of Object.entries(PERSONAS)) {
@@ -75,7 +77,7 @@ const pools = lightPools(scene, [[-3.9, 7.3, 2.6, 0xffc070, 0.55], [9.6, 3.2, 2.
 // ---- day / night (Calvin's local UTC+8 clock; ?t=HH:MM preview) ----
 const dayClock = makeDayClock(); setDayClock(wt => ((dayClock() + wt - wallTime()) % 86400 + 86400) % 86400); setTalkClock(() => dayClock() / 3600); const day = makeDayCycle({ skyMat: sky.mat, atmoEl: atmo, raysEl: atmos.rays });
 // ---- v23 weather (deterministic per day, ?weather= preview): rain/overcast/fog/storm visuals + umbrellas, feed line, campfires out
-const weather = makeWeather(scene, { tier, roofGeo: window.__exec.userData.roofGeo, rays: atmos.rays }); let wxNow = { cloud: 0, rain: 0, storm: 0, fog: 0, kind: 'clear', wet: false };
+const weather = makeWeather(scene, { tier, roofGeo: mergeG([window.__exec.userData.roofGeo, window.__cafe.userData.roofGeo]), rays: atmos.rays }); let wxNow = { cloud: 0, rain: 0, storm: 0, fog: 0, kind: 'clear', wet: false };
 window.__lightning = hold => { if (hold != null) weather.state.hold = hold; else weather.state.force = clock.getElapsedTime(); }; // screenshot hook: __lightning(0.8) holds a flash
 window.__weather = () => ({ ...wxNow, flash: weather.state.flash, rainVisible: weather.rain.visible, drops: weather.rain.geometry.drawRange.count / 2, count: weather.count });
 const UMB_C = [0xe07a6a, 0x6aa7d8, 0xe8c25a, 0x8fbf9a, 0xb39ad8]; const umbrellas = new Map();
@@ -87,7 +89,7 @@ function weatherUpdate(t, wt) { const ws = DAY(); wxNow = weatherAt(ws, ootdDay(
   const out = wxNow.rain < 0.3; home.flames.visible = out; calIsl.flames.visible = out; if (calIsl.fireLight) calIsl.fireLight.visible = out;
   // umbrellas over anyone (bots + Calvin) walking or waiting outdoors in the rain
   [calvin, ...chibis].forEach((c, i) => { let u = umbrellas.get(c); const want = wxNow.rain > 0.25 && !c.userData.brain?.state.asleep && !indoors(c.position.x, c.position.z) && !c.userData.pet;
-    if (!u && !want) return; if (!u) { u = umbrella(i); umbrellas.set(c, u); } u.visible = want; if (want) { const s = c === calvin ? CALVIN_S : BOT_S; u.position.set(c.position.x + 0.15, c.position.y + 2.55 * s / 1.5 + 0.85, c.position.z); u.rotation.z = -0.12; u.children[1].visible = !(c === calvin && player.fp); /* v24 FP: canopy overhead, no stick through the eye */ } });
+    if (!u && !want) return; if (!u) { u = umbrella(i); umbrellas.set(c, u); } u.visible = want && !(c === calvin && player.fp); /* v25 FP: whole umbrella hidden (canopy filled the top of the view) */ if (want) { const s = c === calvin ? CALVIN_S : BOT_S; u.position.set(c.position.x + 0.15, c.position.y + 2.55 * s / 1.5 + 0.85, c.position.z); u.rotation.z = -0.12; u.children[1].visible = !(c === calvin && player.fp); /* v24 FP: canopy overhead, no stick through the eye */ } });
   // rain starts: a heads-up in the office feed + someone says it out loud
   if (wxNow.wet && !wxWet) { const k = 'rain-' + ootdDay() + '-' + Math.round(wxNow.start || 0); if (wxNow.since < 300 || t < 3) { post(k, 'Mika', wxNow.storm > 0.5 ? 'Thunderstorm rolling in ⛈️ Everyone inside!' : 'Looks like rain, everyone inside! ☔', 25);
       if (t > wxSay) { wxSay = t + 60; const c = chibis.find(c => !c.userData.brain.state.asleep); if (c) { say(c.userData.name, wxNow.storm > 0.5 ? 'Whoa, thunder! ⛈️ Inside, everyone!' : 'Looks like rain, everyone inside! ☔', wt, 5); emoteBot(c.userData.name, 'look', 2); } } } }
@@ -237,6 +239,10 @@ const OBJS = [
   { label: () => player.carry ? '🍵 Sip coffee' : '☕ Make coffee', x: PANTRY.x - 0.3, z: PANTRY.z + 1.4, r: 1.6, run: () => { const t = clock.getElapsedTime(); if (player.carry) { emoteCalvin('sip', 2.4); say('Calvin', pick(['Ahh, perfect.', 'Mmm. Founder fuel.', 'Best brew on the island.']), wallTime(), 2.5); return; }
     emoteCalvin('water', 2.0); say('Calvin', 'Brewing… ☕', wallTime(), 2); setTimeout(() => { player.carry = true; say('Calvin', 'Fresh brew! ☕', wallTime(), 2.5); }, 2000); } },
   { label: '🔭 Look through telescope', x: 2.6, z: -10.35, fx: 2.6, fz: -14, y: ROOF.y, r: 1.3, run: () => { emoteCalvin('look', 5); player.look = { pos: new THREE.Vector3(2.6, ROOF.y + 2.2, -9.6), tgt: new THREE.Vector3(-8, 6, -70) }; say('Calvin', pick(['Is that… another island? 🏝️', 'I can see the Imagine.ooo blimp!', 'Clouds shaped like a roadmap.', 'A whale-shaped cloud! 🐋']), wallTime() + 1, 3.5); setTimeout(() => { player.look = null; }, 5000); } },
+  // v26 café: every table seat (chairs + the booth bench) and the barista counter
+  ...CAFE.seats.map(sd => seat('cafe', [sd.x, sd.z], sd.rot, (sd.kind === 'bench' ? 0.12 : 0.07) + HIPC, 'stand', sd.out ? '☂️ Sit on the café patio' : sd.kind === 'bench' ? '🛋️ Sit in the café booth' : '🪑 Sit at a café table', { camDist: 9, camYaw: 0.6 })),
+  { label: () => player.carry ? '🍵 Sip latte' : '☕ Order a latte', x: CAFE.barista[0] + 0.6, z: CAFE.counter[3] + 0.5, fx: CAFE.barista[0] + 0.6, fz: CAFE.barista[1], r: 1.5, run: () => { if (player.carry) { emoteCalvin('sip', 2.4); return; }
+    emoteCalvin('look', 1.5); say('Calvin', pick(['One oat latte, please! ☕', 'Flat white and a croissant 🥐', 'Surprise me ☕']), wallTime(), 2); setTimeout(() => { player.carry = true; say('Calvin', 'Ooh, latte art! ☕', wallTime(), 2.5); }, 1600); } },
   seat('roof', [-2.5, -10.75], 0, -0.05 + HIPC, 'stand', '🌿 Sit under the pergola', { camDist: 10, camYaw: 0.5, y0: ROOF.y }),
   seat('roof', [1.2, -10.0], -Math.PI / 2, -0.05 + HIPC, 'stand', '☂️ Sit at the parasol table', { camDist: 10, camYaw: 0.6, y0: ROOF.y }),
   { label: '🌅 Lean on railing · Enjoy the view', x: BALCONY.x1 - 1.4, z: BALCONY.z0 + 0.75, r: 1.3, run: () => { player.sitAt({ kind: 'view', standing: true, pos: [BALCONY.x1 - 1.4, BALCONY.z0 + RAIL_LEAN], rot: Math.PI /* v18: -z, the north rail — open sea + the far island; v17 +x faced straight into the shop street */, y: 0, pose: 'lean', look: { pos: new THREE.Vector3(BALCONY.x1 - 2.0, 2.6, BALCONY.z1 + 2.2), tgt: new THREE.Vector3(31, -4, -70) } }); closeTalk(); say('Calvin', pick(['What a view… ☁️', 'This is why we built on a floating island.', 'Breathe in. Breathe out. 🌤️']), wallTime() + 0.8, 4); } },
@@ -249,7 +255,7 @@ const OBJS = [
 ];
 function onSit(kind) { const wt = wallTime(); onIsland(kind);
   if (kind === 'desk') { bossGlow.visible = true; say('Calvin', pick(['Time to build. 💻', 'Inbox zero, here I come.', 'Okay, focus mode.']), wt, 2.5); }
-  if (kind === 'sofa' || kind === 'meeting') { const zone = kind === 'sofa' ? 'lounge' : 'meeting'; const here = chibis.filter(c => zoneOf(c) === zone && Math.hypot(c.position.x - calvin.position.x, c.position.z - calvin.position.z) < 6);
+  if (kind === 'sofa' || kind === 'meeting' || kind === 'cafe') { const zone = kind === 'sofa' ? 'lounge' : kind === 'cafe' ? 'cafe' : 'meeting'; const here = chibis.filter(c => zoneOf(c) === zone && Math.hypot(c.position.x - calvin.position.x, c.position.z - calvin.position.z) < 6);
     if (player.seat && chibis.find(c => c.userData.name === 'Pixel')?.userData.brain.state.act === 'game' && kind === 'sofa') { player.seat.pose = 'game'; calvin.userData.props.ctrl.visible = true; say('Pixel', 'Player 2 has entered the game! 🎮', wt + 0.8, 4); emoteBot('Pixel', 'jump'); }
     if (here.length >= 2) setTimeout(() => openGroup(here.map(c => c.userData.name), wallTime()), 900); else if (here.length === 1) setTimeout(() => openTalk(here[0]), 900); } }
 actb.addEventListener('click', e => { e.stopPropagation(); if (mode && imenu.classList.contains('on')) { closeTalk(); return; } if (!target) return; const wt = wallTime();
@@ -461,6 +467,6 @@ function loop() { const t = clock.getElapsedTime(); toonUniforms.uTime.value = t
     const far = player.free && d > 60; if (far !== farLod) { farLod = far; scene.traverse(o => { if (o.isMesh && o.userData.hull && o.material?.type === 'MeshBasicMaterial') o.visible = !far; }); } }
   { const want = OCC_MODE === '0' ? 0 : (OCC_MODE === '1' || (player.follow && !player.look && !player.free && !player.fp)) ? 1 : 0; // v24: off in first person // v22: off in free camera // v17 see-through: buildings/props between camera and Calvin dither to ~25%
     toonUniforms.uOccK.value += (want - toonUniforms.uOccK.value) * Math.min(1, dt * 3); toonUniforms.uOccP.value.set(calvin.position.x, calvin.position.y + 1.3, calvin.position.z); }
-  if (!player.fp) controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop); }
+  if (!player.fp) { controls.update(); player.postCam?.(); } window.__cafe.userData.cull(camera); renderer.render(scene, camera); requestAnimationFrame(loop); }
 loop();
 addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); if (!camP) { const off = camera.position.clone().sub(controls.target).setLength(fitDistance()); camera.position.copy(controls.target).add(off); } renderer.setSize(innerWidth, innerHeight); });

@@ -1,7 +1,7 @@
 // Dialogue bank + deterministic scheduler.
 // Every device computes the same conversation for the same UTC slot: slot index -> seeded RNG,
 // and who is where comes from each brain's pure actAt(t). No network needed.
-export const ZONE = { home: 'campfire', sleep: 'bed', pantry: 'pantry', game: 'lounge', read: 'lounge', sketch: 'lounge', meeting: 'meeting', work: 'desk', fidget: 'desk', bob: 'desk', stretch: 'desk', pace: 'desk', shop: 'street' };
+export const ZONE = { home: 'campfire', sleep: 'bed', pantry: 'pantry', game: 'lounge', read: 'lounge', sketch: 'lounge', meeting: 'meeting', work: 'desk', fidget: 'desk', bob: 'desk', stretch: 'desk', pace: 'desk', shop: 'street', lunch: 'cafe', cafe: 'cafe', cafeIn: 'cafe', lunchP: 'pantry' };
 
 // Solo desk quips (said to nobody in particular).
 export const QUIPS = {
@@ -13,6 +13,13 @@ export const QUIPS = {
 
 // Exchanges: who = [names] (specific) or null (any two). where = zone or 'any'. lines = [speakerIdx, text].
 export const EXCHANGES = [
+  // v26 café
+  { who: null, where: 'cafe', lines: [[0, 'Lunch at the café was the right call.'], [1, 'The soup of the day agrees.']] },
+  { who: null, where: 'cafe', lines: [[0, 'Croissant or cinnamon roll?'], [1, 'Why not both?'], [0, 'Exactly my thinking.']] },
+  { who: null, where: 'cafe', lines: [[0, 'This latte art is a tiny masterpiece.'], [1, 'Too pretty to drink. …Drinking it anyway.']] },
+  { who: ['Jun', 'Mika'], where: 'cafe', lines: [[0, 'The pendant lamps here are SO cozy.'], [1, 'Thumbnail lighting, honestly.']] },
+  { who: ['Pixel', 'Sage'], where: 'cafe', lines: [[0, 'Pantry coffee is faster…'], [1, 'Faster is not always better, Pixel.'], [0, '…ok the flat white is better.']] },
+  { who: null, where: 'desk', lines: [[0, 'Lunch at the café?'], [1, 'Only if they still have croissants.']] },
   { who: ['Pixel', 'Mika'], where: 'pantry', lines: [[0, 'Third coffee. Don\'t judge.'], [1, 'Smoothie gang says hi.'], [0, 'Is that kale?! Brave.'], [1, 'It\'s purple. It\'s fine.']] },
   { who: ['Pixel', 'Jun'], where: 'pantry', lines: [[1, 'Your HUD font is still Comic Sans.'], [0, 'It\'s… retro?'], [1, 'It\'s a crime.']] },
   { who: ['Sage', 'Jun'], where: 'pantry', lines: [[0, 'Green tea or jasmine?'], [1, 'Jasmine. It pairs with pastel.'], [0, 'A design-led choice. Approved.']] },
@@ -70,7 +77,7 @@ export function conversationFor(k, bots) {
   if (zones.campfire?.length >= 2 && r() < 0.75) { const ppl = zones.campfire, a = ppl[Math.floor(r() * ppl.length)], rest = ppl.filter(n => n !== a), bb = rest[Math.floor(r() * rest.length)]; const e = CAMPFIRE[Math.floor(r() * CAMPFIRE.length)];
     conv = { start: t0, lines: e.map(([i, tx]) => [i ? bb : a, tx]) }; cache.set(k, conv); return conv; }
   if (zones.bed?.length && !zones.desk?.length && !zones.campfire?.length) { if (r() < 0.6) { const n = zones.bed[Math.floor(r() * zones.bed.length)]; conv = { start: t0 + r() * 6, lines: [[n, SLEEPY[Math.floor(r() * SLEEPY.length)]]] }; } cache.set(k, conv); return conv; }
-  const social = ['pantry', 'lounge', 'meeting'].filter(z => zones[z]?.length >= 2);
+  const social = ['pantry', 'lounge', 'meeting', 'cafe'].filter(z => zones[z]?.length >= 2);
   const zone = social.length ? social[Math.floor(r() * social.length)] : (r() < 0.55 && zones.desk?.length >= 2 ? 'desk' : null);
   if (zone) { const ppl = zones[zone]; const opts = EXCHANGES.filter(e => (e.where === zone || e.where === 'any') && (!e.who || e.who.every(n => ppl.includes(n))));
     const e = opts[Math.floor(r() * opts.length)]; let who = e.who;
