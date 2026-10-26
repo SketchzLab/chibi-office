@@ -45,11 +45,11 @@ const TALL_BOXES = [[FLOOR.x0, BACK_Z - 0.12, FLOOR.x1, BACK_Z + 0.1], [LEFT_X -
   [GLASS.x0, GLASS.z1 - 0.06, GLASS.door0, GLASS.z1 + 0.06], [GLASS.x1 - 0.06, GLASS.z0, GLASS.x1 + 0.06, GLASS.z1 + 0.06], // glass room panes (door gap)
   [ROOF.x0, ROOF.z0, ROOF.x1, ROOF.z1], ...HOUSE_TALL, ...SHOP_BLDG.map(b => shopBox(b, 0)), ...SHOP_SIDE, ...CAL_TALL, ...EXEC_TALL, ...CAFE_TALL]; // annex block walls (roof only reachable from above), home longhouse
 // trees: trunk is a body circle; foliage is a head circle sized from the real canopy spheres (3D head-vs-sphere clearance)
-const TALL_CIRCLES = [...TREES.map(([x, z, s], i) => [x, z, canopyRadius(s) - RH + (i === 0 ? 0.07 : 0)]), // tree 0 sits by the island-3 bridge landing: a hair more margin
+const TALL_CIRCLES = [...TREES.map(([x, z, s], i) => [x, z, canopyRadius(s) - RH + (i < 3 ? 0.07 : 0)]), // v27: the café-garden trees 0-2 (big crowns, open lawn on all sides) get a hair more margin
   ...PLANTS.map(([x, z, s]) => [x, z, headReach(PLANT_SPHERES, s) - RH]), ...HOME_CIRCLES.filter(c => c[2] === 0.1).map(([x, z]) => [x, z, 0.16]), ...STREET_PROPS.filter(p => p[3] === 'tree').map(([x, z]) => [x, z, STREET_TREE.canopyR + HEAD_R + 0.05 - RH]), ...STREET_PROPS.filter(p => p[3] === 'lamp').map(([x, z]) => [x, z, 0.1])]; // + lamp posts (head vs pole) // + street-tree canopies (3D: canopy above the head line) // + lantern posts // pushOut adds RH back
 const GROUND_BOXES = [
   [STAIRS.x0, STAIRS.z0 - 0.1, STAIRS.x1 - 0.5, STAIRS.z0 + 0.02], [STAIRS.x0, STAIRS.z1 - 0.02, STAIRS.x1 - 0.5, STAIRS.z1 + 0.1]]; // stair sides
-const GROUND_CIRCLES = [...TREES.map(([x, z, s]) => [x, z, 0.24 * s]), [POOL.x, POOL.z, 2.5], [-9.0, 10.0, 0.95], [-7.8, 10.0, 0.95], [-1.2, 13.0, 0.8], [P.cx, P.cz, 1.15],
+const GROUND_CIRCLES = [...TREES.map(([x, z, s]) => [x, z, 0.24 * s]), [POOL.x, POOL.z, 2.5], [-7.55, 10.45, 0.8], [-6.45, 10.45, 0.8], [-1.2, 13.0, 0.8], [P.cx, P.cz, 1.15],
   ...[0, 2.1, 4.2].map(a => [P.cx + Math.cos(a + 0.5) * 1.75, P.cz + Math.sin(a + 0.5) * 1.75, 0.5]), ...P.benches.map(([x, z]) => [x, z, 0.75]),
   [BALCONY.x0 + 0.9, BALCONY.z1 - 0.35, 0.35], [BALCONY.x0 + 0.9, BALCONY.z0 + 0.35, 0.35]];
 const ROOF_TALL = [[-5.3, -9.7, canopyRadius(0.7) - RH]]; // little rooftop tree: head vs its canopy

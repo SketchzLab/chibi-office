@@ -57,20 +57,32 @@ CAFE.seats = [
   { id: 'booth', x: CAFE.booth.bench[0], z: CAFE.booth.bench[1], rot: Math.PI / 2, kind: 'bench' }, { id: 'boothc', x: CAFE.booth.chair[0], z: CAFE.booth.chair[1], rot: -Math.PI / 2, kind: 'chair' },
   { id: 't2w', x: CAFE.t2[0] - 0.8, z: CAFE.t2[1], rot: Math.PI / 2, kind: 'chair' }, { id: 't2e', x: CAFE.t2[0] + 0.8, z: CAFE.t2[1], rot: -Math.PI / 2, kind: 'chair' },
   ...CAFE.patio.tables.flatMap(([x, z], i) => [{ id: 'p' + i + 'w', x: x - 0.8, z, rot: Math.PI / 2, kind: 'chair', out: true }, { id: 'p' + i + 'e', x: x + 0.8, z, rot: -Math.PI / 2, kind: 'chair', out: true }])];
+// v27 café garden: stepping-stone path office south door -> west lawn -> patio gate, path lanterns, patio hedge + gate pots,
+// flower beds, koi pond with a bench (and a lounging cat), chalkboard A-frame. Colliders below feed player.js (CAFE_BOXES/CIRCLES).
+export const CAFE_GARDEN = {
+  path: [[-6.4, 8.6], [-9.4, 9.0], [-11.4, 9.4], [-12.9, 8.0], [-13.7, 4.0], [-13.8, -2.0], [-12.9, -8.8], [-12.2, -11.2], [-13.4, -15.3]],
+  lanterns: [[-10.5, 10.25], [-14.7, 6.4], [-14.9, -4.0], [-14.6, -9.0], [-14.5, -12.6], [-8.2, -17.0]],
+  hedges: [[-18.2, -15.5, -14.95, -15.1], [-11.85, -15.5, -8.8, -15.1], [-18.55, -18.9, -18.2, -15.9], [-8.6, -18.9, -8.25, -15.9]],
+  pots: [[-14.6, -15.3], [-12.2, -15.3]],
+  beds: [[-16.8, -13.2, 1.2, 0.7], [-10.3, -13.3, 1.3, 0.7]],
+  pond: { x: -6.3, z: -18.4, r: 0.95 }, bench: { x: -6.3, z: -16.35 }, sign: [-14.95, -14.5] };
 export const onCafeLobe = (x, z, m = 0) => Math.hypot(x - CAFE_LOBE.cx, z - CAFE_LOBE.cz) < CAFE_LOBE.r + m;
 export const CAFE_TALL = roomWallsT(CAFE).concat([CAFE.shelf]);
 function roomWallsT(R) { return roomWalls(R, R.t); }
 const _cs = (s, w, d) => (Math.abs(Math.sin(s.rot)) > 0.5 ? [s.x - d, s.z - w, s.x + d, s.z + w] : [s.x - w, s.z - d, s.x + w, s.z + d]);
 export const CAFE_BOXES = [CAFE.counter, [CAFE.booth.bench[0] - 0.35, CAFE.booth.bench[1] - 0.75, CAFE.booth.bench[0] + 0.3, CAFE.booth.bench[1] + 0.75],
   ...CAFE.seats.filter(s => s.kind === 'chair').map(s => _cs(s, 0.24, 0.22)),
-  [CAFE.t4[0] - 0.55, CAFE.t4[1] - 0.55, CAFE.t4[0] + 0.55, CAFE.t4[1] + 0.55], [CAFE.booth.table[0] - 0.35, CAFE.booth.table[1] - 0.45, CAFE.booth.table[0] + 0.35, CAFE.booth.table[1] + 0.45]];
-export const CAFE_CIRCLES = [[...CAFE.t2, 0.4], ...CAFE.patio.tables.map(([x, z]) => [x, z, 0.4]), ...CAFE.plants.map(([x, z]) => [x, z, 0.32]), ...CAFE.patio.posts.map(([x, z]) => [x, z, 0.1])];
+  [CAFE.t4[0] - 0.55, CAFE.t4[1] - 0.55, CAFE.t4[0] + 0.55, CAFE.t4[1] + 0.55], [CAFE.booth.table[0] - 0.35, CAFE.booth.table[1] - 0.45, CAFE.booth.table[0] + 0.35, CAFE.booth.table[1] + 0.45],
+  ...CAFE_GARDEN.hedges, [CAFE_GARDEN.bench.x - 0.9, CAFE_GARDEN.bench.z - 0.3, CAFE_GARDEN.bench.x + 0.9, CAFE_GARDEN.bench.z + 0.3]];
+export const CAFE_CIRCLES = [[...CAFE.t2, 0.4], ...CAFE.patio.tables.map(([x, z]) => [x, z, 0.4]), ...CAFE.plants.map(([x, z]) => [x, z, 0.32]), ...CAFE.patio.posts.map(([x, z]) => [x, z, 0.1]),
+  ...CAFE_GARDEN.lanterns.map(([x, z]) => [x, z, 0.13]), ...CAFE_GARDEN.pots.map(([x, z]) => [x, z, 0.3]), ...CAFE_GARDEN.beds.flatMap(([x, z, w, d]) => [-0.5, 0.5].map(k => [x + k * w, z, d + 0.05])), [CAFE_GARDEN.pond.x, CAFE_GARDEN.pond.z, CAFE_GARDEN.pond.r + 0.3], [...CAFE_GARDEN.sign, 0.3]];
 export const onLobe = (x, z, m = 0) => Math.hypot(x - LOBE.cx, z - LOBE.cz) < LOBE.r + m;
 // rooms' walls as [x0,z0,x1,z1] boxes (door gap in the south wall)
 export function roomWalls(R, t = ROOM_T) { return [[R.x0, R.z0 - t, R.x1, R.z0 + t], [R.x0 - t, R.z0, R.x0 + t, R.z1], [R.x1 - t, R.z0, R.x1 + t, R.z1],
   [R.x0, R.z1 - t, R.door[0], R.z1 + t], [R.door[1], R.z1 - t, R.x1, R.z1 + t]]; }
 // v23 trees 4 + 8 moved off the new path to the executive wing (were (10.3,-12.7) and (14.2,-9.1))
-export const TREES = [[-15.6, -4.2, 1.5], [-15.1, 4.6, 1.3], [-6.8, -14.6, 1.4], [-2.4, -15.5, 1.1], [1.6, -20.6, 1.4], [16.6, -6.0, 1.3], [-13.9, 10.7, 1.2], [-11.0, 13.2, 0.9], [21.6, -14.6, 1.0],
+// v27: the four trees that squeezed the west lawn strip and the north lawn -> café band now frame the café garden (lobe edge)
+export const TREES = [[-20.9, -14.6, 1.5], [-21.3, -21.8, 1.3], [-4.9, -22.8, 1.4], [-6.0, -26.4, 1.1], [1.6, -20.6, 1.4], [16.6, -6.0, 1.3], [-16.7, 5.9, 1.2], [-11.0, 13.2, 0.9], [21.6, -14.6, 1.0],
   [12.9, 3.6, 0.9], [14.0, 5.8, 1.0], [12.3, 7.4, 0.8], // park grove
   [9.6, 29.4, 0.85], [-4.6, 28.6, 0.8]]; // home island (last two)
 // ---- home island (+z), joined by a rope-and-plank bridge ----

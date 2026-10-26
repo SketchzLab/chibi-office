@@ -3,11 +3,13 @@ import { dayUniforms } from './daycycle.js';
 import { toonMesh, toonMat } from './toon.js';
 import { bake } from './bake.js';
 import { cast } from './shadows.js';
-import { ISLAND_R as R, FLOOR, POOL as PL, BACK_Z, TREES, ROOF, STAIRS, BALCONY, PARK, inR, TREE_LIFT, TREE_SPHERES, treeRot, LOBE, CORR, EXEC, CAFE_LOBE } from './layout.js';
+import { ISLAND_R as R, FLOOR, POOL as PL, BACK_Z, TREES, ROOF, STAIRS, BALCONY, PARK, inR, TREE_LIFT, TREE_SPHERES, treeRot, LOBE, CORR, EXEC, CAFE_LOBE, CAFE_GARDEN } from './layout.js';
+// v27: distance to the café stepping-stone path (keeps grass tufts / flowers off the path ribbon)
+export const pathDist = (x, z) => { let d = 1e9; const P = CAFE_GARDEN.path; for (let i = 0; i < P.length - 1; i++) { const [ax, az] = P[i], [bx, bz] = P[i + 1], dx = bx - ax, dz = bz - az, t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz))); d = Math.min(d, Math.hypot(x - ax - t * dx, z - az - t * dz)); } return d; };
 const inLobe = (x, z) => Math.hypot(x - LOBE.cx, z - LOBE.cz) < LOBE.r - 0.3 || Math.hypot(x - CAFE_LOBE.cx, z - CAFE_LOBE.cz) < CAFE_LOBE.r - 0.3; // v23: main-rim bushes/vines that would sit on the executive lobe lawn
 let seed = 11; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
 const POOL = new THREE.Vector3(PL.x, 0, PL.z);
-function onGrassRing(x, z) { const r = Math.hypot(x, z); return r < R - 0.7 && !inR(CORR, x, z, 0.2) && !inR(EXEC, x, z, 0.2) && (x < FLOOR.x0 - 0.3 || x > FLOOR.x1 + 0.3 || z < FLOOR.z0 - 0.3 || z > FLOOR.z1 + 0.3) && !inR(ROOF, x, z, 0.2) && !inR(STAIRS, x, z, 0.2) && !inR(BALCONY, x, z, 0.1) && Math.abs(Math.hypot(x - PARK.cx, z - PARK.cz) - PARK.r) > 0.5 && Math.hypot(x - PARK.cx, z - PARK.cz) > 1.3; }
+function onGrassRing(x, z) { const r = Math.hypot(x, z); return r < R - 0.7 && pathDist(x, z) > 0.75 && !inR(CORR, x, z, 0.2) && !inR(EXEC, x, z, 0.2) && (x < FLOOR.x0 - 0.3 || x > FLOOR.x1 + 0.3 || z < FLOOR.z0 - 0.3 || z > FLOOR.z1 + 0.3) && !inR(ROOF, x, z, 0.2) && !inR(STAIRS, x, z, 0.2) && !inR(BALCONY, x, z, 0.1) && Math.abs(Math.hypot(x - PARK.cx, z - PARK.cz) - PARK.r) > 0.5 && Math.hypot(x - PARK.cx, z - PARK.cz) > 1.3; }
 // canopy spheres [x, y, z, r] (scaled by s); lifted 0.35 so the lowest foliage sits higher. Shared with collision (canopyRadius).
 export function tree(s = 1, rot = null) {
   const g = new THREE.Group();
@@ -66,7 +68,7 @@ export function makeNature(scene) {
     const addStone = (x, z) => { if (si < 40) { e.set(0, rnd() * 3, 0); q.setFromEuler(e); M.compose(new THREE.Vector3(x, -0.03, z), q, new THREE.Vector3(1, 1, 0.85)); stones.setMatrixAt(si++, M); } };
   for (let t = 0; t <= 1; t += 0.12) { addStone(0.5 - 3.0 * t, FLOOR.z1 + 0.7 + 2.9 * t); } for (let t = 0.1; t <= 1; t += 0.16) { addStone(0.6 + 2.6 * t, FLOOR.z1 + 1.9 + 2.4 * t); }
   stones.count = si; g.add(stones);
-  [[-8.4, 10.0, 1.6, 1.0]].forEach(([x, z, w, d]) => {
+  [[-7.0, 10.45, 1.4, 0.95]] /* v27: shifted east off the office-corner -> café path */.forEach(([x, z, w, d]) => {
     const bed = toonMesh(new THREE.CylinderGeometry(1, 1, 0.25, 16), 0x9a6a44); bed.scale.set(w, 1, d); bed.position.set(x, 0.0, z); g.add(bed);
     const soil = toonMesh(new THREE.CylinderGeometry(0.92, 0.92, 0.05, 16), 0x6b4a33, { outline: false }); soil.scale.set(w, 1, d); soil.position.set(x, 0.13, z); g.add(soil);
     const cols = [0xff9bb8, 0xffd36a, 0xffffff, 0xb7a2ff, 0xff7a59];
@@ -82,7 +84,7 @@ export function makeNature(scene) {
   // ---- grass detail (instanced, no outlines: cheap) ----
   const tuftGeo = new THREE.ConeGeometry(0.08, 0.38, 3, 1, true); tuftGeo.translate(0, 0.17, 0);
   const NT = 820; const tufts = new THREE.InstancedMesh(tuftGeo, toonMat(0x63b852), NT); tufts.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(NT * 3).map((_, i) => 0.85 + ((i * 7919) % 100) / 100 * 0.3), 3);
-  let n = 0; while (n < NT) { const x = (rnd() - 0.5) * 2 * R, z = (rnd() - 0.5) * 2 * R; if (!onGrassRing(x, z) || Math.hypot((x - POOL.x) / (PL.rx + 0.6), (z - POOL.z) / (PL.rz + 0.6)) < 1 || (Math.abs(x - POOL.x) < 1 && z > POOL.z) || [[4.6, 11.0, 2.4, 1.5], [8.2, 10.0, 2.1, 1.4], [-8.6, 9.6, 1.8, 1.2]].some(([bx, bz, bw, bd]) => Math.hypot((x - bx) / bw, (z - bz) / bd) < 1)) continue;
+  let n = 0; while (n < NT) { const x = (rnd() - 0.5) * 2 * R, z = (rnd() - 0.5) * 2 * R; if (!onGrassRing(x, z) || Math.hypot((x - POOL.x) / (PL.rx + 0.6), (z - POOL.z) / (PL.rz + 0.6)) < 1 || (Math.abs(x - POOL.x) < 1 && z > POOL.z) || [[4.6, 11.0, 2.4, 1.5], [8.2, 10.0, 2.1, 1.4], [-7.0, 10.3, 1.6, 1.15]].some(([bx, bz, bw, bd]) => Math.hypot((x - bx) / bw, (z - bz) / bd) < 1)) continue;
     e.set((rnd() - 0.5) * 0.5, 0, (rnd() - 0.5) * 0.5); q.setFromEuler(e); M.compose(new THREE.Vector3(x, -0.05, z), q, new THREE.Vector3(1.3, 0.45 + rnd() * 0.5, 1.3)); tufts.setMatrixAt(n++, M); }
   g.add(tufts);
   const flowerGeo = new THREE.OctahedronGeometry(0.1, 0); const flowerCols = [0xffffff, 0xffd36a, 0xff9bb8, 0xb7a2ff];

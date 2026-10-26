@@ -92,7 +92,8 @@ const AUR_SPOTS = { Pixel: [BALCONY.x1 - 2.3, BALCONY.z0 + 0.5], Jun: [BALCONY.x
 function auroraPlace(b) { const [x, z] = AUR_SPOTS[b.name] || AUR_SPOTS.Pixel; return { pos: [x, z], rot: Math.PI, seat: null, approach: [[9.2, 0.25], [12.2, 0.25], [BALCONY.x0 + 0.4, 0.2], [x, 0.2], [x, z]] }; }
 // ---------- v26 café (north-west lobe): lunch at the big 4-top, coffee breaks on the patio (indoor booth/2-top when wet) ----------
 // route: out the office's south front (as to Calvin's island), up the west lawn clear of the wall/trees, through the patio to the door
-export const TO_CAFE = [[-4.65, 0.25], [-4.65, 8.0], [-9.8, 8.0], [-10.5, 9.1], [-11.9, 9.0], [-12.1, 8.0], [-12.3, 0.3], [-12.6, -8.5], [-13.2, -13.5], [-13.4, -16.2]];
+// v27: follows the garden stepping-stone path (layout GARDEN.path) through the widened west lawn, in at the patio gate
+export const TO_CAFE = [[-4.65, 0.25], [-4.65, 8.0], [-6.4, 8.6], [-9.4, 9.0], [-11.4, 9.4], [-12.9, 8.0], [-13.7, 4.0], [-13.8, -2.0], [-12.9, -8.8], [-12.2, -11.2], [-13.4, -16.2]];
 const IN_CAFE = [...TO_CAFE, [-13.4, -19.0], [-13.4, -20.4]];
 const cs = id => CAFE.seats.find(s => s.id === id);
 const CAFE_VIA = { t4w: [[-13.0, -22.6]], t4s: [[-12.4, -21.2], [-11.0, -20.9]], t4n: [[-13.0, -22.6], [-12.0, -23.8], [-12.0, -24.3], [-11.0, -24.3]], t4e: [[-12.4, -20.8], [-9.5, -21.4], [-9.5, -22.6]],

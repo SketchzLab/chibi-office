@@ -5,7 +5,7 @@ const SOFTC = new WeakMap();
 export function soften(geo) { if (!geo || geo.type !== 'BoxGeometry' || geo.userData.soft) return geo; if (SOFTC.has(geo)) return SOFTC.get(geo);
   geo.computeBoundingBox(); const bb = geo.boundingBox, sz = bb.getSize(new THREE.Vector3()), ce = bb.getCenter(new THREE.Vector3()), p = geo.attributes.position; let out = geo;
   let axisAligned = true; for (let i = 0; i < p.count && axisAligned; i++) for (const [ax, lo, hi] of [['getX', bb.min.x, bb.max.x], ['getY', bb.min.y, bb.max.y], ['getZ', bb.min.z, bb.max.z]]) { const v = p[ax](i); if (Math.abs(v - lo) > 1e-4 && Math.abs(v - hi) > 1e-4) { axisAligned = false; break; } }
-  const mn = Math.min(sz.x, sz.y, sz.z); if (axisAligned && mn >= 0.12 && sz.x * sz.y * sz.z >= 0.05) { out = new RoundedBoxGeometry(sz.x, sz.y, sz.z, 1, mn * 0.2); out.translate(ce.x, ce.y, ce.z); out.userData.soft = true; }
+  const mn = Math.min(sz.x, sz.y, sz.z); if (axisAligned && mn >= 0.2 && sz.x * sz.y * sz.z >= 0.05) { out = new RoundedBoxGeometry(sz.x, sz.y, sz.z, 1, mn * 0.2); out.translate(ce.x, ce.y, ce.z); out.userData.soft = true; }
   SOFTC.set(geo, out); return out; }
 // v17 camera-occlusion see-through: any world fragment that sits between the camera and the player (inside a soft cone around
 // the camera->player ray, in front of the player, above the ground) is ordered-dithered down to ~25% coverage. Shared by the

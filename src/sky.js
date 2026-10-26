@@ -50,7 +50,7 @@ export function makeSky(scene) {
       gl_FragColor=vec4(c,1.0);} `});
   const dome = new THREE.Mesh(new THREE.SphereGeometry(400, 20, 10), mat); dome.renderOrder = -1; scene.add(dome);
   // puffy 3D clouds: clusters of soft-toon spheres, no outline
-  const cloudMat = toonMat(0xffffff); const sph = new THREE.SphereGeometry(1, 10, 7);
+  const cloudMat = toonMat(0xffffff); const sph = new THREE.SphereGeometry(1, 8, 6); // v27 perf: 10x7 -> 8x6 (soft toon, far away: no visible loss)
   const clouds = new THREE.Group(); let seed = 7; const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
   for (let i = 0; i < 14; i++) {
     const c = new THREE.Group(); const a = i / 14 * Math.PI * 2 + rnd() * 0.3, r = 75 + rnd() * 60;

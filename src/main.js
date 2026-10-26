@@ -10,6 +10,7 @@ import { makeBrain, actEmoji, applyPose, seatPlaces, setDayClock, breath } from 
 import { buildShadows, chibiShadow } from './shadows.js';
 import { makeExec } from './exec.js';
 import { makeCafe } from './cafe.js';
+import { makeGarden } from './garden.js';
 import { mergeGeometries as mergeG } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { makeIsland } from './island.js';
 import { makeNature } from './nature.js';
@@ -59,7 +60,7 @@ controls.minDistance = tgtP ? 3 : 12; controls.maxDistance = 110; controls.minPo
 const sky = makeSky(scene);
 const island = makeIsland(scene);
 const nature = makeNature(scene);
-makeOffice(scene); window.__exec = makeExec(scene); window.__cafe = makeCafe(scene); makeWorld(scene, nature.waterMat); const home = makeHome(scene); window.__home = home; const calIsl = makeCalvinIsland(scene, nature.waterMat); window.__calIsl = calIsl; window.__shops = makeShops(scene); const npcs = makeNPCs(scene, window.__shops.userData.keepers); window.__npcs = npcs; window.__closets = makeClosets(scene);
+makeOffice(scene); window.__exec = makeExec(scene); window.__cafe = makeCafe(scene); makeWorld(scene, nature.waterMat); window.__garden = makeGarden(scene, nature.waterMat); const home = makeHome(scene); window.__home = home; const calIsl = makeCalvinIsland(scene, nature.waterMat); window.__calIsl = calIsl; window.__shops = makeShops(scene); const npcs = makeNPCs(scene, window.__shops.userData.keepers); window.__npcs = npcs; window.__closets = makeClosets(scene);
 // ---- Bots: look + persona + clock-driven brain ----
 const chibis = [], brains = [];
 for (const [name, per] of Object.entries(PERSONAS)) {
